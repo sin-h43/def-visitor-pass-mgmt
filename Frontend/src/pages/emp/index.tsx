@@ -1,6 +1,6 @@
 // pages/emp/index.tsx
 import React, { useState, useMemo, useEffect } from 'react';
-import { UserPlus, FileText, Eye, RefreshCw, MoreVertical, X, CheckCircle, UploadCloud, Users, ShieldAlert } from 'lucide-react';
+import { UserPlus, FileText, Eye, RefreshCw, MoreVertical, X, CheckCircle } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import SearchFilterMatrix from '../../components/common/SearchFilterMatrix';

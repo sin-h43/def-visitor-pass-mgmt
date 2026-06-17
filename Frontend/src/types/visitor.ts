@@ -10,6 +10,7 @@ export interface VisitorRecord {
   requestDate: string;
   status: 'Pending' | 'Approved' | 'Denied' | 'Cleared' | 'Active';
   passType?: string;
+  pipeline: 'immediate' | 'scheduled' | 'repeated';
 }
 
 // Defines how the reusable table should render columns

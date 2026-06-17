@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import EmployeeDashboard from './pages/emp/index';
 import AddVisitorPage from './pages/emp/add_visitor';
 import RepeatedVisitorPage from './pages/emp/repeated_visitor';
+import DispatchedLogsPage from './pages/emp/dispatchedLogs';
 
 // --- HR Pages (Placeholders for what we build next) ---
 // import HRDashboard from './pages/hr/index';
@@ -24,6 +25,9 @@ export default function App() {
         <Route path="/emp" element={<EmployeeDashboard />} />
         <Route path="/emp/add_visitor" element={<AddVisitorPage />} />
         <Route path="/emp/repeated_visitor" element={<RepeatedVisitorPage />} />
+        <Route path="/emp/dispatchedlogs" element={<DispatchedLogsPage />} />
+
+
         
         {/* Catch-all for Employee settings/misc */}
         <Route path="/emp/settings" element={<div className="p-8">Employee Settings (Coming Soon)</div>} />

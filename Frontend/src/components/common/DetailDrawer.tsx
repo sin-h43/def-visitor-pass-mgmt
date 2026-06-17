@@ -13,6 +13,7 @@ interface DetailDrawerProps {
     purpose: string;
     hostName: string;
     hostDept?: string;
+    pipeline :string;
     [key: string]: any; // Allows flexibility for extra backend data variables
   } | null;
   onAutofill?: (name: string) => void;

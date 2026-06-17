@@ -1,10 +1,54 @@
-import './App.css'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
-function App() {
+// --- Employee Pages ---
+import EmployeeDashboard from './pages/emp/index';
+import AddVisitorPage from './pages/emp/add_visitor';
+import RepeatedVisitorPage from './pages/emp/repeated_visitor';
 
+// --- HR Pages (Placeholders for what we build next) ---
+// import HRDashboard from './pages/hr/index';
+// import VisitorMgmtPage from './pages/hr/visitormgmt';
+// import AnalyticsPage from './pages/hr/analytics';
+// import AuditPage from './pages/hr/audit';
+
+export default function App() {
   return (
-    <App />
-  )
-}
+    <Router>
+      <Routes>
+        {/* Default Route - Redirects to Employee Portal for now */}
+        <Route path="/" element={<Navigate to="/emp" replace />} />
 
-export default App
+        {/* =========================================
+            EMPLOYEE PORTAL ROUTES
+        ========================================= */}
+        <Route path="/emp" element={<EmployeeDashboard />} />
+        <Route path="/emp/add_visitor" element={<AddVisitorPage />} />
+        <Route path="/emp/repeated_visitor" element={<RepeatedVisitorPage />} />
+        
+        {/* Catch-all for Employee settings/misc */}
+        <Route path="/emp/settings" element={<div className="p-8">Employee Settings (Coming Soon)</div>} />
+
+        {/* =========================================
+            HR PORTAL ROUTES
+        ========================================= */}
+        {/* Uncomment these as we build them! */}
+        
+        {/* <Route path="/hr" element={<HRDashboard />} /> */}
+        {/* <Route path="/hr/visitormgmt" element={<VisitorMgmtPage />} /> */}
+        {/* <Route path="/hr/analytics" element={<AnalyticsPage />} /> */}
+        {/* <Route path="/hr/audit" element={<AuditPage />} /> */}
+        
+        {/* Catch-all for 404 Pages */}
+        <Route path="*" element={
+          <div className="h-screen w-full flex items-center justify-center bg-slate-50 text-slate-500">
+            <div className="text-center">
+              <h1 className="text-4xl font-bold text-slate-800 mb-2">404</h1>
+              <p>Portal gateway not found.</p>
+              <a href="/emp" className="text-blue-600 hover:underline mt-4 inline-block">Return to Base Console</a>
+            </div>
+          </div>
+        } />
+      </Routes>
+    </Router>
+  );
+}

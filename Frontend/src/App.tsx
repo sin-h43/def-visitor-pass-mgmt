@@ -16,6 +16,8 @@ import VerificationQueuePage from './pages/hr/verification';
 
 export default function App() {
   return (
+    <>
+    
     <Router>
       <Routes>
         {/* Default Route - Redirects to Employee Portal for now */}
@@ -60,5 +62,6 @@ export default function App() {
         } />
       </Routes>
     </Router>
+    </>
   );
 }

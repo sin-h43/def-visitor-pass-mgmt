@@ -1,89 +1,336 @@
-// components/common/SearchFilterMatrix.tsx
-import { useState } from 'react';
-import { Search, Filter } from 'lucide-react';
+// pages/hr/index.tsx
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Bell, Eye, CheckCircle, X } from 'lucide-react';
+import DashboardLayout from '../../components/layout/DashboardLayout';
+import DataTable from '../../components/common/DataTable';
+import SearchFilterMatrix from '../../components/common/SearchFilterMatrix';
+import type { VisitorRecord, TableColumn } from '../../types/visitor';
 
-interface FilterOption {
-  label: string;
-  value: string;
-}
+const initialHRDashboardData: VisitorRecord[] = [
+  {
+    id: 'DEF-8821',
+    visitorName: 'Rajesh Kumar',
+    phone: '+91 98860 12345',
+    email: 'rajesh.k@gmail.com',
+    category: 'Govt',
+    purpose: 'Inter-Departmental Security Audit',
+    hostName: 'Nagarjun',
+    hostDept: 'Cyber Security Division',
+    requestDate: '18/06/2026 10:15 AM',
+    status: 'Approved',
+    pipeline: 'scheduled'
+  },
+  {
+    id: 'DEF-2294',
+    visitorName: 'Sarah Jenkins',
+    phone: '+1 555 019 2834',
+    email: 's.jenkins@globaltech.com',
+    category: 'Foreign',
+    purpose: 'Propulsion Systems Briefing',
+    hostName: 'Anand M S',
+    hostDept: 'Aerospace Engineering',
+    requestDate: '18/06/2026 11:30 AM',
+    status: 'Pending',
+    pipeline: 'immediate'
+  },
+  {
+    id: 'DEF-4091',
+    visitorName: 'Madan Gowda',
+    phone: '+91 94481 98765',
+    category: 'Service',
+    purpose: 'HVAC Plant Maintenance',
+    hostName: 'Sayona K',
+    hostDept: 'Estate & Facilities',
+    requestDate: '17/06/2026 04:00 PM',
+    status: 'Cleared',
+    pipeline: 'repeated'
+  }
+];
 
-interface FilterBucket {
-  key: string;
-  title: string;
-  options: FilterOption[];
-}
+const dynamicBroadcastPool = [
+  { id: 1, type: 'FOREIGN REGISTRY', text: 'Passport clearance requested for Sarah Jenkins.', color: 'bg-orange-50 border-orange-100 text-orange-800' },
+  { id: 2, type: 'GATE AUTO-SYNC', text: 'Gate 2 badge scanner synchronization completed.', color: 'bg-emerald-50 border-emerald-100 text-emerald-800' },
+  { id: 3, type: 'GOVT CLEARANCE', text: 'Pass DEF-8821 authorized by cyber security command desk.', color: 'bg-purple-50 border-purple-100 text-purple-800' },
+  { id: 4, type: 'VITAL ALERTS', text: 'Contractor Madan Gowda logged departure via South Outpost.', color: 'bg-slate-50 border-slate-200 text-slate-700' },
+  { id: 5, type: 'SYSTEM AUDIT', text: 'Sinchana K updated centralized pass pipeline rules.', color: 'bg-blue-50 border-blue-100 text-blue-800' }
+];
 
-interface SearchFilterMatrixProps {
-  searchTerm: string;
-  onSearchChange: (value: string) => void;
-  selectedFilters: Record<string, string[]>;
-  onFilterToggle: (bucketKey: string, value: string) => void;
-  filterBuckets: FilterBucket[];
-  placeholder?: string;
-}
+export default function HRDashboard() {
+  const [dataList, setDataList] = useState<VisitorRecord[]>(initialHRDashboardData);
+  const [activeTab, setActiveTab] = useState('All Requests');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [broadcastLogs, setBroadcastLogs] = useState([dynamicBroadcastPool[0], dynamicBroadcastPool[1]]);
 
-export default function SearchFilterMatrix({
-  searchTerm,
-  onSearchChange,
-  selectedFilters,
-  onFilterToggle,
-  filterBuckets,
-  placeholder = "Search records..."
-}: SearchFilterMatrixProps) {
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  // Multi-Feature Filter Categories Matrix
+  const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
+    category: ['Govt', 'Foreign', 'Service', 'General', 'HR'],
+    pipeline: ['immediate', 'scheduled', 'repeated'],
+    status: ['Pending', 'Approved', 'Denied', 'Cleared', 'Active']
+  });
+
+  const filterBuckets = [
+    {
+      key: 'category',
+      title: 'Category Tracks',
+      options: [
+        { label: 'Government / Defence', value: 'Govt' },
+        { label: 'Foreign Nationals', value: 'Foreign' },
+        { label: 'Service Providers / Vendors', value: 'Service' },
+        { label: 'General Walk-ins', value: 'General' },
+        { label: 'HR Admin Personnel', value: 'HR' }
+      ]
+    },
+    {
+      key: 'pipeline',
+      title: 'Pipeline Variance Type',
+      options: [
+        { label: 'Immediate Access / Walk-in', value: 'immediate' },
+        { label: 'Pre-Scheduled Entry', value: 'scheduled' },
+        { label: 'Repeated Profile Framework', value: 'repeated' }
+      ]
+    },
+    {
+      key: 'status',
+      title: 'Pass Clearance Status',
+      options: [
+        { label: 'Pending Review', value: 'Pending' },
+        { label: 'Approved Access', value: 'Approved' },
+        { label: 'Denied Entries', value: 'Denied' },
+        { label: 'Cleared Outposts', value: 'Cleared' },
+        { label: 'Active On-Site', value: 'Active' }
+      ]
+    }
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const randomLog = dynamicBroadcastPool[Math.floor(Math.random() * dynamicBroadcastPool.length)];
+      setBroadcastLogs(prev => [{ ...randomLog, id: Date.now() }, ...prev.slice(0, 3)]);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleUpdateStatus = (id: string, newStatus: VisitorRecord['status']) => {
+    setDataList(prev => prev.map(item => item.id === id ? { ...item, status: newStatus } : item));
+  };
+
+  const handleFilterToggle = (bucketKey: string, value: string) => {
+    setSelectedFilters(prev => {
+      const current = prev[bucketKey] || [];
+      const updated = current.includes(value) 
+        ? current.filter(item => item !== value) 
+        : [...current, value];
+      return { ...prev, [bucketKey]: updated };
+    });
+  };
+
+  // Processing internal matrix matching filters
+  const matrixFilteredRows = dataList.filter(row => {
+    const matchesSearch = 
+      row.visitorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      row.hostName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      row.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      row.purpose.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesCategory = (selectedFilters.category || []).includes(row.category);
+    const matchesPipeline = (selectedFilters.pipeline || []).includes(row.pipeline);
+    const matchesStatus = (selectedFilters.status || []).includes(row.status);
+
+    let matchesTab = true;
+    if (activeTab === 'Pending Verification') matchesTab = row.status === 'Pending';
+    if (activeTab === 'Active Passes') matchesTab = row.status === 'Approved' || row.status === 'Active';
+
+    return matchesSearch && matchesCategory && matchesPipeline && matchesStatus && matchesTab;
+  });
+
+  const columns: TableColumn<VisitorRecord>[] = [
+    { key: 'id', label: 'PASS ID', render: (row) => <span className="text-blue-600 font-mono font-bold text-xs">{row.id}</span> },
+    {
+      key: 'visitorName',
+      label: 'VISITOR DETAILS',
+      render: (row) => (
+        <div>
+          <div className="font-semibold text-slate-800 text-sm">{row.visitorName}</div>
+          <div className="text-xs text-slate-500 font-mono">{row.phone}</div>
+        </div>
+      )
+    },
+    {
+      key: 'category',
+      label: 'CATEGORY',
+      render: (row) => {
+        const colors: Record<string, string> = {
+          Govt: 'bg-purple-100 text-purple-800 border-purple-200',
+          Foreign: 'bg-orange-100 text-orange-800 border-orange-200',
+          Service: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+          General: 'bg-slate-100 text-slate-800 border-slate-200'
+        };
+        return <span className={`px-2 py-0.5 text-xs font-bold rounded border ${colors[row.category] || 'bg-slate-100'}`}>{row.category}</span>;
+      }
+    },
+    { key: 'pipeline', label: 'PIPELINE TYPE', render: (row) => <span className="text-xs uppercase font-semibold text-slate-500 font-mono tracking-wider">{row.pipeline}</span> },
+    { key: 'purpose', label: 'PURPOSE OBJECTIVE', render: (row) => <p className="text-xs text-slate-600 max-w-[140px] truncate" title={row.purpose}>{row.purpose}</p> },
+    { key: 'hostName', label: 'ASSIGNED HOST', render: (row) => <span className="text-slate-700 font-medium text-xs">{row.hostName}</span> },
+    {
+      key: 'status',
+      label: 'STATUS',
+      render: (row) => {
+        if (row.status === 'Approved' || row.status === 'Active') return <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-xs rounded font-medium border border-emerald-200">Active</span>;
+        if (row.status === 'Pending') return <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded font-medium border border-amber-200">HR Review</span>;
+        return <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded border border-slate-200">{row.status}</span>;
+      }
+    },
+    {
+      key: 'id',
+      label: 'ACTIONS',
+      render: (row) => (
+        <div className="flex items-center space-x-1">
+          {row.status === 'Pending' && (
+            <>
+              <button onClick={() => handleUpdateStatus(row.id, 'Approved')} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"><CheckCircle className="w-4 h-4" /></button>
+              <button onClick={() => handleUpdateStatus(row.id, 'Denied')} className="p-1 text-rose-600 hover:bg-rose-50 rounded"><X className="w-4 h-4" /></button>
+            </>
+          )}
+          <button onClick={() => alert(`Reviewing: ${row.id}`)} className="p-1 text-slate-400 hover:bg-slate-100 rounded"><Eye className="w-4 h-4" /></button>
+        </div>
+      )
+    }
+  ];
 
   return (
-    <div className="flex items-center space-x-3 relative">
-      {/* Search Input Framework */}
-      <div className="relative">
-        <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-        <input 
-          type="text" 
-          placeholder={placeholder} 
-          value={searchTerm}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-9 pr-4 py-2 text-sm border border-slate-400/60 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 text-slate-800 font-medium"
-        />
-      </div>
-
-      {/* Dropdown Layout Checkbox Frame */}
-      <div className="relative">
-        <button 
-          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          className="flex items-center px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-400/60 rounded-lg hover:bg-slate-50 gap-2"
-        >
-          <Filter className="w-4 h-4" />
-          Filters Matrix
-        </button>
-
-        {isDropdownOpen && (
-          <>
-            <div className="fixed inset-0 z-10" onClick={() => setIsDropdownOpen(false)} />
-            <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-400/80 rounded-xl shadow-xl p-4 z-20 space-y-4 text-xs text-slate-700 max-h-[380px] overflow-y-auto">
-              
-              {filterBuckets.map((bucket, bIdx) => (
-                <div key={bucket.key} className={bIdx > 0 ? "border-t pt-2" : ""}>
-                  <p className="font-bold text-slate-400 uppercase tracking-wider mb-2 text-[10px]">
-                    {bucket.title}
-                  </p>
-                  {bucket.options.map(opt => (
-                    <label key={opt.value} className="flex items-center space-x-2 py-1 font-medium text-slate-700 cursor-pointer select-none">
-                      <input 
-                        type="checkbox" 
-                        checked={(selectedFilters[bucket.key] || []).includes(opt.value)}
-                        onChange={() => onFilterToggle(bucket.key, opt.value)}
-                        className="rounded text-blue-600 focus:ring-blue-500 border-slate-300"
-                      />
-                      <span className="truncate max-w-[220px]">{opt.label}</span>
-                    </label>
-                  ))}
-                </div>
-              ))}
-
+    <DashboardLayout role="hr" userName="Sinchana K">
+      <div className="max-w-7xl mx-auto space-y-6">
+        
+        {/* Metric Cards Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { title: 'Total Requests', value: '1,248', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+            { title: 'Pending Clearance', value: dataList.filter(d => d.status === 'Pending').length.toString(), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+            { title: 'Denied Access', value: '32', icon: XCircle, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
+            { title: 'Active On-Site', value: dataList.filter(d => d.status === 'Approved' || d.status === 'Active').length.toString(), icon: ShieldCheck, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' }
+          ].map((stat, idx) => (
+            <div key={idx} className="bg-white p-5 border border-slate-200 rounded-xl flex items-center justify-between shadow-sm">
+              <div>
+                <p className="text-sm font-medium text-slate-500">{stat.title}</p>
+                <p className="text-2xl font-bold text-slate-800 mt-1">{stat.value}</p>
+              </div>
+              <div className={`p-3 rounded-lg ${stat.bg} ${stat.color} border ${stat.border}`}><stat.icon className="w-5 h-5" /></div>
             </div>
-          </>
-        )}
+          ))}
+        </div>
+
+        {/* Main Workspace Splits */}
+        <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
+          
+          {/* Left Block Queue Container Dashboard (60%) */}
+          <div className="lg:col-span-6 bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-5">
+            
+            {/* Header Content Box */}
+            <div>
+              <h3 className="font-bold text-slate-800 text-base">Centralized Access Management Queue</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Real-time gate passes and processing pipelines control panel</p>
+            </div>
+
+            {/* SEPARATED ELEMENT: Placed perfectly beneath the main title group */}
+            <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100 flex justify-start">
+              <SearchFilterMatrix 
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                selectedFilters={selectedFilters}
+                onFilterToggle={handleFilterToggle}
+                filterBuckets={filterBuckets}
+                placeholder="Search visitor, sponsor, or pass ID..."
+              />
+            </div>
+
+            {/* Sub-Tab Navigation Elements */}
+            <div className="flex border-b border-slate-200 text-xs font-semibold space-x-4">
+              {['All Requests', 'Pending Verification', 'Active Passes'].map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`pb-2 px-1 relative ${activeTab === tab ? 'text-blue-600 font-bold border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+
+            {/* Core Table Layout - Adding CSS override to hide default DataTable inputs */}
+            <div className="overflow-x-auto custom-datatable-hide-search">
+              <style>{`
+                .custom-datatable-hide-search [type="text"], 
+                .custom-datatable-hide-search input[placeholder*="Search"] {
+                  display: none !important;
+                }
+                .custom-datatable-hide-search button:has(svg) {
+                  display: none !important;
+                }
+              `}</style>
+              <DataTable 
+                title="" 
+                data={matrixFilteredRows} 
+                columns={columns}
+                tabs={[]} 
+              />
+            </div>
+          </div>
+
+          {/* Right Panels Section */}
+          <div className="lg:col-span-4 space-y-6">
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+              <h3 className="font-bold text-slate-800 text-base mb-4">Command Quick Actions</h3>
+              <div className="grid grid-cols-1 gap-2">
+                <Link to="/hr/visitormgmt" className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-blue-500 hover:bg-slate-50/50 transition-all group">
+                  <div className="flex items-center text-sm font-medium text-slate-700">
+                    <UserPlus className="w-4 h-4 mr-3 text-slate-400 group-hover:text-blue-500" />
+                    Launch Visitor Onboarding
+                  </div>
+                  <span className="text-xs text-slate-400">Go →</span>
+                </Link>
+                <Link to="/hr/visitormgmt" className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-amber-500 hover:bg-slate-50/50 transition-all group">
+                  <div className="flex items-center text-sm font-medium text-slate-700">
+                    <History className="w-4 h-4 mr-3 text-slate-400 group-hover:text-amber-500" />
+                    Review Repeated Manifests
+                  </div>
+                  <span className="text-xs text-slate-400">View →</span>
+                </Link>
+                <div onClick={() => alert('Synchronizing with local terminals...')} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-purple-500 hover:bg-slate-50/50 transition-all cursor-pointer group">
+                  <div className="flex items-center text-sm font-medium text-slate-700">
+                    <Shield className="w-4 h-4 mr-3 text-slate-400 group-hover:text-purple-500" />
+                    Gate Security Sync Console
+                  </div>
+                  <span className="text-xs text-slate-400">Link 🟢</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Live Activity Broadcast Box */}
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col h-[320px]">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-3">
+                <h3 className="font-bold text-slate-800 text-base flex items-center">
+                  <Bell className="w-4 h-4 mr-2 text-slate-500" />
+                  Live Activity Broadcast
+                </h3>
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
+                {broadcastLogs.map((log) => (
+                  <div key={log.id} className={`p-3 border rounded-lg transition-all duration-300 ${log.color}`}>
+                    <div className="flex justify-between font-bold text-[10px] uppercase tracking-wider mb-1">
+                      <span>{log.type}</span>
+                      <span className="font-mono text-slate-400">LIVE</span>
+                    </div>
+                    <p className="font-medium">{log.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+        </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

@@ -10,8 +10,9 @@ import DispatchedLogsPage from './pages/emp/dispatchedLogs';
 import HRDashboard from './pages/hr/index';
 import VisitorMgmtPage from './pages/hr/visitormgmt';
 import HRAddVisitorPage from './pages/hr/add_visitor';
-// import AnalyticsPage from './pages/hr/analytics';
+import AnalyticsPage from './pages/hr/analytics';
 import AuditPage from './pages/hr/audit';
+import VerificationQueuePage from './pages/hr/verification';
 
 export default function App() {
   return (
@@ -42,8 +43,10 @@ export default function App() {
 {/* Fallback support for both case pathways to prevent portal dropouts */}
 <Route path="/hr/add_visitor" element={<HRAddVisitorPage />} />
 <Route path="/hr/addvisitor" element={<HRAddVisitorPage />} />
+<Route path="/hr/verification" element={<VerificationQueuePage />} />
 
-{/* <Route path="/hr/analytics" element={<AnalyticsPage />} /> */}
+
+<Route path="/hr/analytics" element={<AnalyticsPage />} />
 <Route path="/hr/audit" element={<AuditPage />} />
         {/* Catch-all for 404 Pages */}
         <Route path="*" element={

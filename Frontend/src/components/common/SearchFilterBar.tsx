@@ -1,5 +1,5 @@
 // components/common/SearchFilterBar.tsx
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Search, Filter, Check } from 'lucide-react';
 
 export interface FilterOption {

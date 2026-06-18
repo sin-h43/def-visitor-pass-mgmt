@@ -11,7 +11,7 @@ import HRDashboard from './pages/hr/index';
 import VisitorMgmtPage from './pages/hr/visitormgmt';
 import HRAddVisitorPage from './pages/hr/add_visitor';
 // import AnalyticsPage from './pages/hr/analytics';
-// import AuditPage from './pages/hr/audit';
+import AuditPage from './pages/hr/audit';
 
 export default function App() {
   return (
@@ -44,7 +44,7 @@ export default function App() {
 <Route path="/hr/addvisitor" element={<HRAddVisitorPage />} />
 
 {/* <Route path="/hr/analytics" element={<AnalyticsPage />} /> */}
-{/* <Route path="/hr/audit" element={<AuditPage />} /> */}
+<Route path="/hr/audit" element={<AuditPage />} />
         {/* Catch-all for 404 Pages */}
         <Route path="*" element={
           <div className="h-screen w-full flex items-center justify-center bg-slate-50 text-slate-500">

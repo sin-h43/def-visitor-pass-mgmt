@@ -34,7 +34,7 @@ export default function DashboardLayout({ children, role, userName }: LayoutProp
       {/* --- ICON-ANCHORED SLIDABLE LEFT SIDEBAR --- */}
       <aside 
         className={`bg-gray-900 text-slate-300 flex flex-col border-r border-gray-800 shrink-0 transition-all duration-300 ease-in-out z-30 ${
-          isLeftSidebarOpen ? 'w-64' : 'w-20'
+          isLeftSidebarOpen ? 'w-52' : 'w-20'
         }`}
       >
         {/* Brand Header: Static padding guarantees the shield icon never jumps or moves */}

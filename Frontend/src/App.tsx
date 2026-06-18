@@ -7,8 +7,9 @@ import RepeatedVisitorPage from './pages/emp/repeated_visitor';
 import DispatchedLogsPage from './pages/emp/dispatchedLogs';
 
 // --- HR Pages (Placeholders for what we build next) ---
-// import HRDashboard from './pages/hr/index';
-// import VisitorMgmtPage from './pages/hr/visitormgmt';
+import HRDashboard from './pages/hr/index';
+import VisitorMgmtPage from './pages/hr/visitormgmt';
+import HRAddVisitorPage from './pages/hr/add_visitor';
 // import AnalyticsPage from './pages/hr/analytics';
 // import AuditPage from './pages/hr/audit';
 
@@ -32,16 +33,18 @@ export default function App() {
         {/* Catch-all for Employee settings/misc */}
         <Route path="/emp/settings" element={<div className="p-8">Employee Settings (Coming Soon)</div>} />
 
-        {/* =========================================
-            HR PORTAL ROUTES
-        ========================================= */}
-        {/* Uncomment these as we build them! */}
-        
-        {/* <Route path="/hr" element={<HRDashboard />} /> */}
-        {/* <Route path="/hr/visitormgmt" element={<VisitorMgmtPage />} /> */}
-        {/* <Route path="/hr/analytics" element={<AnalyticsPage />} /> */}
-        {/* <Route path="/hr/audit" element={<AuditPage />} /> */}
-        
+       {/* =========================================
+    HR PORTAL ROUTES
+========================================= */}
+<Route path="/hr" element={<HRDashboard />} />
+<Route path="/hr/visitormgmt" element={<VisitorMgmtPage />} />
+
+{/* Fallback support for both case pathways to prevent portal dropouts */}
+<Route path="/hr/add_visitor" element={<HRAddVisitorPage />} />
+<Route path="/hr/addvisitor" element={<HRAddVisitorPage />} />
+
+{/* <Route path="/hr/analytics" element={<AnalyticsPage />} /> */}
+{/* <Route path="/hr/audit" element={<AuditPage />} /> */}
         {/* Catch-all for 404 Pages */}
         <Route path="*" element={
           <div className="h-screen w-full flex items-center justify-center bg-slate-50 text-slate-500">

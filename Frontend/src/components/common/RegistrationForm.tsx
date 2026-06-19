@@ -1,7 +1,7 @@
 // components/common/RegistrationForm.tsx
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { UploadCloud, Users, ShieldAlert, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { UploadCloud, Users, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 const NATIONALITIES = [
@@ -30,8 +30,7 @@ export default function RegistrationForm() {
   // Field States
   const [pipeline, setPipeline] = useState(prefillData?.pipeline === 'Pre-Scheduled' ? 'Pre-Scheduled Visit' : 'New Visitor / Urgent Access');
   const [scheduledDate, setScheduledDate] = useState('');
-  const [clearance, setClearance] = useState('Level 1 (Public)');
-  
+
   // Visitor Details
   const [visitorName, setVisitorName] = useState(prefillData?.visitorName || '');
   const [dob, setDob] = useState(prefillData?.dob !== 'N/A' ? (prefillData?.dob || '') : '');

@@ -1,69 +1,32 @@
 // pages/hr/audit.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ShieldCheck, Eye, FileSpreadsheet } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
 import DetailDrawer from '../../components/common/DetailDrawer';
 import type { TableColumn } from '../../types/visitor';
+import { supabase } from '../../lib/supabase';
 
 interface AuditLogRecord {
   id: string;
   actorName: string;
   actorRole: 'HR Admin' | 'Security Officer' | 'Employee' | 'System Automated';
   dob: string;
- phone: string;
- email:string;
+  phone: string;
+  email: string;
   actionPerformed: string;
   targetPassId: string;
   timestamp: string;
   severity: 'Low' | 'Medium' | 'High' | 'Critical';
 }
 
-const mockAuditLogs: AuditLogRecord[] = [
-  {
-    id: 'AUD-0844',
-    actorName: 'Gate Outpost 2 Console',
-    actorRole: 'Security Officer',
-    dob: 'N/A (Terminal Core)',
-    phone: 'Ext: 4012',
-    email: 'terminal.gate2@defencepass.local',
-    actionPerformed: 'Badge Auth Token Override Issued',
-    targetPassId: 'DEF-4091',
-    timestamp: '18/06/2026 09:12 AM',
-    severity: 'High'
-  },
-  {
-    id: 'AUD-0731',
-    actorName: 'System Automated Scheduler',
-    actorRole: 'System Automated',
-    dob: 'N/A (Automated Engine)',
-    phone: 'N/A (Local Host)',
-    email: 'cron.daemon@defencepass.local',
-    actionPerformed: 'Purged Expired Repeated Manifest Files',
-    targetPassId: 'GLOBAL_CRON',
-    timestamp: '17/06/2026 11:59 PM',
-    severity: 'Low'
-  },
-  {
-    id: 'AUD-0912',
-    actorName: 'Sinchana K',
-    actorRole: 'HR Admin',
-    dob: '07/09/2006', // September 7, 2006
-    phone: '+91 94480 12345',
-    email: 'sinchana.km@defencepass.gov.in',
-    actionPerformed: 'Approved Foreign Track Pass Passport Clear',
-    targetPassId: 'DEF-2294',
-    timestamp: '18/06/2026 10:45 AM',
-    severity: 'Medium'
-  },
-];
-
 export default function AuditPage() {
+  const [auditLogs, setAuditLogs] = useState<AuditLogRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('All Trails');
   
-  // State for tracking the open drawer record state mapping
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeDrawerData, setActiveDrawerData] = useState<any | null>(null);
 
@@ -95,6 +58,46 @@ export default function AuditPage() {
     }
   ];
 
+  // Supabase Fetch Logic
+  useEffect(() => {
+    async function fetchAuditLogs() {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('system_audit_logs')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (data) {
+          const transformedLogs: AuditLogRecord[] = data.map((row) => ({
+            id: row.log_id,
+            actorName: row.actor_name,
+            actorRole: row.actor_role as AuditLogRecord['actorRole'],
+            dob: 'Classified Record', // Hiding DOB in live system for security compliance
+            phone: row.actor_phone || 'N/A',
+            email: row.actor_email || 'N/A',
+            actionPerformed: row.action_performed,
+            targetPassId: row.target_pass_id || 'N/A',
+            timestamp: new Date(row.created_at).toLocaleString('en-IN', {
+              day: '2-digit', month: '2-digit', year: 'numeric',
+              hour: '2-digit', minute: '2-digit', hour12: true
+            }),
+            severity: row.severity as AuditLogRecord['severity']
+          }));
+          setAuditLogs(transformedLogs);
+        }
+      } catch (error) {
+        console.error('Error fetching audit ledger:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchAuditLogs();
+  }, []);
+
   const handleFilterToggle = (groupKey: string, value: string) => {
     setSelectedFilters(prev => {
       const current = prev[groupKey] || [];
@@ -108,7 +111,7 @@ export default function AuditPage() {
     setIsDrawerOpen(true);
   };
 
-  const filteredAuditLogs = mockAuditLogs.filter(row => {
+  const filteredAuditLogs = auditLogs.filter(row => {
     const matchesSearch = 
       row.actorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       row.targetPassId.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -166,11 +169,23 @@ export default function AuditPage() {
     }
   ];
 
+  if (loading) {
+    return (
+      <DashboardLayout role="hr" userName="Sinchana K">
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="animate-pulse flex flex-col items-center">
+            <div className="h-8 w-8 bg-slate-800 rounded-full mb-4"></div>
+            <p className="text-slate-500 font-medium">Fetching secure audit trails...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout role="hr" userName="Sinchana K">
       <div className="max-w-7xl mx-auto space-y-6 relative">
         
-        {/* Header Block Section */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-slate-800 text-white rounded-lg shadow-sm">
@@ -190,10 +205,8 @@ export default function AuditPage() {
           </button>
         </div>
 
-        {/* Master Logging Table Wrapper */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-5">
           
-          {/* Decoupled Filter Matrix Toolbar */}
           <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
             <SearchFilterBar 
               value={searchTerm}
@@ -205,7 +218,6 @@ export default function AuditPage() {
             />
           </div>
 
-          {/* Sub-Tabs Navigation */}
           <div className="flex border-b border-slate-200 text-xs font-semibold space-x-4">
             {['All Trails', 'Elevated Alerts'].map(tab => (
               <button
@@ -218,25 +230,14 @@ export default function AuditPage() {
             ))}
           </div>
 
-          {/* Table Element Content Box */}
-          <div className="overflow-x-auto custom-audit-table-hide-search">
-            <style>{`
-              .custom-audit-table-hide-search [type="text"], 
-              .custom-audit-table-hide-search input[placeholder*="Search"],
-              .custom-audit-table-hide-search .flex:has(input[placeholder*="Search"]) {
-                display: none !important;
-              }
-            `}</style>
+          <div className="overflow-x-auto">
             <DataTable 
-              title="" 
               data={filteredAuditLogs} 
               columns={columns}
-              tabs={[]} 
             />
           </div>
         </div>
 
-        {/* REUSABLE LIGHT BACKDROP PROFILE DRAWER COMPONENT TRIGGERED VIA STATE HOOKS */}
         <DetailDrawer 
           isOpen={isDrawerOpen}
           onClose={() => setIsDrawerOpen(false)}

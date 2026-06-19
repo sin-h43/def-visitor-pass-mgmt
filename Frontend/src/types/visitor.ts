@@ -3,7 +3,7 @@ export interface VisitorRecord {
   visitorName: string;
   phone: string;
   email?: string;
-  category: 'General' | 'HR' | 'Govt' | 'Foreign' | 'Service' | 'Repeated';
+  category: 'General' | 'HR' | 'Govt' | 'Foreign' | 'Service';
   purpose: string;
   hostName: string;
   hostDept?: string;
@@ -11,6 +11,8 @@ export interface VisitorRecord {
   status: 'Pending' | 'Approved' | 'Denied' | 'Cleared' | 'Active';
   passType?: string;
   pipeline: 'immediate' | 'scheduled' | 'repeated';
+  nationality?: string;
+  organization?:string;
 }
 
 // Defines how the reusable table should render columns

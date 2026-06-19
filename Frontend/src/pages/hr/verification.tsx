@@ -1,6 +1,6 @@
 // pages/hr/verification.tsx
-import React, { useState } from 'react';
-import { ShieldAlert, CheckCircle, XCircle, Eye, ShieldCheck, ClipboardCheck, Fingerprint, Clock } from 'lucide-react';
+import  { useState } from 'react';
+import { ShieldAlert, CheckCircle, XCircle, Eye, ShieldCheck, ClipboardCheck, Clock } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
@@ -254,7 +254,7 @@ export default function VerificationQueuePage() {
               title="" 
               data={processedFilteredQueue} 
               columns={columns}
-              tabs={[]} 
+              
             />
           </div>
         </div>

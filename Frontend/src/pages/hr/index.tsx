@@ -6,7 +6,7 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
 import type { VisitorRecord, TableColumn } from '../../types/visitor';
-
+import { supabase } from '../../lib/supabase';
 const initialHRDashboardData: VisitorRecord[] = [
   {
     id: 'DEF-8821',
@@ -195,10 +195,48 @@ export default function HRDashboard() {
     }
   ];
 
+  useEffect(() => {
+    async function fetchVisits() {
+      const { data, error } = await supabase
+        .from('visits')
+        .select(`
+    visit_id,
+    visit_type,
+    pass_type,
+    purpose,
+    status,
+    start_date,
+    visitors (
+      visitor_id,
+      name,
+      phone,
+      email,
+      nationality,
+      organization
+    ),
+    host:employees!visits_host_employee_id_fkey (
+      name,
+      role
+    )
+  `);
+
+      if (error) {
+        console.error('Supabase fetch error:', error);
+        return;
+      }
+
+      console.log(JSON.stringify(data,null,2));
+    }
+
+    fetchVisits();
+  }, []);
+
   return (
     <DashboardLayout role="hr" userName="Sinchana K">
       <div className="max-w-7xl mx-auto space-y-6">
-        
+        {/* <div onClick={fetchVisits}>
+
+        </div> */}
         {/* Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
@@ -266,7 +304,6 @@ export default function HRDashboard() {
                 title="" 
                 data={matrixFilteredRows} 
                 columns={columns}
-                tabs={[]} 
               />
             </div>
           </div>

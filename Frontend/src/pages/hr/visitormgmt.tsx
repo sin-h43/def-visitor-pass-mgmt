@@ -1,64 +1,95 @@
 // pages/hr/visitormgmt.tsx
-import  { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, User, Landmark, Globe, ShieldAlert, Wrench } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
 import type { VisitorRecord, TableColumn } from '../../types/visitor';
-
-const globalVisitorLogs: VisitorRecord[] = [
-  {
-    id: 'DEF-8821',
-    visitorName: 'Rajesh Kumar',
-    phone: '+91 98860 12345',
-    email: 'rajesh.k@gmail.com',
-    category: 'Govt',
-    purpose: 'Inter-Departmental Security Audit',
-    hostName: 'Nagarjun',
-    hostDept: 'Cyber Security Division',
-    requestDate: '18/06/2026 10:15 AM',
-    status: 'Approved',
-    pipeline: 'scheduled'
-  },
-  {
-    id: 'DEF-2294',
-    visitorName: 'Sarah Jenkins',
-    phone: '+1 555 019 2834',
-    email: 's.jenkins@globaltech.com',
-    category: 'Foreign',
-    purpose: 'Propulsion Systems Briefing',
-    hostName: 'Anand M S',
-    hostDept: 'Aerospace Engineering',
-    requestDate: '18/06/2026 11:30 AM',
-    status: 'Pending',
-    pipeline: 'immediate'
-  },
-  {
-    id: 'DEF-4091',
-    visitorName: 'Madan Gowda',
-    phone: '+91 94481 98765',
-    category: 'Service',
-    purpose: 'HVAC Plant Maintenance',
-    hostName: 'Sayona K',
-    hostDept: 'Estate & Facilities',
-    requestDate: '17/06/2026 04:00 PM',
-    status: 'Cleared',
-    pipeline: 'repeated'
-  }
-];
+import { supabase } from '../../lib/supabase';
 
 export default function VisitorMgmtPage() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('All Visitors');
 
-  // Multi-Feature Filter Categories Matrix for Visitor Management Track
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
     category: ['Govt', 'Foreign', 'Service', 'General', 'HR'],
     pipeline: ['immediate', 'scheduled', 'repeated'],
     status: ['Pending', 'Approved', 'Denied', 'Cleared', 'Active']
   });
+
+  const [visitorLogs, setVisitorLogs] = useState<VisitorRecord[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    const fetchVisitorLogs = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('visits')
+          .select(`
+            visit_id,
+            visit_type,
+            pass_type,
+            purpose,
+            status,
+            start_date,
+            visitors (
+              visitor_id,
+              name,
+              phone,
+              email,
+              nationality,
+              organization
+            ),
+            host:employees!visits_host_employee_id_fkey (
+              name,
+              role
+            )
+          `);
+
+        if (error) throw error;
+        
+        if (data) {
+          const transformed: VisitorRecord[] = data.map((row: any) => {
+            let uiPipeline: 'immediate' | 'scheduled' | 'repeated' = 'immediate';
+            const dbType = row.visit_type?.toLowerCase();
+            
+            if (dbType === 'prescheduled' || dbType === 'scheduled') uiPipeline = 'scheduled';
+            if (dbType === 'repeated') uiPipeline = 'repeated';
+
+            const computedCategory = row.visitors?.nationality?.toLowerCase() !== 'indian' ? 'Foreign' : 'General';
+
+            return {
+              id: row.visit_id, 
+              visitorName: row.visitors?.name || 'Unknown',
+              phone: row.visitors?.phone || '',
+              email: row.visitors?.email,
+              category: computedCategory, 
+              purpose: row.purpose || '',
+              hostName: row.host?.name || 'Unassigned',
+              hostDept: row.host?.role === 'hr' ? 'HR Officer' : 'Staff Member',
+              requestDate: row.start_date ? new Date(row.start_date).toLocaleDateString('en-IN') : 'N/A',
+              status: row.status as 'Pending' | 'Approved' | 'Denied' | 'Cleared' | 'Active',
+              passType: row.pass_type || 'ONE_DAY',
+              pipeline: uiPipeline,
+              nationality: row.visitors?.nationality || 'Indian',
+              organization: row.visitors?.organization || ''
+            };
+          });
+
+          setVisitorLogs(transformed);
+        }
+      } catch (error) {
+        console.error('Error hydrating visitor management registry:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchVisitorLogs();
+  }, []);
 
   const visitorFilterGroups = [
     {
@@ -102,8 +133,7 @@ export default function VisitorMgmtPage() {
     });
   };
 
-  // Natively compute rows against matrix selections
-  const matrixFilteredRows = globalVisitorLogs.filter(row => {
+  const matrixFilteredRows = visitorLogs.filter(row => {
     const matchesSearch = 
       row.visitorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       row.id.toLowerCase().includes(searchTerm.toLowerCase());
@@ -165,6 +195,15 @@ export default function VisitorMgmtPage() {
       )
     },
     {
+      key: 'nationality',
+      label: 'NATIONALITY',
+      render: (row) => (
+        <span className="text-xs font-medium text-slate-600 font-mono tracking-wide bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+          {row.nationality || 'Indian'}
+        </span>
+      )
+    },
+    {
       key: 'status',
       label: 'CLEARANCE STATUS',
       render: (row) => {
@@ -176,11 +215,25 @@ export default function VisitorMgmtPage() {
     }
   ];
 
+  // 1. The layout to show while fetching data
+  if (loading) {
+    return (
+      <DashboardLayout role="hr" userName="Sinchana K">
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="animate-pulse flex flex-col items-center">
+            <div className="h-8 w-8 bg-blue-600 rounded-full mb-4"></div>
+            <p className="text-slate-500 font-medium">Syncing Master Security Manifest...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // 2. The main layout that renders safely AFTER data is loaded
   return (
     <DashboardLayout role="hr" userName="Sinchana K">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* Header Summary */}
         <div className="flex items-center space-x-3">
           <div className="p-2 bg-blue-600 text-white rounded-lg shadow-sm">
             <Users className="w-6 h-6" />
@@ -191,7 +244,6 @@ export default function VisitorMgmtPage() {
           </div>
         </div>
 
-        {/* Onboarding Context Pathway Row */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Select Onboarding Context Pathway</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -211,14 +263,12 @@ export default function VisitorMgmtPage() {
           </div>
         </div>
 
-        {/* Manifest Panel Container Card */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
           <div>
             <h2 className="text-base font-bold text-slate-800">Master Security Manifest Log</h2>
             <p className="text-xs text-slate-400 mt-0.5">Historical verification records registry</p>
           </div>
 
-          {/* Integrated Reusable SearchFilterBar */}
           <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
             <SearchFilterBar 
               value={searchTerm}
@@ -230,7 +280,6 @@ export default function VisitorMgmtPage() {
             />
           </div>
 
-          {/* Sub-Tab Array Layout */}
           <div className="flex border-b border-slate-200 text-xs font-semibold space-x-4">
             {['All Visitors', 'Pre-Scheduled', 'Repeated', 'Expired'].map(tab => (
               <button
@@ -243,20 +292,10 @@ export default function VisitorMgmtPage() {
             ))}
           </div>
 
-          {/* Clear layout matching rules */}
-          <div className="overflow-x-auto custom-mgmt-table-hide-search">
-            <style>{`
-              .custom-mgmt-table-hide-search [type="text"], 
-              .custom-mgmt-table-hide-search input[placeholder*="Search"],
-              .custom-mgmt-table-hide-search .flex:has(input[placeholder*="Search"]) {
-                display: none !important;
-              }
-            `}</style>
+          <div className="overflow-x-auto">
             <DataTable 
-              title="" 
               data={matrixFilteredRows} 
               columns={columns}
-              tabs={[]} 
             />
           </div>
         </div>

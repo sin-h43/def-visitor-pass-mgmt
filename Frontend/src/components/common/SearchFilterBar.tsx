@@ -50,6 +50,8 @@ export default function SearchFilterBar({
       <div className="relative flex-1">
         <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
         <input
+          id='manifest-search-input'
+          name='manifest-search'
           type="text"
           placeholder={placeholder}
           value={value}

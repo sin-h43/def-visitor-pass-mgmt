@@ -7,69 +7,28 @@ import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
 import type { VisitorRecord, TableColumn } from '../../types/visitor';
 import { supabase } from '../../lib/supabase';
-const initialHRDashboardData: VisitorRecord[] = [
-  {
-    id: 'DEF-8821',
-    visitorName: 'Rajesh Kumar',
-    phone: '+91 98860 12345',
-    email: 'rajesh.k@gmail.com',
-    category: 'Govt',
-    purpose: 'Inter-Departmental Security Audit',
-    hostName: 'Nagarjun',
-    hostDept: 'Cyber Security Division',
-    requestDate: '18/06/2026 10:15 AM',
-    status: 'Approved',
-    pipeline: 'scheduled'
-  },
-  {
-    id: 'DEF-2294',
-    visitorName: 'Sarah Jenkins',
-    phone: '+1 555 019 2834',
-    email: 's.jenkins@globaltech.com',
-    category: 'Foreign',
-    purpose: 'Propulsion Systems Briefing',
-    hostName: 'Anand M S',
-    hostDept: 'Aerospace Engineering',
-    requestDate: '18/06/2026 11:30 AM',
-    status: 'Pending',
-    pipeline: 'immediate'
-  },
-  {
-    id: 'DEF-4091',
-    visitorName: 'Madan Gowda',
-    phone: '+91 94481 98765',
-    category: 'Service',
-    purpose: 'HVAC Plant Maintenance',
-    hostName: 'Sayona K',
-    hostDept: 'Estate & Facilities',
-    requestDate: '17/06/2026 04:00 PM',
-    status: 'Cleared',
-    pipeline: 'repeated'
-  }
-];
 
 const dynamicBroadcastPool = [
   { id: 1, type: 'FOREIGN REGISTRY', text: 'Passport clearance requested for Sarah Jenkins.', color: 'bg-orange-50 border-orange-100 text-orange-800' },
   { id: 2, type: 'GATE AUTO-SYNC', text: 'Gate 2 badge scanner synchronization completed.', color: 'bg-emerald-50 border-emerald-100 text-emerald-800' },
   { id: 3, type: 'GOVT CLEARANCE', text: 'Pass DEF-8821 authorized by cyber security command desk.', color: 'bg-purple-50 border-purple-100 text-purple-800' },
   { id: 4, type: 'VITAL ALERTS', text: 'Contractor Madan Gowda logged departure via South Outpost.', color: 'bg-slate-50 border-slate-200 text-slate-700' },
-  { id: 5, type: 'SYSTEM AUDIT', text: 'Sinchana K updated centralized pass pipeline rules.', color: 'bg-blue-50 border-blue-100 text-blue-800' }
+  { id: 5, type: 'SYSTEM AUDIT', text: 'Centralized pass pipeline rules updated.', color: 'bg-blue-50 border-blue-100 text-blue-800' }
 ];
 
 export default function HRDashboard() {
-  const [dataList, setDataList] = useState<VisitorRecord[]>(initialHRDashboardData);
+  const [dataList, setDataList] = useState<VisitorRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('All Requests');
   const [searchTerm, setSearchTerm] = useState('');
   const [broadcastLogs, setBroadcastLogs] = useState([dynamicBroadcastPool[0], dynamicBroadcastPool[1]]);
 
-  // Multi-Feature State Trackers matching your configuration requirements
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
     category: ['Govt', 'Foreign', 'Service', 'General', 'HR'],
     pipeline: ['immediate', 'scheduled', 'repeated'],
     status: ['Pending', 'Approved', 'Denied', 'Cleared', 'Active']
   });
 
-  // Role-Specific Dropdown Settings Configuration
   const hrFilterGroups = [
     {
       key: 'category',
@@ -102,6 +61,75 @@ export default function HRDashboard() {
     }
   ];
 
+  // 1. Live Supabase Data Fetch
+  useEffect(() => {
+    async function fetchVisits() {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('visits')
+          .select(`
+            visit_id,
+            visit_type,
+            pass_type,
+            purpose,
+            status,
+            start_date,
+            visitors (
+              visitor_id,
+              name,
+              phone,
+              email,
+              nationality,
+              organization
+            ),
+            host:employees!visits_host_employee_id_fkey (
+              name,
+              role
+            )
+          `);
+
+        if (error) throw error;
+
+        if (data) {
+          const transformed: VisitorRecord[] = data.map((row: any) => {
+            let uiPipeline: 'immediate' | 'scheduled' | 'repeated' = 'immediate';
+            const dbType = row.visit_type?.toLowerCase();
+            if (dbType === 'prescheduled' || dbType === 'scheduled') uiPipeline = 'scheduled';
+            if (dbType === 'repeated') uiPipeline = 'repeated';
+
+            const computedCategory = row.visitors?.nationality?.toLowerCase() !== 'indian' ? 'Foreign' : 'General';
+
+            return {
+              id: row.visit_id,
+              visitorName: row.visitors?.name || 'Unknown',
+              phone: row.visitors?.phone || '',
+              email: row.visitors?.email,
+              category: computedCategory,
+              purpose: row.purpose || '',
+              hostName: row.host?.name || 'Unassigned',
+              hostDept: row.host?.role === 'hr' ? 'HR Officer' : 'Staff Member',
+              requestDate: row.start_date ? new Date(row.start_date).toLocaleDateString('en-IN') : 'N/A',
+              status: row.status as 'Pending' | 'Approved' | 'Denied' | 'Cleared' | 'Active',
+              passType: row.pass_type || 'ONE_DAY',
+              pipeline: uiPipeline,
+              nationality: row.visitors?.nationality || 'Indian',
+              organization: row.visitors?.organization || ''
+            };
+          });
+          setDataList(transformed);
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchVisits();
+  }, []);
+
+  // Broadcast animation
   useEffect(() => {
     const interval = setInterval(() => {
       const randomLog = dynamicBroadcastPool[Math.floor(Math.random() * dynamicBroadcastPool.length)];
@@ -110,8 +138,21 @@ export default function HRDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleUpdateStatus = (id: string, newStatus: VisitorRecord['status']) => {
+  // 2. Real Database Update for Status Action Buttons
+  const handleUpdateStatus = async (id: string, newStatus: VisitorRecord['status']) => {
+    // Instantly update the UI so it feels fast
     setDataList(prev => prev.map(item => item.id === id ? { ...item, status: newStatus } : item));
+    
+    // Update the record in Supabase in the background
+    const { error } = await supabase
+      .from('visits')
+      .update({ status: newStatus })
+      .eq('visit_id', id);
+      
+    if (error) {
+      console.error("Failed to update status in DB:", error);
+      alert("Failed to update pass status. Please try again.");
+    }
   };
 
   const handleFilterToggle = (groupKey: string, value: string) => {
@@ -124,7 +165,6 @@ export default function HRDashboard() {
     });
   };
 
-  // Safe internal query filtering that explicitly constraints search lookups to Name and ID strings
   const matrixFilteredRows = dataList.filter(row => {
     const matchesSearch = 
       row.visitorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -175,6 +215,7 @@ export default function HRDashboard() {
       render: (row) => {
         if (row.status === 'Approved' || row.status === 'Active') return <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-xs rounded font-medium border border-emerald-200">Active</span>;
         if (row.status === 'Pending') return <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded font-medium border border-amber-200">HR Review</span>;
+        if (row.status === 'Denied') return <span className="px-2 py-0.5 bg-rose-100 text-rose-800 text-xs rounded font-medium border border-rose-200">Denied</span>;
         return <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded border border-slate-200">{row.status}</span>;
       }
     },
@@ -195,54 +236,29 @@ export default function HRDashboard() {
     }
   ];
 
-  useEffect(() => {
-    async function fetchVisits() {
-      const { data, error } = await supabase
-        .from('visits')
-        .select(`
-    visit_id,
-    visit_type,
-    pass_type,
-    purpose,
-    status,
-    start_date,
-    visitors (
-      visitor_id,
-      name,
-      phone,
-      email,
-      nationality,
-      organization
-    ),
-    host:employees!visits_host_employee_id_fkey (
-      name,
-      role
-    )
-  `);
-
-      if (error) {
-        console.error('Supabase fetch error:', error);
-        return;
-      }
-
-      console.log(JSON.stringify(data,null,2));
-    }
-
-    fetchVisits();
-  }, []);
+  if (loading) {
+    return (
+      <DashboardLayout role="hr" userName="Sinchana K">
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="animate-pulse flex flex-col items-center">
+            <div className="h-8 w-8 bg-blue-600 rounded-full mb-4"></div>
+            <p className="text-slate-500 font-medium">Loading command center...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout role="hr" userName="Sinchana K">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* <div onClick={fetchVisits}>
-
-        </div> */}
-        {/* Metric Cards */}
+        
+        {/* 3. Fully Dynamic Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { title: 'Total Requests', value: '1,248', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+            { title: 'Total Requests', value: dataList.length.toString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
             { title: 'Pending Clearance', value: dataList.filter(d => d.status === 'Pending').length.toString(), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
-            { title: 'Denied Access', value: '32', icon: XCircle, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
+            { title: 'Denied Access', value: dataList.filter(d => d.status === 'Denied').length.toString(), icon: XCircle, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
             { title: 'Active On-Site', value: dataList.filter(d => d.status === 'Approved' || d.status === 'Active').length.toString(), icon: ShieldCheck, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' }
           ].map((stat, idx) => (
             <div key={idx} className="bg-white p-5 border border-slate-200 rounded-xl flex items-center justify-between shadow-sm">
@@ -258,15 +274,12 @@ export default function HRDashboard() {
         {/* 60/40 Split Content Workspace */}
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
           
-          {/* Left Main Control Center (60%) */}
           <div className="lg:col-span-6 bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
-            
             <div>
               <h3 className="font-bold text-slate-800 text-base">Centralized Access Management Queue</h3>
               <p className="text-xs text-slate-400 mt-0.5">Real-time gate passes and processing pipelines control panel</p>
             </div>
 
-            {/* Structured SearchFilterBar Row placement */}
             <div>
               <SearchFilterBar 
                 value={searchTerm}
@@ -278,7 +291,6 @@ export default function HRDashboard() {
               />
             </div>
 
-            {/* Sub-Tab Navigation System */}
             <div className="flex border-b border-slate-200 text-xs font-semibold space-x-4">
               {['All Requests', 'Pending Verification', 'Active Passes'].map(tab => (
                 <button
@@ -291,24 +303,14 @@ export default function HRDashboard() {
               ))}
             </div>
 
-            {/* Cleaned Reusable DataTable with embedded selector override style rules */}
-            <div className="overflow-x-auto clean-layout-matrix-box">
-              <style>{`
-                .clean-layout-matrix-box [type="text"], 
-                .clean-layout-matrix-box input[placeholder*="Search"],
-                .clean-layout-matrix-box .flex:has(input[placeholder*="Search"]) {
-                  display: none !important;
-                }
-              `}</style>
+            <div className="overflow-x-auto">
               <DataTable 
-                title="" 
                 data={matrixFilteredRows} 
                 columns={columns}
               />
             </div>
           </div>
 
-          {/* Right Panels Section (40%) */}
           <div className="lg:col-span-4 space-y-6">
             <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
               <h3 className="font-bold text-slate-800 text-base mb-4">Command Quick Actions</h3>
@@ -337,7 +339,6 @@ export default function HRDashboard() {
               </div>
             </div>
 
-            {/* Dynamic System Broadcaster Engine */}
             <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col h-[320px]">
               <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-3">
                 <h3 className="font-bold text-slate-800 text-base flex items-center">

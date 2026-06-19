@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function AddVisitorPage() {
+
   return (
     <DashboardLayout role="emp" userName="Employee">
       <div className="max-w-4xl mx-auto">

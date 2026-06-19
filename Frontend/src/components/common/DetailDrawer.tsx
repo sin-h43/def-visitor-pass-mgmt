@@ -121,6 +121,10 @@ export default function DetailDrawer({ isOpen, onClose, title = "Access Registry
                     <span className="text-xs font-bold text-slate-400 block mb-1 tracking-wider">PHONE CONTACT</span>
                     <span className="font-medium text-slate-700">{data.phone}</span>
                   </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-400 block mb-1 tracking-wider">{data.id_type}</span>
+                    <span className="font-medium text-slate-700">{data.id_number}</span>
+                  </div>
                   <div className="mt-2 col-span-2">
                     <span className="text-xs font-bold text-slate-400 block mb-1 tracking-wider">SECURE DIGEST EMAIL</span>
                     <span className="font-medium text-slate-700 text-sm break-all">{data.email || 'N/A'}</span>
@@ -147,6 +151,9 @@ export default function DetailDrawer({ isOpen, onClose, title = "Access Registry
 
           {/* Right Status / Severity Block Card Component */}
           <div className="md:col-span-1 flex flex-col">
+            <div>
+              
+            </div>
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex-1 flex flex-col justify-between">
               <div>
                 <span className="text-[10px] font-bold text-slate-400 block mb-2 tracking-wider uppercase">Incident Metric</span>

@@ -4,6 +4,7 @@ import { UserPlus, FileText, Eye, RefreshCw, MoreVertical, X, CheckCircle } from
 import { Link, useSearchParams } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import SearchFilterMatrix from '../../components/common/SearchFilterMatrix';
+import { supabase } from '../../lib/supabase';
 
 interface VisitorRecord {
   id: string;
@@ -19,38 +20,17 @@ interface VisitorRecord {
   status: string;
 }
 
-const defaultBaseRecords: VisitorRecord[] = [
-  {
-    id: 'DEF-IMM-1001',
-    visitorName: 'John Doe',
-    phone: '+91 98765 12345',
-    email: 'john.doe@contractor.gov.in',
-    pipeline: 'Immediate Access / Live Walk-in',
-    classification: 'IT Department',
-    purpose: 'Server Infrastructure Hardware Upgrade and Maintenance',
-    hostName: 'Amit Sharma',
-    hostDept: 'Cyber Security Unit',
-    requestDate: '09/05/2026 08:45',
-    status: 'Cleared'
-  },
-  {
-    id: 'DEF-PRE-1002',
-    visitorName: 'Jane Smith',
-    phone: '+91 99887 66554',
-    email: 'jane.smith@vendor.com',
-    pipeline: 'Pre-Scheduled Visit',
-    classification: 'Cyber Security Unit',
-    purpose: 'Vendor Delivery Manifest Verification and Audit',
-    hostName: 'Neha Kapoor',
-    hostDept: 'Logistics Division',
-    requestDate: '09/05/2026 09:15',
-    status: 'Pending'
-  }
-];
-
 export default function EmployeeDashboard() {
   const [searchParams] = useSearchParams();
   const [shiftData, setShiftData] = useState<VisitorRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Hardcoded current employee context (Replace with auth later)
+  const currentUser = {
+    empId: 'EMP001',
+    name: 'Sinchana K',
+    dept: 'Cyber Security Unit'
+  };
 
   const [currentTab, setCurrentTab] = useState<'All Visitors' | 'Pre-Scheduled' | 'Repeated' | 'Expired'>('All Visitors');
   const [searchTerm, setSearchTerm] = useState('');
@@ -65,6 +45,7 @@ export default function EmployeeDashboard() {
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form Fields State
   const [formName, setFormName] = useState('');
@@ -74,18 +55,66 @@ export default function EmployeeDashboard() {
   const [formPipeline, setFormPipeline] = useState('Immediate Access / Live Walk-in');
   const [formClassification, setFormClassification] = useState('IT Department');
 
-  // Load from local storage data cache or default to starter arrays
-  useEffect(() => {
-    const stored = localStorage.getItem('DEFENCE_SHIFT_LOGS');
-    if (stored) {
-      setShiftData(JSON.parse(stored));
-    } else {
-      localStorage.setItem('DEFENCE_SHIFT_LOGS', JSON.stringify(defaultBaseRecords));
-      setShiftData(defaultBaseRecords);
+  // Fetch Live Data from Supabase
+  const fetchMyVisits = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('visits')
+        .select(`
+          visit_id,
+          visit_type,
+          purpose,
+          status,
+          start_date,
+          created_at,
+          visitors (name, phone, email)
+        `)
+        .eq('host_employee_id', currentUser.empId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        const transformed: VisitorRecord[] = data.map((row: any) => {
+          // Map DB types back to UI dropdown labels
+          let uiPipeline = 'Immediate Access / Live Walk-in';
+          if (row.visit_type === 'PRESCHEDULED') uiPipeline = 'Pre-Scheduled Visit';
+          if (row.visit_type === 'REPEATED') uiPipeline = 'Repeated Visitor';
+
+          // Extract classification if we embedded it in the purpose, otherwise default
+          const purposeParts = (row.purpose || '').split('] ');
+          const classification = purposeParts.length > 1 ? purposeParts[0].replace('[', '') : 'General Unit';
+          const cleanPurpose = purposeParts.length > 1 ? purposeParts[1] : row.purpose;
+
+          return {
+            id: row.visit_id,
+            visitorName: row.visitors?.name || 'Unknown',
+            phone: row.visitors?.phone || 'N/A',
+            email: row.visitors?.email || 'N/A',
+            pipeline: uiPipeline,
+            classification: classification,
+            purpose: cleanPurpose || 'General Entry Clearance Walk-in Protocol',
+            hostName: currentUser.name,
+            hostDept: currentUser.dept,
+            requestDate: new Date(row.start_date || row.created_at).toLocaleString('en-GB', { hour12: false, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+            status: row.status === 'Approved' ? 'Cleared' : row.status
+          };
+        });
+        setShiftData(transformed);
+      }
+    } catch (err) {
+      console.error("Error fetching shift data:", err);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchMyVisits();
   }, []);
 
-  // Listen for Autofill Parameters from the route query link safely
+  // Listen for Autofill Parameters
   useEffect(() => {
     const autofillName = searchParams.get('autofill');
     if (autofillName) {
@@ -155,42 +184,75 @@ export default function EmployeeDashboard() {
     });
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName || !formPhone) return;
+    setIsSubmitting(true);
 
-    const prefix = formPipeline === 'Pre-Scheduled Visit' ? 'PRE' : formPipeline === 'Repeated Visitor' ? 'REP' : 'IMM';
-    const newRecord: VisitorRecord = {
-      id: `DEF-${prefix}-${Math.floor(1000 + Math.random() * 9000)}`,
-      visitorName: formName,
-      phone: formPhone,
-      email: formEmail || 'n/a',
-      pipeline: formPipeline,
-      classification: formClassification,
-      purpose: formPurpose || 'General Entry Clearance Walk-in Protocol',
-      hostName: 'Unassigned Desk',
-      hostDept: formClassification,
-      requestDate: new Date().toLocaleString('en-GB', { hour12: false }),
-      status: 'Pending'
-    };
+    try {
+      const timestamp = Date.now().toString().slice(-6);
+      const newVisitorId = `VIS${timestamp}`;
+      const newVisitId = `VST${timestamp}`;
+      
+      const dbPipeline = formPipeline === 'Pre-Scheduled Visit' ? 'PRESCHEDULED' : formPipeline === 'Repeated Visitor' ? 'REPEATED' : 'IMMEDIATE';
+      const dbPurpose = `[${formClassification}] ${formPurpose || 'General Entry Clearance'}`;
 
-    const updatedData = [newRecord, ...shiftData];
-    setShiftData(updatedData);
-    localStorage.setItem('DEFENCE_SHIFT_LOGS', JSON.stringify(updatedData));
-    setIsRegModalOpen(false);
+      // 1. Insert Visitor
+      const { error: visitorError } = await supabase.from('visitors').insert({
+        visitor_id: newVisitorId,
+        name: formName,
+        phone: formPhone,
+        email: formEmail || null,
+        id_type: 'Aadhaar',
+        id_number: 'PENDING'
+      });
+      if (visitorError) throw visitorError;
 
-    setFormName('');
-    setFormPhone('');
-    setFormEmail('');
-    setFormPurpose('');
+      // 2. Insert Visit
+      const { error: visitError } = await supabase.from('visits').insert({
+        visit_id: newVisitId,
+        visitor_id: newVisitorId,
+        host_employee_id: currentUser.empId,
+        created_by_employee_id: currentUser.empId,
+        visit_type: dbPipeline,
+        pass_type: 'ONE_DAY',
+        purpose: dbPurpose,
+        start_date: new Date().toISOString().split('T')[0],
+        end_date: new Date().toISOString().split('T')[0],
+        status: 'Pending'
+      });
+      if (visitError) throw visitError;
+
+      // Refresh table
+      await fetchMyVisits();
+      setIsRegModalOpen(false);
+      setFormName(''); setFormPhone(''); setFormEmail(''); setFormPurpose('');
+    } catch (err) {
+      console.error("Failed to register visitor:", err);
+      alert("Failed to submit request.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRevoke = async (visitId: string) => {
+    if(!window.confirm("Are you sure you want to revoke this pass request?")) return;
+    try {
+      await supabase.from('visits').delete().eq('visit_id', visitId);
+      setShiftData(prev => prev.filter(x => x.id !== visitId));
+    } catch (err) {
+      console.error("Failed to revoke pass:", err);
+    } finally {
+      setActiveMenuId(null);
+    }
   };
 
   return (
-    <DashboardLayout role="emp" userName="Sinchana K">
+    <DashboardLayout role="emp" userName={currentUser.name}>
       <div className="max-w-7xl mx-auto">
         
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-800">Welcome Back, Employee!</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Welcome Back, {currentUser.name}!</h1>
           <p className="text-sm text-slate-500">Gate 1 Reception . Core Entry Registration Console</p>
         </div>
 
@@ -210,7 +272,6 @@ export default function EmployeeDashboard() {
             </div>
           </div>
 
-          {/* Connected routing path specifically to the separate log sheet view */}
           <Link to="/emp/dispatchedlogs" className="block">
             <div className="flex items-center justify-between p-6 bg-white border border-slate-400/60 rounded-xl hover:border-blue-500 hover:shadow-sm transition-all group cursor-pointer h-full">
               <div>
@@ -258,7 +319,12 @@ export default function EmployeeDashboard() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto relative min-h-[200px]">
+            {loading ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
+                <p className="text-slate-500 font-medium animate-pulse">Syncing logs...</p>
+              </div>
+            ) : null}
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="bg-slate-50/80 text-slate-500 border-b border-slate-400/60 font-semibold">
                 <tr>
@@ -272,7 +338,7 @@ export default function EmployeeDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-400/60 font-medium">
-                {visibleRows.length === 0 ? (
+                {visibleRows.length === 0 && !loading ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-12 text-center text-slate-400 italic">No records matched the selected query metrics.</td>
                   </tr>
@@ -290,9 +356,10 @@ export default function EmployeeDashboard() {
                       </td>
                       <td className="px-6 py-4 text-slate-500 text-xs">{row.requestDate}</td>
                       <td className="px-6 py-4">
-                        {row.status === 'Cleared' && <span className="px-2.5 py-1 bg-slate-800 text-white text-xs rounded font-bold">Cleared</span>}
+                        {row.status === 'Cleared' && <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs rounded font-bold">Cleared</span>}
                         {row.status === 'Pending' && <span className="px-2.5 py-1 bg-amber-100 text-amber-800 border border-amber-200 text-xs rounded font-bold">Pending</span>}
                         {row.status === 'Expired' && <span className="px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 text-xs rounded font-bold">Expired</span>}
+                        {row.status === 'Denied' && <span className="px-2.5 py-1 bg-rose-100 text-rose-800 border border-rose-200 text-xs rounded font-bold">Denied</span>}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <div className="flex items-center justify-center space-x-1.5 relative">
@@ -319,7 +386,7 @@ export default function EmployeeDashboard() {
                                 <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
                                 <div className="absolute right-0 mt-1 w-40 bg-white border border-slate-400/80 rounded-xl shadow-lg py-1.5 z-20 text-left text-xs font-semibold text-slate-700">
                                   <button onClick={() => { alert(`Editing context logic initialized for token field: ${row.id}`); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700">Edit Info</button>
-                                  <button onClick={() => { const rem = shiftData.filter(x => x.id !== row.id); setShiftData(rem); localStorage.setItem('DEFENCE_SHIFT_LOGS', JSON.stringify(rem)); setActiveMenuId(null); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-rose-600 border-t border-slate-100">Revoke Request</button>
+                                  <button onClick={() => handleRevoke(row.id)} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-rose-600 border-t border-slate-100">Revoke Request</button>
                                 </div>
                               </>
                             )}
@@ -337,24 +404,32 @@ export default function EmployeeDashboard() {
         {/* --- REGISTRATION MODAL --- */}
         {isRegModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setIsRegModalOpen(false)}></div>
-            <div className="relative bg-white w-full max-w-2xl rounded-xl shadow-2xl border border-slate-400/80 flex flex-col overflow-hidden">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => !isSubmitting && setIsRegModalOpen(false)}></div>
+            <div className="relative bg-white w-full max-w-2xl rounded-xl shadow-2xl border border-slate-400/80 flex flex-col overflow-hidden animate-fade-in">
               <div className="p-5 border-b border-slate-400/60 bg-slate-50 flex justify-between items-center">
                 <h2 className="text-lg font-bold text-slate-900">Security Pass Request</h2>
-                <button onClick={() => setIsRegModalOpen(false)} className="p-1.5 hover:bg-slate-200 rounded-full text-slate-400"><X className="w-5 h-5" /></button>
+                <button onClick={() => !isSubmitting && setIsRegModalOpen(false)} className="p-1.5 hover:bg-slate-200 rounded-full text-slate-400"><X className="w-5 h-5" /></button>
               </div>
               <form onSubmit={handleFormSubmit} className="p-6 space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">VISITOR FULL NAME</label>
-                  <input type="text" required value={formName} onChange={(e) => setFormName(e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="Sinchana K" />
+                  <input type="text" required disabled={isSubmitting} value={formName} onChange={(e) => setFormName(e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="e.g. Rahul Verma" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">PHONE NUMBER</label>
-                  <input type="tel" required value={formPhone} onChange={(e) => setFormPhone(e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="+91..." />
+                  <input type="tel" required disabled={isSubmitting} value={formPhone} onChange={(e) => setFormPhone(e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="+91..." />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">EMAIL ADDRESS (OPTIONAL)</label>
+                  <input type="email" disabled={isSubmitting} value={formEmail} onChange={(e) => setFormEmail(e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="email@example.com" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">PURPOSE OF VISIT</label>
+                  <input type="text" disabled={isSubmitting} value={formPurpose} onChange={(e) => setFormPurpose(e.target.value)} className="w-full p-2 border rounded-lg text-sm" placeholder="Brief reason for access..." />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">PIPELINE TYPE</label>
-                  <select value={formPipeline} onChange={(e) => setFormPipeline(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white">
+                  <select disabled={isSubmitting} value={formPipeline} onChange={(e) => setFormPipeline(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white">
                     <option>Immediate Access / Live Walk-in</option>
                     <option>Pre-Scheduled Visit</option>
                     <option>Repeated Visitor</option>
@@ -362,7 +437,7 @@ export default function EmployeeDashboard() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">DEPARTMENT CLASSIFICATION</label>
-                  <select value={formClassification} onChange={(e) => setFormClassification(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white">
+                  <select disabled={isSubmitting} value={formClassification} onChange={(e) => setFormClassification(e.target.value)} className="w-full p-2 border rounded-lg text-sm bg-white">
                     <option>IT Department</option>
                     <option>Cyber Security Unit</option>
                     <option>Logistics Division</option>
@@ -371,15 +446,17 @@ export default function EmployeeDashboard() {
                   </select>
                 </div>
                 <div className="flex justify-end space-x-2 pt-4 border-t">
-                  <button type="button" onClick={() => setIsRegModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-slate-500">Cancel</button>
-                  <button type="submit" className="px-4 py-2 bg-slate-900 text-white font-semibold text-sm rounded-lg">Submit Pass</button>
+                  <button type="button" disabled={isSubmitting} onClick={() => setIsRegModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-slate-500 disabled:opacity-50">Cancel</button>
+                  <button type="submit" disabled={isSubmitting} className="px-4 py-2 bg-slate-900 text-white font-semibold text-sm rounded-lg disabled:opacity-50 flex items-center">
+                    {isSubmitting ? 'Processing...' : 'Submit Pass'}
+                  </button>
                 </div>
               </form>
             </div>
           </div>
         )}
 
-        {/* --- REVERTED CLEAN TWO-COLUMN DETAIL PREVIEW DRAWER --- */}
+        {/* --- DETAIL PREVIEW DRAWER --- */}
         {isDetailDrawerOpen && selectedVisitor && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setIsDetailDrawerOpen(false)}></div>
@@ -432,7 +509,7 @@ export default function EmployeeDashboard() {
                   </div>
                 </div>
 
-                <div className="md:col-span-1 bg-white p-4 rounded-xl border border-slate-400/60 shadow-xs flex flex-col justify-center text-center text-slate-400 p-4 border-dashed min-h-[180px]">
+                <div className="md:col-span-1 bg-white p-4 rounded-xl border border-slate-400/60 shadow-xs flex flex-col justify-center text-center text-slate-400 border-dashed min-h-[180px]">
                   <FileText className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                   <span className="font-bold text-slate-600 text-xs break-all">encrypted_identity_token.pdf</span>
                   <span className="text-[9px] text-slate-400 mt-0.5">Secure View Matrix Active</span>

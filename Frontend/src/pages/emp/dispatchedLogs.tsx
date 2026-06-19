@@ -4,6 +4,7 @@ import { Eye, FileText, ArrowLeft, RefreshCw, CheckCircle, X } from 'lucide-reac
 import { Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import SearchFilterMatrix from '../../components/common/SearchFilterMatrix';
+import { supabase } from '../../lib/supabase';
 
 interface VisitorRecord {
   id: string;
@@ -22,6 +23,7 @@ interface VisitorRecord {
 export default function DispatchedLogsPage() {
   const navigate = useNavigate();
   const [logs, setLogs] = useState<VisitorRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
     pipeline: [],
@@ -31,14 +33,70 @@ export default function DispatchedLogsPage() {
 
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-// Pull data once on mount and save it to the source of truth
-useEffect(() => {
-  const stored = localStorage.getItem('DEFENCE_SHIFT_LOGS');
-  if (stored) {
-    const parsed = JSON.parse(stored);
-    setLogs(parsed); // This is all you need!
-  }
-}, []);
+
+  // Hardcoded current employee context
+  const currentUser = {
+    empId: 'EMP001',
+    name: 'Sinchana K',
+    dept: 'Cyber Security Unit'
+  };
+
+  // Live Supabase Fetch
+  useEffect(() => {
+    async function fetchDispatchedLogs() {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('visits')
+          .select(`
+            visit_id,
+            visit_type,
+            purpose,
+            status,
+            start_date,
+            created_at,
+            visitors (name, phone, email)
+          `)
+          .eq('host_employee_id', currentUser.empId)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (data) {
+          const transformed: VisitorRecord[] = data.map((row: any) => {
+            let uiPipeline = 'Immediate Access / Live Walk-in';
+            if (row.visit_type === 'PRESCHEDULED') uiPipeline = 'Pre-Scheduled Visit';
+            if (row.visit_type === 'REPEATED') uiPipeline = 'Repeated Visitor';
+
+            const purposeParts = (row.purpose || '').split('] ');
+            const classification = purposeParts.length > 1 ? purposeParts[0].replace('[', '') : 'General Unit';
+            const cleanPurpose = purposeParts.length > 1 ? purposeParts[1] : row.purpose;
+
+            return {
+              id: row.visit_id,
+              visitorName: row.visitors?.name || 'Unknown',
+              phone: row.visitors?.phone || 'N/A',
+              email: row.visitors?.email || 'N/A',
+              pipeline: uiPipeline,
+              classification: classification,
+              purpose: cleanPurpose || 'General Entry Clearance Walk-in Protocol',
+              hostName: currentUser.name,
+              hostDept: currentUser.dept,
+              requestDate: new Date(row.start_date || row.created_at).toLocaleString('en-GB', { hour12: false, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+              status: row.status === 'Approved' ? 'Cleared' : row.status
+            };
+          });
+          setLogs(transformed);
+        }
+      } catch (err) {
+        console.error("Error fetching dispatched logs:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchDispatchedLogs();
+  }, []);
 
   const filterBuckets = [
     {
@@ -82,7 +140,6 @@ useEffect(() => {
     });
   };
 
-  // Process sorting/filtering queries across stored data layers
   const visibleRows = React.useMemo(() => {
     return logs.filter(item => {
       if (searchTerm) {
@@ -98,7 +155,7 @@ useEffect(() => {
   }, [logs, searchTerm, selectedFilters]);
 
   return (
-    <DashboardLayout role="emp" userName="Sinchana K">
+    <DashboardLayout role="emp" userName={currentUser.name}>
       <div className="max-w-7xl mx-auto">
         
         <div className="mb-6">
@@ -123,7 +180,12 @@ useEffect(() => {
             />
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto relative min-h-[200px]">
+            {loading ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
+                <p className="text-slate-500 font-medium animate-pulse">Syncing master archive...</p>
+              </div>
+            ) : null}
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="bg-slate-50/80 text-slate-500 border-b border-slate-400/60 font-semibold">
                 <tr>
@@ -137,9 +199,9 @@ useEffect(() => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-400/60 font-medium">
-                {visibleRows.length === 0 ? (
+                {visibleRows.length === 0 && !loading ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400 italic">No historical dispatch items discovered in browser cache history templates.</td>
+                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400 italic">No historical dispatch items discovered in the centralized database.</td>
                   </tr>
                 ) : (
                   visibleRows.map(row => (
@@ -155,7 +217,10 @@ useEffect(() => {
                       </td>
                       <td className="px-6 py-4 text-slate-500 text-xs">{row.requestDate}</td>
                       <td className="px-6 py-4">
-                        <span className="px-2.5 py-1 bg-slate-800 text-white text-xs rounded font-bold">{row.status}</span>
+                        {row.status === 'Cleared' && <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs rounded font-bold">Cleared</span>}
+                        {row.status === 'Pending' && <span className="px-2.5 py-1 bg-amber-100 text-amber-800 border border-amber-200 text-xs rounded font-bold">Pending</span>}
+                        {row.status === 'Expired' && <span className="px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 text-xs rounded font-bold">Expired</span>}
+                        {row.status === 'Denied' && <span className="px-2.5 py-1 bg-rose-100 text-rose-800 border border-rose-200 text-xs rounded font-bold">Denied</span>}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <button 
@@ -226,7 +291,7 @@ useEffect(() => {
                   </div>
                 </div>
 
-                <div className="md:col-span-1 bg-white p-4 rounded-xl border border-slate-400/60 shadow-xs flex flex-col justify-center text-center text-slate-400 p-4 border-dashed min-h-[180px]">
+                <div className="md:col-span-1 bg-white p-4 rounded-xl border border-slate-400/60 shadow-xs flex flex-col justify-center text-center text-slate-400 border-dashed min-h-[180px]">
                   <FileText className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                   <span className="font-bold text-slate-600 text-xs break-all">encrypted_identity_token.pdf</span>
                   <span className="text-[9px] text-slate-400 mt-0.5">Secure View Matrix Active</span>
@@ -234,7 +299,7 @@ useEffect(() => {
               </div>
 
               <div className="p-4 border-t border-slate-400/60 bg-white flex justify-between items-center">
-                <span className="text-xs text-slate-500 flex items-center font-medium"><CheckCircle className="w-4 h-4 mr-2 text-emerald-500" /> Pass trace logged in local persistence cache.</span>
+                <span className="text-xs text-slate-500 flex items-center font-medium"><CheckCircle className="w-4 h-4 mr-2 text-emerald-500" /> Pass trace verified against centralized live database.</span>
                 <button 
                   onClick={() => { setIsDetailOpen(false); navigate(`/emp?autofill=${selectedVisitor.visitorName}`); }}
                   className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"

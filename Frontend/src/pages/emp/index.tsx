@@ -6,6 +6,13 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import SearchFilterMatrix from '../../components/common/SearchFilterMatrix';
 import { supabase } from '../../lib/supabase';
 
+interface EscortRecord {
+  name:string;
+  phone:string;
+  id_number:string;
+  id_type:string;
+}
+
 interface VisitorRecord {
   id: string;
   id_type: string;
@@ -20,10 +27,7 @@ interface VisitorRecord {
   purpose: string;
   hostName: string;
   hostDept: string;
-  escortName: string;
-  escortPhone: string;
-  escortIdNumber:string;
-  escortIdType:string;
+  escorts : EscortRecord[];
   requestDate: string;
   status: string;
   organization: string;
@@ -82,10 +86,7 @@ export default function EmployeeDashboard() {
           if (row.visit_type === 'PRESCHEDULED') uiPipeline = 'Pre-Scheduled';
           if (row.visit_type === 'REPEATED') uiPipeline = 'Repeated';
 
-          // Because 'visit_id' is a foreign key inside the 'escorts' table, 
-          // Supabase returns an array of escorts for each visit. We grab the first one.
-          const primaryEscort = Array.isArray(row.escorts) ? row.escorts[0] : row.escorts;
-
+          const escortsArray = Array.isArray(row.escorts)? row.escorts:(row.escorts?[row.escorts]:[]);
           return {
             id: row.visit_id,
             visitorName: row.visitors?.name || 'Unknown',
@@ -100,10 +101,7 @@ export default function EmployeeDashboard() {
             purpose: row.purpose || 'General Entry',
             hostName: currentUser.name,
             hostDept: currentUser.dept,
-            escortName: primaryEscort?.name || 'N/A', 
-            escortPhone: primaryEscort?.phone || 'N/A' ,  
-            escortIdNumber:primaryEscort?.id_number || 'N/A',
-            escortIdType:primaryEscort?.id_type || 'Govt',    
+            escorts: escortsArray,
             requestDate: new Date(row.start_date || row.created_at).toLocaleString('en-GB', { hour12: false, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
             status: row.status === 'Approved' ? 'Cleared' : row.status,
             organization: row.visitors?.organization || 'N/A'
@@ -168,7 +166,7 @@ export default function EmployeeDashboard() {
 
       for (const key of Object.keys(selectedFilters)) {
         const selectedValues = selectedFilters[key];
-        if (selectedValues.length > 0 && !selectedValues.includes(item[key as keyof VisitorRecord])) return false;
+        if (selectedValues.length > 0 && !selectedValues.some(val => String(val) === String(item[key as keyof VisitorRecord]))) return false;
       }
       return true;
     });
@@ -415,14 +413,27 @@ export default function EmployeeDashboard() {
                 {/* 3. Host & Escort */}
                 <section>
                   <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                    <Shield className="w-4 h-4 mr-2 text-blue-600" /> Host & Escort
+                    <Shield className="w-4 h-4 mr-2 text-blue-600" /> Host & Escorts
                   </h3>
-                  <div className="space-y-4 text-sm">
+                  <div className="space-y-4 text-sm mb-4">
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Assigned Host</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.hostName}</span></div>
-                    <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Escort Name</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.escortName}</span></div>
-                    <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Escort Phone</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.escortPhone}</span></div>
-                    <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Escort {selectedVisitor.escortIdType} ID</span><span className="col-span-2 font-medium text-slate-900 font-mono">{selectedVisitor.escortIdNumber}</span></div>
                   </div>
+
+                  {/* Loop through all available escorts in the array */}
+                  {selectedVisitor.escorts && selectedVisitor.escorts.length > 0 ? (
+                    <div className="space-y-4 mt-4">
+                      {selectedVisitor.escorts.map((escort, idx) => (
+                        <div key={idx} className="bg-white p-3 border border-slate-200 rounded-lg shadow-sm text-sm">
+                          <div className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Escort {idx + 1}</div>
+                          <div className="grid grid-cols-3 gap-1 mb-1"><span className="text-slate-500">Name</span><span className="col-span-2 font-medium text-slate-900">{escort.name || 'N/A'}</span></div>
+                          <div className="grid grid-cols-3 gap-1 mb-1"><span className="text-slate-500">Phone</span><span className="col-span-2 font-medium text-slate-900">{escort.phone || 'N/A'}</span></div>
+                          <div className="grid grid-cols-3 gap-1"><span className="text-slate-500">{escort.id_type || 'ID'}</span><span className="col-span-2 font-medium text-slate-900 font-mono">{escort.id_number || 'N/A'}</span></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-slate-500 italic">No escorts assigned.</div>
+                  )}
                 </section>
 
               </div>

@@ -22,6 +22,8 @@ interface VisitorRecord {
   hostDept: string;
   escortName: string;
   escortPhone: string;
+  escortIdNumber:string;
+  escortIdType:string;
   requestDate: string;
   status: string;
   organization: string;
@@ -44,7 +46,7 @@ export default function EmployeeDashboard() {
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
     pipeline: [],
     status: [],
-    classification: []
+    department: []
   });
 
   // UI States
@@ -66,7 +68,8 @@ export default function EmployeeDashboard() {
           status,
           start_date,
           created_at,
-          visitors (visitor_id, name, phone, address, email, dob, organization, designation, id_type, id_number, nationality)
+          visitors (visitor_id, name, phone, address, email, dob, organization, designation, id_type, id_number, nationality),
+          escorts(name,phone,id_number, id_type)
         `)
         .eq('host_employee_id', currentUser.empId)
         .order('created_at', { ascending: false });
@@ -79,9 +82,9 @@ export default function EmployeeDashboard() {
           if (row.visit_type === 'PRESCHEDULED') uiPipeline = 'Pre-Scheduled';
           if (row.visit_type === 'REPEATED') uiPipeline = 'Repeated';
 
-          // const purposeParts = (row.purpose || '').split('] ');
-          // const department = purposeParts.length > 1 ? purposeParts[0].replace('[', '') : 'General Unit';
-          // const cleanPurpose = purposeParts.length > 1 ? purposeParts[1] : row.purpose;
+          // Because 'visit_id' is a foreign key inside the 'escorts' table, 
+          // Supabase returns an array of escorts for each visit. We grab the first one.
+          const primaryEscort = Array.isArray(row.escorts) ? row.escorts[0] : row.escorts;
 
           return {
             id: row.visit_id,
@@ -97,8 +100,10 @@ export default function EmployeeDashboard() {
             purpose: row.purpose || 'General Entry',
             hostName: currentUser.name,
             hostDept: currentUser.dept,
-            escortName: 'Not Assigned', // Temporarily hardcoded until we add the DB column
-            escortPhone: 'N/A',         // Temporarily hardcoded until we add the DB column
+            escortName: primaryEscort?.name || 'N/A', 
+            escortPhone: primaryEscort?.phone || 'N/A' ,  
+            escortIdNumber:primaryEscort?.id_number || 'N/A',
+            escortIdType:primaryEscort?.id_type || 'Govt',    
             requestDate: new Date(row.start_date || row.created_at).toLocaleString('en-GB', { hour12: false, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
             status: row.status === 'Approved' ? 'Cleared' : row.status,
             organization: row.visitors?.organization || 'N/A'
@@ -416,6 +421,7 @@ export default function EmployeeDashboard() {
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Assigned Host</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.hostName}</span></div>
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Escort Name</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.escortName}</span></div>
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Escort Phone</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.escortPhone}</span></div>
+                    <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Escort {selectedVisitor.escortIdType} ID</span><span className="col-span-2 font-medium text-slate-900 font-mono">{selectedVisitor.escortIdNumber}</span></div>
                   </div>
                 </section>
 

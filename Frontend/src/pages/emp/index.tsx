@@ -210,12 +210,12 @@ export default function EmployeeDashboard() {
           {/* Redirects to the separate add_visitor page */}
           <div 
             onClick={() => navigate('/emp/add_visitor')}
-            className="flex items-center justify-between p-6 bg-white border border-slate-200 rounded-xl hover:border-blue-500 hover:shadow-md transition-all group cursor-pointer"
+            className="flex items-center justify-between p-6 bg-white border border-slate-200 rounded-xl hover:shadow-md transition-all group cursor-pointer"
           >
             <div>
-              <h3 className="text-lg font-semibold text-slate-800">New Visitor Request</h3>
-              <p className="text-sm text-slate-500 mt-2">Create a new gate pass request or pre-schedule an upcoming visit.</p>
-              <span className="text-blue-600 text-sm font-medium mt-4 inline-block group-hover:underline">Open Form →</span>
+              <h3 className="text-lg font-semibold text-blue-400">New Visitor Request</h3>
+              <p className="text-sm text-slate-400 mt-2">Create a new gate pass request or pre-schedule an upcoming visit.</p>
+              <span className="text-blue-400 text-sm font-medium mt-4 inline-block group-hover:text-blue-500">Open Form →</span>
             </div>
             <div className="flex flex-col items-center justify-center p-4 border border-blue-100 bg-blue-50 rounded-lg text-blue-600 shrink-0">
               <UserPlus className="w-8 h-8 mb-2" />
@@ -224,13 +224,13 @@ export default function EmployeeDashboard() {
           </div>
 
           <Link to="/emp/dispatchedlogs" className="block">
-            <div className="flex items-center justify-between p-6 bg-white border border-slate-200 rounded-xl hover:border-slate-800 hover:shadow-md transition-all group cursor-pointer h-full">
+            <div className="flex items-center justify-between p-6 bg-white border border-slate-200 rounded-xl  hover:shadow-md transition-all group cursor-pointer h-full">
               <div>
-                <h3 className="text-lg font-semibold text-slate-800">Pass History Logs</h3>
+                <h3 className="text-lg font-semibold text-amber-400">Pass History Logs</h3>
                 <p className="text-sm text-slate-500 mt-2">View previously dispatched passes, expired credentials, and exit logs.</p>
-                <span className="text-slate-800 text-sm font-medium mt-4 inline-block group-hover:underline">View Logs →</span>
+                <span className="text-amber-400 text-sm font-medium mt-4 inline-block group-hover:text-amber-500">View Logs →</span>
               </div>
-              <div className="flex flex-col items-center justify-center p-4 border border-slate-200 bg-slate-50 rounded-lg text-slate-700 shrink-0">
+              <div className="flex flex-col items-center justify-center p-4 border border-slate-200 bg-amber-50 rounded-lg text-amber-500 shrink-0">
                 <FileText className="w-8 h-8 mb-2" />
                 <span className="font-semibold text-sm">View History</span>
               </div>

@@ -85,7 +85,8 @@ export default function HRDashboard() {
             ),
             host:employees!visits_host_employee_id_fkey (
               name,
-              role
+              role,
+              id
             )
           `);
 

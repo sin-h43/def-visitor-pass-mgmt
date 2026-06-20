@@ -1,7 +1,7 @@
 // components/layout/DashboardLayout.tsx
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Calendar, Bell, LayoutDashboard, UserPlus, FileText, Settings, Shield, BarChart3, Users, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Calendar, Bell, LayoutDashboard, UserPlus, FileText, Settings, Shield, BarChart3, Users, PanelLeftClose, PanelLeftOpen, Repeat } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -23,7 +23,7 @@ export default function DashboardLayout({ children, role, userName }: LayoutProp
   ] : [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/hr' },
     { label: 'Visitor Management', icon: Users, path: '/hr/visitormgmt' },
-    { label: 'Verification Queue', icon: Shield, path: '/hr/verification' },
+    { label: 'Repeated Visitor Logs', icon: Repeat, path: '/hr/hrrep' },
     { label: 'Analytics', icon: BarChart3, path: '/hr/analytics' },
     { label: 'Audit Logs', icon: FileText, path: '/hr/audit' },
   ];

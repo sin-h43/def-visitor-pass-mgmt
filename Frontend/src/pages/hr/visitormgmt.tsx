@@ -150,12 +150,51 @@ export default function VisitorMgmtPage() {
   });
 
   const categories = [
-    { type: 'General', label: 'General Pass', icon: User, color: 'hover:border-blue-500 hover:text-blue-600 bg-blue-50/30' },
-    { type: 'HR', label: 'HR Registry', icon: ShieldAlert, color: 'hover:border-amber-500 hover:text-amber-600 bg-amber-50/30' },
-    { type: 'Govt', label: 'Govt / Defense', icon: Landmark, color: 'hover:border-purple-500 hover:text-purple-600 bg-purple-50/30' },
-    { type: 'Foreign', label: 'Foreign National', icon: Globe, color: 'hover:border-orange-500 hover:text-orange-600 bg-orange-50/30' },
-    { type: 'Service', label: 'Service / Vendor', icon: Wrench, color: 'hover:border-emerald-500 hover:text-emerald-600 bg-emerald-50/30' },
-  ];
+  { 
+    type: 'General', 
+    label: 'General Pass', 
+    desc: 'Standard public walk-ins, temporary business visits, or casual meetings.',
+    icon: User, 
+    color: 'border-blue-100 hover:border-blue-300 hover:shadow-blue-50/50 hover:bg-blue-50 ',
+    iconBg: 'bg-blue-50 text-blue-600 hover:bg-white',
+    title: "text-blue-400 "
+  },
+  { 
+    type: 'HR', 
+    label: 'HR Registry', 
+    desc: 'Candidate interviews, employee onboardings, and internal hr syncs.',
+    icon: ShieldAlert,
+    color: 'border-purple-100 hover:border-purple-300 hover:shadow-purple-50/50 hover:bg-purple-50',
+    iconBg: 'bg-purple-50 text-purple-600'
+  },
+  { 
+    type: 'Govt', 
+    label: 'Govt / Defense', 
+    desc: 'High-security clearance pathways for officials and ministry personnel.',
+    icon: Landmark, 
+    color: 'border-emerald-100 hover:border-emerald-300 hover:shadow-emerald-50/50 hover:bg-emerald-50',
+    iconBg: 'bg-emerald-50 text-emerald-600'
+
+  },
+  { 
+    type: 'Foreign', 
+    label: 'Foreign National', 
+    desc: 'International delegates, international passports, embassy tracks.',
+    icon: Globe, 
+    color: 'border-amber-100 hover:border-amber-300 hover:shadow-amber-50/50 hover:bg-amber-50',
+    iconBg: 'bg-amber-50 text-amber-600'
+
+  },
+  { 
+    type: 'Service', 
+    label: 'Service / Vendor', 
+    desc: 'Maintenance, infrastructure crews, and outsourced service tokens.',
+    icon: Wrench, 
+    color: 'border-orange-100 hover:border-orange-300 hover:shadow-orange-50/50 hover:bg-orange-50/50',
+    iconBg: 'bg-orange-50 text-orange-600'
+
+  },
+];
 
   const columns: TableColumn<VisitorRecord>[] = [
     { key: 'id', label: 'PASS ID', render: (row) => <span className="text-slate-800 font-mono font-semibold text-xs">{row.id}</span> },
@@ -244,24 +283,63 @@ export default function VisitorMgmtPage() {
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Select Onboarding Context Pathway</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {categories.map((cat) => {
-              const Icon = cat.icon;
-              return (
-                <div 
-                  key={cat.type}
-                  onClick={() => navigate(`/hr/add_visitor?category=${cat.type.toLowerCase()}`)}
-                  className={`border border-slate-300 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 group ${cat.color}`}
-                >
-                  <Icon className="w-6 h-6 text-slate-400 group-hover:scale-110 transition-transform mb-2" />
-                  <span className="text-sm font-bold text-slate-700">{cat.label}</span>
-                </div>
-              );
-            })}
+<div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+  <div className="mb-5">
+    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+      SELECT VISITOR CATEGORY
+    </h3>
+    <p className="text-xs text-slate-500 mt-0.5">
+      Select the most appropriate category for your visitor.
+    </p>
+  </div>
+
+  {/* Cleaned Layout Grid (No top-border on hover) */}
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    {categories.map((cat) => {
+      const Icon = cat.icon;
+      return (
+        <div 
+          key={cat.type}
+          onClick={() => navigate(`/hr/add_visitor?category=${cat.type.toLowerCase()}`)}
+          className={`group bg-white border rounded-xl p-5 flex flex-col justify-between items-start cursor-pointer hover:shadow-lg transition-all duration-200 relative overflow-hidden ${cat.color}`}
+        >
+          <div className="w-full">
+            {/* Soft background icon container */}
+            <div className={`p-2.5 rounded-lg w-fit mb-4 transition-transform group-hover:bg-white duration-200 ${cat.iconBg}`}>
+              <Icon className="w-5 h-5" />
+            </div>
+
+            {/* Title */}
+            <h4 className="text-sm font-bold text-slate-800 tracking-tight group-hover:text-slate-900">
+              {cat.label}
+            </h4>
+
+            {/* Functional context description */}
+            <p className="text-[11px] leading-relaxed text-slate-400 font-medium mt-1.5 group-hover:text-slate-500 line-clamp-2">
+              {cat.desc}
+            </p>
+          </div>
+
+          {/* Action indicator row */}
+          <div className="mt-5 w-full flex items-center justify-between pt-3 border-t border-slate-50 group-hover:border-slate-100">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 group-hover:text-slate-600 transition-colors">
+              Launch Track
+            </span>
+            <svg 
+              className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-600 group-hover:translate-x-0.5 transition-all" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor" 
+              strokeWidth={2.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
           </div>
         </div>
+      );
+    })}
+  </div>
+</div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
           <div>

@@ -48,6 +48,10 @@ export default function RegistrationForm() {
   const [headCount, setHeadCount] = useState<number>(0);
   const [escorts, setEscorts] = useState<{name: string, govId: string}[]>([]);
 
+  //file
+  const [file , setFile] =useState<File | null>(null);
+  const [uploadingText, setUploadingText] = useState('');
+
   // Dynamically update Escort rows
   useEffect(() => {
     const count = Math.max(0, Math.min(headCount, 10)); // Cap at 10 rows
@@ -90,6 +94,27 @@ export default function RegistrationForm() {
       const newVisitorId = `VIS${timestamp}`;
       const newVisitId = `VST${timestamp}`;
 
+      let documentUrl = null;
+      if (file) {
+        setUploadingText('Uploading document...');
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${newVisitId}_doc.${fileExt}`; // e.g., VST123456_doc.pdf
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('visitor-documents')
+          .upload(fileName, file);
+
+        if (uploadError) throw uploadError;
+
+        // Get the public URL to save in the database
+        const { data: publicUrlData } = supabase.storage
+          .from('visitor-documents')
+          .getPublicUrl(fileName);
+          
+        documentUrl = publicUrlData.publicUrl;
+      }
+      setUploadingText('Saving records...');
+
       // Insert into visitors table
       const { error: visitorError } = await supabase.from('visitors').insert({
         visitor_id: newVisitorId,
@@ -129,7 +154,8 @@ export default function RegistrationForm() {
         purpose: finalPurpose,
         start_date: startDate,
         end_date: startDate,
-        status: 'Pending'
+        status: 'Pending',
+        document_url: documentUrl
       });
 
       if (visitError) throw visitError;
@@ -350,26 +376,29 @@ export default function RegistrationForm() {
         {/* Scan Verification Documents */}
         <div className="pt-6 border-t border-slate-200">
           <label className="block text-sm font-semibold text-slate-800 mb-3">Upload Verification Documents</label>
-          <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 bg-slate-50 flex flex-col items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors cursor-pointer mb-6">
-            <UploadCloud className="w-8 h-8 mb-2 text-slate-400" />
-            <span className="font-medium text-slate-700 text-sm">Drag & Drop or Click to Upload Credentials</span>
-            <span className="text-xs mt-1">PDF, PNG, or JPG up to 5MB (Automatic encryption applied)</span>
-          </div>
+          
+          <label className="border-2 border-dashed border-slate-300 rounded-xl p-8 bg-slate-50 flex flex-col items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors cursor-pointer mb-6 relative">
+            <UploadCloud className="w-8 h-8 mb-2 text-blue-500" />
+            <span className="font-medium text-slate-700 text-sm">
+              {file ? file.name : 'Click to Upload Credentials'}
+            </span>
+            <span className="text-xs mt-1">PDF, PNG, or JPG up to 5MB</span>
+            
+            {/* Hidden file input */}
+            <input 
+              type="file" 
+              accept=".pdf,.png,.jpg,.jpeg"
+              onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+          </label>
 
           <div className="flex justify-end gap-4 pt-4">
-            <button 
-              type="button" 
-              onClick={() => navigate('/emp')}
-              className="px-6 py-2.5 rounded-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors text-sm"
-            >
+            <button type="button" onClick={() => navigate('/emp')} className="px-6 py-2.5 rounded-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors text-sm">
               Cancel
             </button>
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="px-8 py-2.5 rounded-lg font-medium bg-slate-900 text-white hover:bg-slate-800 shadow-sm transition-colors text-sm disabled:opacity-50 flex items-center"
-            >
-              {loading ? 'Processing Ledger...' : 'Submit Application'}
+            <button type="submit" disabled={loading} className="px-8 py-2.5 rounded-lg font-medium bg-slate-900 text-white hover:bg-slate-800 shadow-sm transition-colors text-sm disabled:opacity-50 flex items-center">
+              {loading ? (uploadingText || 'Processing...') : 'Submit Application'}
             </button>
           </div>
         </div>

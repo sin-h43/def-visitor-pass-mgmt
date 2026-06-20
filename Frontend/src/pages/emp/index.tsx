@@ -31,6 +31,7 @@ interface VisitorRecord {
   requestDate: string;
   status: string;
   organization: string;
+  documentUrl:string | null;
 }
 
 export default function EmployeeDashboard() {
@@ -72,7 +73,7 @@ export default function EmployeeDashboard() {
           status,
           start_date,
           created_at,
-          visitors (visitor_id, name, phone, address, email, dob, organization, designation, id_type, id_number, nationality),
+          visitors (visitor_id, name, phone, address, email, dob, organization, designation, id_type, id_number, nationality, document_url),
           escorts(name,phone,id_number, id_type)
         `)
         .eq('host_employee_id', currentUser.empId)
@@ -99,6 +100,7 @@ export default function EmployeeDashboard() {
             pipeline: uiPipeline,
             department: row.department || "General Unit",
             purpose: row.purpose || 'General Entry',
+            documentUrl:row.visitors?.document_url || null,
             hostName: currentUser.name,
             hostDept: currentUser.dept,
             escorts: escortsArray,
@@ -433,6 +435,30 @@ export default function EmployeeDashboard() {
                     </div>
                   ) : (
                     <div className="text-sm text-slate-500 italic">No escorts assigned.</div>
+                  )}
+                </section>
+                {/* 5. Document Link */}
+                <section>
+                  <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
+                    <FileText className="w-4 h-4 mr-2 text-blue-600" /> Attached Documents
+                  </h3>
+                  
+                  {selectedVisitor.documentUrl ? (
+                    <a 
+                      href={selectedVisitor.documentUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex flex-col items-center justify-center text-center hover:bg-blue-100 transition-colors group cursor-pointer"
+                    >
+                      <FileText className="w-8 h-8 mb-2 text-blue-500 group-hover:scale-110 transition-transform" />
+                      <span className="font-bold text-blue-700 text-xs break-all">View clearance_document.pdf</span>
+                      <span className="text-[10px] text-blue-500 mt-1">Opens in secure viewer</span>
+                    </a>
+                  ) : (
+                    <div className="bg-slate-50 border border-dashed border-slate-300 p-4 rounded-xl flex flex-col items-center justify-center text-center text-slate-400 min-h-[120px]">
+                      <FileText className="w-8 h-8 mb-2 text-slate-300" />
+                      <span className="text-xs font-medium">No documents attached</span>
+                    </div>
                   )}
                 </section>
 

@@ -1,24 +1,12 @@
 // pages/emp/dispatchedlogs.tsx
 import React, { useState, useEffect } from 'react';
-import { Eye, FileText, ArrowLeft, RefreshCw, CheckCircle, X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import SearchFilterMatrix from '../../components/common/SearchFilterMatrix';
+import VisitorTable  from '../../components/common/eVisitorTable';
+import type { VisitorRecord } from '../../components/common/eVisitorTable';
 import { supabase } from '../../lib/supabase';
-
-interface VisitorRecord {
-  id: string;
-  visitorName: string;
-  phone: string;
-  email: string;
-  pipeline: string;
-  classification: string;
-  purpose: string;
-  hostName: string;
-  hostDept: string;
-  requestDate: string;
-  status: string;
-}
 
 export default function DispatchedLogsPage() {
   const navigate = useNavigate();
@@ -28,20 +16,15 @@ export default function DispatchedLogsPage() {
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
     pipeline: [],
     status: [],
-    classification: []
+    department: []
   });
 
-  const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-
-  // Hardcoded current employee context
   const currentUser = {
     empId: 'EMP001',
     name: 'Sinchana K',
     dept: 'Cyber Security Unit'
   };
 
-  // Live Supabase Fetch
   useEffect(() => {
     async function fetchDispatchedLogs() {
       try {
@@ -51,11 +34,14 @@ export default function DispatchedLogsPage() {
           .select(`
             visit_id,
             visit_type,
+            department,
             purpose,
             status,
             start_date,
             created_at,
-            visitors (name, phone, email)
+             
+            visitors (visitor_id, name,document_url, phone, address, email, dob, organization, designation, id_type, id_number, nationality),
+            escorts(name,phone,id_number, id_type)
           `)
           .eq('host_employee_id', currentUser.empId)
           .order('created_at', { ascending: false });
@@ -64,26 +50,31 @@ export default function DispatchedLogsPage() {
 
         if (data) {
           const transformed: VisitorRecord[] = data.map((row: any) => {
-            let uiPipeline = 'Immediate Access / Live Walk-in';
-            if (row.visit_type === 'PRESCHEDULED') uiPipeline = 'Pre-Scheduled Visit';
-            if (row.visit_type === 'REPEATED') uiPipeline = 'Repeated Visitor';
+            let uiPipeline = 'Walk-in';
+            if (row.visit_type === 'PRESCHEDULED') uiPipeline = 'Pre-Scheduled';
+            if (row.visit_type === 'REPEATED') uiPipeline = 'Repeated';
 
-            const purposeParts = (row.purpose || '').split('] ');
-            const classification = purposeParts.length > 1 ? purposeParts[0].replace('[', '') : 'General Unit';
-            const cleanPurpose = purposeParts.length > 1 ? purposeParts[1] : row.purpose;
-
+            const escortsArray = Array.isArray(row.escorts) ? row.escorts : (row.escorts ? [row.escorts] : []);
+            
             return {
               id: row.visit_id,
               visitorName: row.visitors?.name || 'Unknown',
               phone: row.visitors?.phone || 'N/A',
               email: row.visitors?.email || 'N/A',
+              dob: row.visitors?.dob || 'N/A',
+              id_type: row.visitors?.id_type || 'Govt ID',
+              id_number: row.visitors?.id_number || 'N/A',
+              address: row.visitors?.address || 'N/A',
               pipeline: uiPipeline,
-              classification: classification,
-              purpose: cleanPurpose || 'General Entry Clearance Walk-in Protocol',
+              department: row.department || "General Unit",
+              purpose: row.purpose || 'General Entry',
+              documentUrl: row.visitors?.document_url || null,
               hostName: currentUser.name,
               hostDept: currentUser.dept,
+              escorts: escortsArray,
               requestDate: new Date(row.start_date || row.created_at).toLocaleString('en-GB', { hour12: false, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-              status: row.status === 'Approved' ? 'Cleared' : row.status
+              status: row.status === 'Approved' ? 'Cleared' : row.status,
+              organization: row.visitors?.organization || 'N/A'
             };
           });
           setLogs(transformed);
@@ -101,16 +92,16 @@ export default function DispatchedLogsPage() {
   const filterBuckets = [
     {
       key: 'pipeline',
-      title: 'Pipeline Context',
+      title: 'Visit Type',
       options: [
-        { label: 'Immediate Access / Live Walk-in', value: 'Immediate Access / Live Walk-in' },
-        { label: 'Pre-Scheduled Visit', value: 'Pre-Scheduled Visit' },
-        { label: 'Repeated Visitor', value: 'Repeated Visitor' },
+        { label: 'Walk-in', value: 'Walk-in' },
+        { label: 'Pre-Scheduled', value: 'Pre-Scheduled' },
+        { label: 'Repeated', value: 'Repeated' },
       ]
     },
     {
       key: 'status',
-      title: 'Clearance Status',
+      title: 'Status',
       options: [
         { label: 'Cleared', value: 'Cleared' },
         { label: 'Pending', value: 'Pending' },
@@ -118,9 +109,10 @@ export default function DispatchedLogsPage() {
       ]
     },
     {
-      key: 'classification',
-      title: 'Department Classification',
+      key: 'department',
+      title: 'Department',
       options: [
+        { label: 'Research Wing', value: 'Research Wing' },
         { label: 'IT Department', value: 'IT Department' },
         { label: 'Cyber Security Unit', value: 'Cyber Security Unit' },
         { label: 'Logistics Division', value: 'Logistics Division' },
@@ -140,6 +132,18 @@ export default function DispatchedLogsPage() {
     });
   };
 
+  const handleRevoke = async (visitId: string) => {
+    if(!window.confirm("Are you sure you want to revoke this pass request?")) return;
+    try {
+      const { error } = await supabase.from('visits').update({ status: 'Revoked' }).eq('visit_id', visitId);
+      if (error) throw error;
+      setLogs(prev => prev.map(x => x.id === visitId ? { ...x, status: 'Revoked' } : x));
+    } catch (err) {
+      console.error("Failed to revoke pass:", err);
+      alert("Failed to revoke pass request.");
+    }
+  };
+
   const visibleRows = React.useMemo(() => {
     return logs.filter(item => {
       if (searchTerm) {
@@ -148,7 +152,10 @@ export default function DispatchedLogsPage() {
       }
       for (const key of Object.keys(selectedFilters)) {
         const vals = selectedFilters[key];
-        if (vals.length > 0 && !vals.includes(item[key as keyof VisitorRecord])) return false;
+        if (vals.length > 0) {
+          const itemValue = item[key as keyof VisitorRecord];
+          if (typeof itemValue === 'string' && !vals.includes(itemValue)) return false;
+        }
       }
       return true;
     });
@@ -180,138 +187,15 @@ export default function DispatchedLogsPage() {
             />
           </div>
 
-          <div className="overflow-x-auto relative min-h-[200px]">
-            {loading ? (
-              <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
-                <p className="text-slate-500 font-medium animate-pulse">Syncing master archive...</p>
-              </div>
-            ) : null}
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-slate-50/80 text-slate-500 border-b border-slate-400/60 font-semibold">
-                <tr>
-                  <th className="px-6 py-4 font-semibold text-xs tracking-wider">REGISTRY ID</th>
-                  <th className="px-6 py-4 font-semibold text-xs tracking-wider">VISITOR NAME</th>
-                  <th className="px-6 py-4 font-semibold text-xs tracking-wider">PIPELINE TYPE</th>
-                  <th className="px-6 py-4 font-semibold text-xs tracking-wider">ASSIGNED UNIT</th>
-                  <th className="px-6 py-4 font-semibold text-xs tracking-wider">DISPATCHED TIME</th>
-                  <th className="px-6 py-4 font-semibold text-xs tracking-wider">STATUS</th>
-                  <th className="px-6 py-4 font-semibold text-xs tracking-wider text-center">ACTION</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-400/60 font-medium">
-                {visibleRows.length === 0 && !loading ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400 italic">No historical dispatch items discovered in the centralized database.</td>
-                  </tr>
-                ) : (
-                  visibleRows.map(row => (
-                    <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-6 py-4 text-amber-600 font-bold">{row.id}</td>
-                      <td className="px-6 py-4">
-                        <div className="font-bold text-slate-800">{row.visitorName}</div>
-                        <div className="text-xs text-slate-500">{row.phone}</div>
-                      </td>
-                      <td className="px-6 py-4 text-slate-600 text-xs font-semibold">{row.pipeline}</td>
-                      <td className="px-6 py-4">
-                        <span className="px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded text-xs font-bold">{row.classification}</span>
-                      </td>
-                      <td className="px-6 py-4 text-slate-500 text-xs">{row.requestDate}</td>
-                      <td className="px-6 py-4">
-                        {row.status === 'Cleared' && <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs rounded font-bold">Cleared</span>}
-                        {row.status === 'Pending' && <span className="px-2.5 py-1 bg-amber-100 text-amber-800 border border-amber-200 text-xs rounded font-bold">Pending</span>}
-                        {row.status === 'Expired' && <span className="px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 text-xs rounded font-bold">Expired</span>}
-                        {row.status === 'Denied' && <span className="px-2.5 py-1 bg-rose-100 text-rose-800 border border-rose-200 text-xs rounded font-bold">Denied</span>}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <button 
-                          onClick={() => { setSelectedVisitor(row); setIsDetailOpen(true); }}
-                          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <VisitorTable 
+            data={visibleRows} 
+            loading={loading}
+            onEdit={(visitor) => navigate('/emp/add_visitor', { state: { autofill: visitor, isEdit: true } })}
+            onRevoke={handleRevoke}
+            onReRegister={(visitor) => navigate('/emp/add_visitor', { state: { autofill: visitor } })}
+          />
+
         </div>
-
-        {/* --- LIGHT-THEMED MASTER DETAIL DRAWER --- */}
-        {isDetailOpen && selectedVisitor && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xs" onClick={() => setIsDetailOpen(false)}></div>
-            <div className="relative bg-white w-full max-w-4xl rounded-xl shadow-2xl border border-slate-400/80 flex flex-col overflow-hidden animate-fade-in">
-              
-              <div className="p-5 border-b border-slate-400/60 bg-slate-50 text-slate-800 flex justify-between items-center">
-                <div>
-                  <h3 className="font-bold text-lg text-slate-900">Complete Access Registry Profile</h3>
-                  <p className="text-xs text-slate-500 mt-1">Pass ID Reference: <span className="text-blue-600 font-bold">{selectedVisitor.id}</span></p>
-                </div>
-                <button onClick={() => setIsDetailOpen(false)} className="p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-600 rounded-full transition-colors"><X className="w-5 h-5" /></button>
-              </div>
-
-              <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50/50 max-h-[70vh] overflow-y-auto">
-                <div className="md:col-span-2 space-y-6">
-                  <div className="grid grid-cols-2 gap-4 bg-white p-5 rounded-xl border border-slate-400/60 shadow-xs">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 block mb-0.5 tracking-wider">VISITOR IDENTIFICATION</span>
-                      <span className="font-bold text-slate-800 text-base">{selectedVisitor.visitorName}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 block mb-0.5 tracking-wider">PHONE CONTACT</span>
-                      <span className="font-medium text-slate-700">{selectedVisitor.phone}</span>
-                    </div>
-                    <div className="col-span-2 mt-1">
-                      <span className="text-[10px] font-bold text-slate-400 block mb-0.5 tracking-wider">SECURE DIGEST EMAIL</span>
-                      <span className="font-medium text-slate-700 text-sm break-all">{selectedVisitor.email}</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-white p-5 rounded-xl border border-slate-400/60 shadow-xs space-y-4">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 block mb-1 tracking-wider">VISITATION ENTRY LOG LOGIC</span>
-                      <p className="text-slate-800 font-medium text-xs bg-slate-50 p-3 border border-slate-200 rounded-lg leading-relaxed">{selectedVisitor.purpose}</p>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4 pt-2 border-t border-slate-100">
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 block tracking-wider">PIPELINE TYPE</span>
-                        <span className="text-xs font-bold text-slate-800">{selectedVisitor.pipeline}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 block tracking-wider">CLASSIFICATION</span>
-                        <span className="text-xs font-bold text-purple-700">{selectedVisitor.classification}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 block tracking-wider">DESIGNATED HOST</span>
-                        <span className="text-xs font-bold text-slate-800">{selectedVisitor.hostName}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="md:col-span-1 bg-white p-4 rounded-xl border border-slate-400/60 shadow-xs flex flex-col justify-center text-center text-slate-400 border-dashed min-h-[180px]">
-                  <FileText className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                  <span className="font-bold text-slate-600 text-xs break-all">encrypted_identity_token.pdf</span>
-                  <span className="text-[9px] text-slate-400 mt-0.5">Secure View Matrix Active</span>
-                </div>
-              </div>
-
-              <div className="p-4 border-t border-slate-400/60 bg-white flex justify-between items-center">
-                <span className="text-xs text-slate-500 flex items-center font-medium"><CheckCircle className="w-4 h-4 mr-2 text-emerald-500" /> Pass trace verified against centralized live database.</span>
-                <button 
-                  onClick={() => { setIsDetailOpen(false); navigate(`/emp?autofill=${selectedVisitor.visitorName}`); }}
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" /> Re-Register & Autofill
-                </button>
-              </div>
-
-            </div>
-          </div>
-        )}
-
       </div>
     </DashboardLayout>
   );

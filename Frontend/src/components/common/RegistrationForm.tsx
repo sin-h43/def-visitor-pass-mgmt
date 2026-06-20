@@ -49,7 +49,7 @@ export default function RegistrationForm() {
   const [escorts, setEscorts] = useState<{name: string, govId: string}[]>([]);
 
   //file
-  const [file , setFile] =useState<File | null>(null);
+  const [file , setFile] =useState(prefillData?.document_url !== 'N/A' ? (prefillData?.document_url || '') : '');
   const [uploadingText, setUploadingText] = useState('');
 
   // Dynamically update Escort rows

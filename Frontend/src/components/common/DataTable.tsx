@@ -33,7 +33,7 @@ export default function DataTable<T>({ title, data, columns }: DataTableProps<T>
               data.map((row, rowIndex) => (
                 <tr key={rowIndex} className="hover:bg-slate-50 transition-colors">
                   {columns.map((col, colIndex) => (
-                    <td key={colIndex} className="px-6 py-4 text-slate-700">
+                    <td key={colIndex} className="px-6 py-2 text-slate-700">
                       {col.render ? col.render(row) : (row as any)[col.key]}
                     </td>
                   ))}

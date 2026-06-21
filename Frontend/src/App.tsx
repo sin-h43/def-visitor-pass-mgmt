@@ -9,7 +9,7 @@ import DispatchedLogsPage from './pages/emp/dispatchedLogs';
 // --- HR Pages (Placeholders for what we build next) ---
 import HRDashboard from './pages/hr/index';
 import VisitorMgmtPage from './pages/hr/visitormgmt';
-import HRAddVisitorPage from './pages/hr/add_visitor';
+import HRAddVisitorPage from './pages/hr/add_visitor_general';
 import AnalyticsPage from './pages/hr/analytics';
 import AuditPage from './pages/hr/audit';
 import HRRepeatedVisitorLogPage from './pages/hr/hr_repeated_visitor.';

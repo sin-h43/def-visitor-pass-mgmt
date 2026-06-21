@@ -256,33 +256,12 @@ export default function HRRepeatedVisitorLogPage() {
         
         {/* Professional Identity Header */}
         <div className="flex items-center space-x-3">
-          <div className="p-2 bg-indigo-600 text-white rounded-lg shadow-sm">
-            <BookOpen className="w-6 h-6" />
-          </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-800">Master Visitor Directory</h1>
             <p className="text-sm text-slate-500">Searchable ledger of all identities that have accessed the facility.</p>
           </div>
         </div>
 
-        {/* Directory Snapshot Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[
-            { title: 'Total Registered Identities', value: directory.length.toString(), icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200' },
-            { title: 'Frequent Visitors (2+)', value: directory.filter(d => d.totalVisits > 1).length.toString(), icon: History, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
-            { title: 'Total Processed Entries', value: directory.reduce((acc, curr) => acc + curr.totalVisits, 0).toString(), icon: UserCheck, color: 'text-slate-600', bg: 'bg-slate-100', border: 'border-slate-200' }
-          ].map((stat, idx) => (
-            <div key={idx} className={`bg-white border p-4 rounded-xl flex items-center justify-between shadow-sm ${stat.border}`}>
-              <div>
-                <span className="text-xs font-bold text-slate-500 block tracking-wide uppercase">{stat.title}</span>
-                <span className="text-2xl font-black text-slate-800 block mt-1">{stat.value}</span>
-              </div>
-              <div className={`p-2.5 rounded-lg ${stat.bg} ${stat.color}`}>
-                <stat.icon className="w-5 h-5" />
-              </div>
-            </div>
-          ))}
-        </div>
 
         {/* Main Dashboard Panel Workspace */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">

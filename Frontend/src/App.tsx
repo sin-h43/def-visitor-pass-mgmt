@@ -14,6 +14,11 @@ import AnalyticsPage from './pages/hr/analytics';
 import AuditPage from './pages/hr/audit';
 import HRRepeatedVisitorLogPage from './pages/hr/hr_repeated_visitor.';
 import VisitorProfilePage from './pages/hr/visitor_profile';
+import AddVisitorGeneralPage from './pages/hr/add_visitor_general';
+import AddVisitorForeignPage from './pages/hr/add_visitor_foriegn';
+import AddVisitorGovtPage from './pages/hr/add_visitor_govt';
+import AddVisitorHRPage from './pages/hr/add_visitor_hr';
+import AddVisitorServicePage from './pages/hr/add_visitor_service';
 
 export default function App() {
   return (
@@ -47,6 +52,11 @@ export default function App() {
 <Route path="/hr/add_visitor" element={<HRAddVisitorPage />} />
 <Route path="/hr/addvisitor" element={<HRAddVisitorPage />} />
 <Route path="/hr/hrrep" element={<HRRepeatedVisitorLogPage />} />
+<Route path="/hr/add_visitor_general" element ={ <AddVisitorGeneralPage /> } />
+<Route path="/hr/add_visitor_govt" element ={ <AddVisitorGovtPage /> } />
+<Route path="/hr/add_visitor_hr" element ={ <AddVisitorHRPage /> } />
+<Route path="/hr/add_visitor_service" element ={ <AddVisitorServicePage /> } />
+<Route path="/hr/add_visitor_foriegn" element ={ <AddVisitorForeignPage /> } />
 <Route path="/hr/visitor/:id" element={<VisitorProfilePage />} />
 
 <Route path="/hr/analytics" element={<AnalyticsPage />} />

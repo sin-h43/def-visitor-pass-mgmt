@@ -216,7 +216,7 @@ export default function VisitorMgmtPage() {
   }, [visitorLogs, searchTerm, selectedFilters, activeTab]);
 
   const categories = [
-    { type: 'General', label: 'General Pass', desc: 'Standard public walk-ins, temporary business visits, or casual meetings.', icon: User, color: 'border-blue-100 hover:border-blue-300 hover:shadow-blue-50/50 hover:bg-blue-50 ', iconBg: 'bg-blue-50 text-blue-600 hover:bg-white' },
+    { type: 'General', label: 'General Pass', desc: 'Standard public walk-ins, temporary business visits, or casual meetings.', icon: User, color: 'border-blue-100 hover:border-blue-300 hover:shadow-blue-50/50 hover:bg-blue-50 ', iconBg: 'bg-blue-50 text-blue-600 hover:bg-white', path: navigate('') },
     { type: 'HR', label: 'HR Registry', desc: 'Candidate interviews, employee onboardings, and internal hr syncs.', icon: ShieldAlert, color: 'border-purple-100 hover:border-purple-300 hover:shadow-purple-50/50 hover:bg-purple-50', iconBg: 'bg-purple-50 text-purple-600' },
     { type: 'Govt', label: 'Govt / Defense', desc: 'High-security clearance pathways for officials and ministry personnel.', icon: Landmark, color: 'border-emerald-100 hover:border-emerald-300 hover:shadow-emerald-50/50 hover:bg-emerald-50', iconBg: 'bg-emerald-50 text-emerald-600' },
     { type: 'Foreign', label: 'Foreign National', desc: 'International delegates, international passports, embassy tracks.', icon: Globe, color: 'border-amber-100 hover:border-amber-300 hover:shadow-amber-50/50 hover:bg-amber-50', iconBg: 'bg-amber-50 text-amber-600' },

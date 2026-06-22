@@ -33,6 +33,7 @@ export default function RegistrationForm() {
 
   // Visitor Core Identity Attributes
   const [visitorName, setVisitorName] = useState(prefillData?.visitorName || '');
+  const [gender, setGender] = useState(prefillData?.gender && prefillData.gender !== 'Others' ? prefillData.gender : 'Others');
   const [dob, setDob] = useState(prefillData?.dob !== 'N/A' ? (prefillData?.dob || '') : '');
   const [email, setEmail] = useState(prefillData?.email !== 'N/A' ? (prefillData?.email || '') : '');
   const [phone, setPhone] = useState(prefillData?.phone !== 'N/A' ? (prefillData?.phone || '+91 ') : '+91 ');
@@ -120,6 +121,7 @@ export default function RegistrationForm() {
         name: visitorName,
         email: email || null,
         phone: phone,
+        gender: gender || 'Others',
         dob: dob || null,
         address: address || null,
         id_type: idType,
@@ -253,7 +255,16 @@ export default function RegistrationForm() {
             <input required type="text" value={visitorName} onChange={(e) => setVisitorName(e.target.value)} placeholder="e.g. Rahul Verma" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500" />
           </div>
           
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Gender *</label>
+              <select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500">
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Non-binary">Non-binary</option>
+                <option value="Others">Others</option>
+              </select>
+            </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1">Nationality *</label>
               <select value={nationality} onChange={handleNationalityChange} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500">
@@ -262,6 +273,7 @@ export default function RegistrationForm() {
                 ))}
               </select>
             </div>
+            
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1">Contact Phone *</label>
               <input required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-blue-500" />

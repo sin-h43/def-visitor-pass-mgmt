@@ -8,7 +8,6 @@ import SearchFilterBar from '../../components/common/SearchFilterBar';
 import type { TableColumn } from '../../types/visitor';
 import { supabase } from '../../lib/supabase';
 
-// Updated Interface to hold all timing and escort data
 interface VisitorRecord {
   id: string;
   visitorName: string;
@@ -19,9 +18,9 @@ interface VisitorRecord {
   purpose: string;
   hostName: string;
   hostDept: string;
-  hostId:string;
-  requestedAt: string; // When the employee submitted it
-  visitDate: string;   // When the visitor is arriving
+  hostId: string;
+  requestedAt: string;
+  visitDate: string;
   status: string;
   passType: string;
   pipeline: string;
@@ -34,7 +33,7 @@ interface VisitorRecord {
   id_number: string;
   address: string;
   department: string;
-  designation:string;
+  designation: string;
 }
 
 export default function VisitorMgmtPage() {
@@ -97,25 +96,19 @@ export default function VisitorMgmtPage() {
             email: row.visitors?.email || 'N/A',
             category: computedCategory, 
             purpose: row.purpose || 'General Entry',
-
-            //host details
             hostName: row.host?.name || 'Unassigned',
             hostDept: row.host?.role === 'hr' ? 'HR Officer' : 'Staff Member',
             hostId: row.host?.id || 'N/A',
-            
-            
-            // Format precise dates
             requestedAt: new Date(row.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
             visitDate: row.start_date ? new Date(row.start_date).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
-            
             status: row.status,
             passType: row.pass_type || 'ONE_DAY',
             pipeline: uiPipeline,
             nationality: row.visitors?.nationality || 'Indian',
             organization: row.visitors?.organization || 'N/A',
-            designation:row.visitors?.desiganization || 'N/A',
+            designation: row.visitors?.designation || 'N/A',
             documentUrl: row.visitors?.document_url || row.document_url || null,
-            escorts : escortsArray,
+            escorts: escortsArray,
             dob: row.visitors?.dob || 'N/A',
             id_type: row.visitors?.id_type || 'Govt ID',
             id_number: row.visitors?.id_number || 'N/A',
@@ -137,13 +130,11 @@ export default function VisitorMgmtPage() {
     fetchVisitorLogs();
   }, []);
 
-  // Update Status directly from the table or drawer
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     try {
       const { error } = await supabase.from('visits').update({ status: newStatus }).eq('visit_id', id);
       if (error) throw error;
       
-      // Update local state instantly
       setVisitorLogs(prev => prev.map(log => log.id === id ? { ...log, status: newStatus } : log));
       if (selectedVisitor?.id === id) {
         setSelectedVisitor(prev => prev ? { ...prev, status: newStatus } : null);
@@ -215,37 +206,36 @@ export default function VisitorMgmtPage() {
     });
   }, [visitorLogs, searchTerm, selectedFilters, activeTab]);
 
+  // Clean Route Strings linked securely to the individual files
   const categories = [
-    { type: 'General', label: 'General Pass', desc: 'Standard public walk-ins, temporary business visits, or casual meetings.', icon: User, color: 'border-blue-100 hover:border-blue-300 hover:shadow-blue-50/50 hover:bg-blue-50 ', iconBg: 'bg-blue-50 text-blue-600 hover:bg-white', path: navigate('') },
-    { type: 'HR', label: 'HR Registry', desc: 'Candidate interviews, employee onboardings, and internal hr syncs.', icon: ShieldAlert, color: 'border-purple-100 hover:border-purple-300 hover:shadow-purple-50/50 hover:bg-purple-50', iconBg: 'bg-purple-50 text-purple-600' },
-    { type: 'Govt', label: 'Govt / Defense', desc: 'High-security clearance pathways for officials and ministry personnel.', icon: Landmark, color: 'border-emerald-100 hover:border-emerald-300 hover:shadow-emerald-50/50 hover:bg-emerald-50', iconBg: 'bg-emerald-50 text-emerald-600' },
-    { type: 'Foreign', label: 'Foreign National', desc: 'International delegates, international passports, embassy tracks.', icon: Globe, color: 'border-amber-100 hover:border-amber-300 hover:shadow-amber-50/50 hover:bg-amber-50', iconBg: 'bg-amber-50 text-amber-600' },
-    { type: 'Service', label: 'Service / Vendor', desc: 'Maintenance, infrastructure crews, and outsourced service tokens.', icon: Wrench, color: 'border-orange-100 hover:border-orange-300 hover:shadow-orange-50/50 hover:bg-orange-50/50', iconBg: 'bg-orange-50 text-orange-600' },
+    { type: 'General', label: 'General Pass', desc: 'Standard public walk-ins, temporary business visits, or casual meetings.', icon: User, color: 'border-blue-100 hover:border-blue-300 hover:shadow-blue-50/50 hover:bg-blue-50 ', iconBg: 'bg-blue-50 text-blue-600', path: '/hr/add_visitor_general' },
+    { type: 'HR', label: 'HR Registry', desc: 'Candidate interviews, employee onboardings, and internal hr syncs.', icon: ShieldAlert, color: 'border-purple-100 hover:border-purple-300 hover:shadow-purple-50/50 hover:bg-purple-50', iconBg: 'bg-purple-50 text-purple-600', path: '/hr/add_visitor_hr' },
+    { type: 'Govt', label: 'Govt / Defense', desc: 'High-security clearance pathways for officials and ministry personnel.', icon: Landmark, color: 'border-emerald-100 hover:border-emerald-300 hover:shadow-emerald-50/50 hover:bg-emerald-50', iconBg: 'bg-emerald-50 text-emerald-600', path: '/hr/add_visitor_govt' },
+    { type: 'Foreign', label: 'Foreign National', desc: 'International delegates, international passports, embassy tracks.', icon: Globe, color: 'border-amber-100 hover:border-amber-300 hover:shadow-amber-50/50 hover:bg-amber-50', iconBg: 'bg-amber-50 text-amber-600', path: '/hr/add_visitor_foreign' },
+    { type: 'Service', label: 'Service / Vendor', desc: 'Maintenance, infrastructure crews, and outsourced service tokens.', icon: Wrench, color: 'border-orange-100 hover:border-orange-300 hover:shadow-orange-50/50 hover:bg-orange-50/50', iconBg: 'bg-orange-50 text-orange-600', path: '/hr/add_visitor_service' },
   ];
 
-  // SUPERCHARGED COLUMNS FOR HR
   const columns: TableColumn<VisitorRecord>[] = [
-      {
+    {
       key: 'hostName',
       label: 'HOST DETAILS',
       render: (row) => (
         <div>
           <div className="text-slate-800 font-medium text-xs">{row.hostName}</div>
           <div className="text-xs text-slate-500">{row.hostDept}</div>
-          <div className="text-[10px] uppercase tracking-wider text-slate-400 mt-0.5">{row.hostId}</div>
-
+          <div className="text-[10px] uppercase tracking-wider text-slate-400 mt-0.5 font-mono">{row.hostId}</div>
         </div>
       )
     },
-    { key: 'id', label: 'PASS ID', render: (row) => <span className="text-blue-500 font-mono font-semibold ">{row.id}</span> },
+    { key: 'id', label: 'PASS ID', render: (row) => <span className="text-blue-500 font-mono font-semibold text-xs">{row.id}</span> },
     {
       key: 'visitorName',
       label: 'VISITOR DETAILS',
       render: (row) => (
         <div>
           <div className="font-bold text-slate-800 text-sm">{row.visitorName}</div>
-          <div className="text-xs text-slate-500">{row.phone}</div>
-          <div className="text-xs text-slate-500">{row.email}</div>
+          <div className="text-xs text-slate-500 font-mono">{row.phone}</div>
+          <div className="text-xs text-slate-400">{row.email}</div>
         </div>
       )
     },
@@ -254,8 +244,8 @@ export default function VisitorMgmtPage() {
       label: 'REQUEST & ENTRY TIMING',
       render: (row) => (
         <div>
-          <div className="text-[11px] text-slate-500 mb-0.5"><span className="font-semibold text-slate-700">Req:</span> {row.requestedAt}</div>
-          <div className="text-[11px] text-slate-500"><span className="font-semibold text-blue-600">Entry:</span> {row.visitDate}</div>
+          <div className="text-[11px] text-slate-500 mb-0.5 font-mono"><span className="font-semibold text-slate-700">Req:</span> {row.requestedAt}</div>
+          <div className="text-[11px] text-slate-500 font-mono"><span className="font-semibold text-blue-600">Entry:</span> {row.visitDate}</div>
         </div>
       )
     },
@@ -263,65 +253,54 @@ export default function VisitorMgmtPage() {
       key: 'category',
       label: 'CATEGORY',
       render: (row) => {
-        if (row.category === 'General') return <span className="font-semibold text-blue-600 text-sm">General Pass</span>;
-        if (row.category === 'HR') return <span className="font-semibold text-purple-600 text-sm">HR Registry</span>;
-        if (row.category === 'Govt') return <span className="font-semibold text-emerald-600 text-sm">Govt/Defence</span>;
-        if (row.category === 'Foreign') return <span className="font-semibold text-amber-600 text-sm">Foreign National</span>;
-        if (row.category === 'Service') return <span className="font-semibold text-orange-600 text-sm">Service</span>;
+        if (row.category === 'General') return <span className="font-bold text-blue-600 text-xs uppercase tracking-wide">General Pass</span>;
+        if (row.category === 'HR') return <span className="font-bold text-purple-600 text-xs uppercase tracking-wide">HR Registry</span>;
+        if (row.category === 'Govt') return <span className="font-bold text-emerald-600 text-xs uppercase tracking-wide">Govt/Defence</span>;
+        if (row.category === 'Foreign') return <span className="font-bold text-amber-600 text-xs uppercase tracking-wide">Foreign National</span>;
+        return <span className="font-bold text-orange-600 text-xs uppercase tracking-wide">Service</span>;
       }
     },
     {
       key: 'department',
       label: 'DEPARTMENT',
-      render: (row) => {
-        if (row.department === 'Research Wing') return <span className="font-semibold text-slate-800 text-sm">Research Wing</span>;
-        if (row.department === 'IT Department') return <span className="font-semibold text-slate-800 text-sm">IT Department</span>;
-        if (row.department === 'Cyber Security Unit') return <span className="font-semibold text-slate-800 text-sm">Cyber Security Unit</span>;
-        if (row.department === 'Logistics Division') return <span className="font-semibold text-slate-800 text-sm">Logistics Division</span>;
-        if (row.department === 'Human Resources') return <span className="font-semibold text-slate-800 text-sm">Human Resources</span>;
-        if (row.department=== 'General Unit') return <span className="font-semibold text-slate-800 text-sm">General Unit</span>;
-        // return <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] uppercase tracking-wider rounded font-bold">{row.status}</span>;
-      }
+      render: (row) => <span className="font-semibold text-slate-700 text-xs">{row.department}</span>
     },
     {
       key: 'purpose',
       label: 'PURPOSE',
-      render: (row) => (
-          <div className="text-semibold text-slate-800">{row.purpose}</div>
-      )
+      render: (row) => <div className="text-xs text-slate-600 font-medium line-clamp-1 max-w-[180px]">{row.purpose}</div>
     },
     {
       key: 'status',
       label: 'STATUS',
       render: (row) => {
-        if (row.status === 'Approved') return <span className="px-2 py-1 bg-emerald-100 text-emerald-800 text-[10px] uppercase tracking-wider rounded font-bold">Approved</span>;
-        if (row.status === 'Pending') return <span className="px-2 py-1 bg-yellow-100 text-yellow-800 border border-yellow-200 text-[10px] uppercase tracking-wider rounded font-bold animate-pulse">Action Req</span>;
-        if (row.status === 'Denied') return <span className="px-2 py-1 bg-red-100 text-red-800 border border-red-200 text-[10px] uppercase tracking-wider rounded font-bold">Denied</span>;
-        return <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] uppercase tracking-wider rounded font-bold">{row.status}</span>;
+        if (row.status === 'Approved') return <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] uppercase tracking-wider rounded font-bold">Approved</span>;
+        if (row.status === 'Pending') return <span className="px-2 py-0.5 bg-yellow-50 border border-yellow-200 text-yellow-700 text-[10px] uppercase tracking-wider rounded font-bold animate-pulse">Action Req</span>;
+        if (row.status === 'Denied') return <span className="px-2 py-0.5 bg-red-50 border border-red-200 text-red-700 text-[10px] uppercase tracking-wider rounded font-bold">Denied</span>;
+        return <span className="px-2 py-0.5 bg-slate-50 border border-slate-200 text-slate-600 text-[10px] uppercase tracking-wider rounded font-bold">{row.status}</span>;
       }
     },
-    
     {
       key: 'actions',
       label: 'ACTIONS',
       render: (row) => (
-        <div className="flex items-center space-x-1.5">
+        <div className="flex items-center space-x-1">
           {row.status === 'Pending' && (
             <>
-              <button onClick={() => handleUpdateStatus(row.id, 'Approved')} className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-md transition-colors" title="Approve Request">
-                <CheckCircle className="w-5 h-5" />
+              <button onClick={() => handleUpdateStatus(row.id, 'Approved')} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Approve Request">
+                <CheckCircle className="w-4 h-4" />
               </button>
-              <button onClick={() => handleUpdateStatus(row.id, 'Denied')} className="p-1.5 text-red-500 hover:bg-red-50 rounded-md transition-colors" title="Decline Request">
-                <XCircle className="w-5 h-5" />
+              <button onClick={() => handleUpdateStatus(row.id, 'Denied')} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Decline Request">
+                <XCircle className="w-4 h-4" />
               </button>
             </>
           )}
           <button 
             onClick={() => { setSelectedVisitor(row); setIsDrawerOpen(true); }} 
-            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors ml-2" 
+            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
             title="Review Full Details"
           >
-            <Eye className="w-5 h-5" />
+            <Eye className="w-4 h-4" />
           </button>
         </div>
       )
@@ -365,11 +344,17 @@ export default function VisitorMgmtPage() {
             {categories.map((cat) => {
               const Icon = cat.icon;
               return (
-                <div key={cat.type} onClick={() => navigate(`/hr/add_visitor?category=${cat.type.toLowerCase()}`)} className={`group bg-white border rounded-xl p-5 flex flex-col justify-between items-start cursor-pointer hover:shadow-lg transition-all duration-200 relative overflow-hidden ${cat.color}`}>
+                <div 
+                  key={cat.type} 
+                  onClick={() => navigate(cat.path)}
+                  className={`group bg-white border rounded-xl p-5 flex flex-col justify-between items-start cursor-pointer hover:shadow-lg transition-all duration-200 relative overflow-hidden ${cat.color}`}
+                >
                   <div className="w-full">
-                    <div className={`p-2.5 rounded-lg w-fit mb-4 transition-transform group-hover:bg-white duration-200 ${cat.iconBg}`}><Icon className="w-5 h-5" /></div>
+                    <div className={`p-2.5 rounded-lg w-fit mb-4 transition-all duration-200 ${cat.iconBg}`}>
+                      <Icon className="w-5 h-5" />
+                    </div>
                     <h4 className="text-sm font-bold text-slate-800 tracking-tight group-hover:text-slate-900">{cat.label}</h4>
-                    <p className="text-[11px] leading-relaxed text-slate-400 font-medium mt-1.5 group-hover:text-slate-500 line-clamp-2">{cat.desc}</p>
+                    <p className="text-[11px] leading-relaxed text-slate-400 font-medium mt-1.5 line-clamp-2">{cat.desc}</p>
                   </div>
                 </div>
               );
@@ -399,7 +384,7 @@ export default function VisitorMgmtPage() {
           <DataTable data={matrixFilteredRows} columns={columns} />
         </div>
 
-        {/* HR REVIEW SLIDE-OUT DRAWER */}
+        {/* REVIEW SLIDE-OUT DRAWER */}
         {isDrawerOpen && selectedVisitor && (
           <div className="fixed inset-0 z-50 overflow-hidden">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setIsDrawerOpen(false)} />
@@ -418,7 +403,6 @@ export default function VisitorMgmtPage() {
 
               <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/50">
                 
-                {/* 1. Audit & Timing */}
                 <section>
                   <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
                     <Shield className="w-4 h-4 mr-2 text-amber-600" /> Audit & Request Tracking
@@ -430,7 +414,6 @@ export default function VisitorMgmtPage() {
                   </div>
                 </section>
 
-                {/* 2. Personal Details */}
                 <section>
                   <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
                     <User className="w-4 h-4 mr-2 text-blue-600" /> Visitor Identity
@@ -439,9 +422,9 @@ export default function VisitorMgmtPage() {
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Full Name</span><span className="col-span-2 font-bold text-slate-900">{selectedVisitor.visitorName}</span></div>
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Gender</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.gender}</span></div>
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Nationality</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.nationality}</span></div>
-                    <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Phone</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.phone}</span></div>
+                    <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Phone</span><span className="col-span-2 font-medium text-slate-900 font-mono">{selectedVisitor.phone}</span></div>
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Email</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.email}</span></div>
-                    <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">DOB</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.dob}</span></div>
+                    <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">DOB</span><span className="col-span-2 font-medium text-slate-900 font-mono">{selectedVisitor.dob}</span></div>
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">ID Type</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.id_type}</span></div>
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">ID Number</span><span className="col-span-2 font-medium text-slate-900 font-mono tracking-wider">{selectedVisitor.id_number}</span></div>
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Organization</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.organization}</span></div>
@@ -449,7 +432,6 @@ export default function VisitorMgmtPage() {
                   </div>
                 </section>
 
-                {/* 3. Visit Context */}
                 <section>
                   <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
                     <Building className="w-4 h-4 mr-2 text-blue-600" /> Purpose of Visit
@@ -459,14 +441,13 @@ export default function VisitorMgmtPage() {
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Pipeline</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.pipeline}</span></div>
                     <div>
                       <span className="text-slate-500 block mb-1">Declared Purpose</span>
-                      <div className="bg-white p-3 border border-slate-200 rounded-lg leading-relaxed shadow-sm text-slate-800">
+                      <div className="bg-white p-3 border border-slate-200 rounded-lg leading-relaxed shadow-sm text-slate-800 text-xs font-medium">
                         {selectedVisitor.purpose}
                       </div>
                     </div>
                   </div>
                 </section>
 
-                {/* 4. Escorts */}
                 <section>
                   <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
                     <Users className="w-4 h-4 mr-2 text-blue-600" /> Accompanying Escorts
@@ -485,7 +466,6 @@ export default function VisitorMgmtPage() {
                   )}
                 </section>
 
-                {/* 5. Documents */}
                 <section>
                   <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
                     <FileText className="w-4 h-4 mr-2 text-blue-600" /> Attached Credentials
@@ -504,12 +484,11 @@ export default function VisitorMgmtPage() {
 
               </div>
 
-              {/* HR ACTION FOOTER */}
               <div className="px-6 py-4 border-t border-slate-100 bg-white flex justify-between items-center shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                 <span className={`text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider ${
                   selectedVisitor.status === 'Cleared' ? 'bg-slate-100 text-slate-700' :
                   selectedVisitor.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
-                  selectedVisitor.status === 'Pending' ? 'bg-amber-100 text-amber-400 animate-pulse' :
+                  selectedVisitor.status === 'Pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
                   'bg-red-100 text-red-800'
                 }`}>
                   {selectedVisitor.status}

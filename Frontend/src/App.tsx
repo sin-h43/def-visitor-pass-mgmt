@@ -56,7 +56,7 @@ export default function App() {
 <Route path="/hr/add_visitor_govt" element ={ <AddVisitorGovtPage /> } />
 <Route path="/hr/add_visitor_hr" element ={ <AddVisitorHRPage /> } />
 <Route path="/hr/add_visitor_service" element ={ <AddVisitorServicePage /> } />
-<Route path="/hr/add_visitor_foriegn" element ={ <AddVisitorForeignPage /> } />
+<Route path="/hr/add_visitor_foreign" element ={ <AddVisitorForeignPage /> } />
 <Route path="/hr/visitor/:id" element={<VisitorProfilePage />} />
 
 <Route path="/hr/analytics" element={<AnalyticsPage />} />

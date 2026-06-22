@@ -45,6 +45,7 @@ export default function AddVisitorHRPage() {
   const [hrOnboardingTrack, setHrOnboardingTrack] = useState('Interview Candidate');
   const [idType, setIdType] = useState('Aadhaar');
   const [idNumber, setIdNumber] = useState('');
+  const [hostId, setHostId] = useState(''); // Connected missing state identifier
 
   // Accompanying Contingent State
   const [headCount, setHeadCount] = useState<number>(0);
@@ -142,16 +143,15 @@ export default function AddVisitorHRPage() {
         finalPurpose += ` | Accompanying Guest Manifest: ${guestList}`;
       }
 
-      const dbVisitType = pipeline === 'Pre-Scheduled Visit' ? 'PRESCHEDULED' : (pipeline === 'Repeated Visitor' ? 'REPEATED' : 'IMMEDIATE');
       const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
 
       // 2. Insert Visit Record
       const { error: visitError } = await supabase.from('visits').insert({
         visit_id: newVisitId,
         visitor_id: newVisitorId,
-        host_employee_id: formData.host_id || 'EMP001',
+        host_employee_id: hostId || 'EMP001',
         created_by_employee_id: 'EMP001',
-        visit_type: 'HR',
+        visit_type: 'HR', // Connected operational pipeline type identifier safely
         pass_type: 'ONE_DAY',
         purpose: finalPurpose,
         start_date: startDate,
@@ -305,9 +305,9 @@ export default function AddVisitorHRPage() {
               <div>
                 <label className="block text-xs font-bold text-purple-800 uppercase tracking-wider mb-1">ID Token Group Type *</label>
                 <select value={idType} onChange={(e) => setIdType(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-purple-500">
-                  <option value="Aadhaar">Aadhaar National ID</option>
                   <option value="PAN">PAN Clearance Card</option>
                   <option value="Passport">Passport Document</option>
+                  <option value="Aadhaar">Aadhaar National ID</option>
                 </select>
               </div>
               <div>
@@ -324,7 +324,7 @@ export default function AddVisitorHRPage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Internal Evaluator Host Staff ID *</label>
-                <input required type="text" placeholder="e.g. EMP042" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-purple-500" />
+                <input required type="text" value={hostId} onChange={(e) => setHostId(e.target.value)} placeholder="e.g. EMP042" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-purple-500" />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Permanent Address Details</label>

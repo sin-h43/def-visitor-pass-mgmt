@@ -1,7 +1,7 @@
 // pages/hr/repeated_visitors.tsx
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, History, RefreshCw, X, Shield, Calendar, UserCheck, Search, Building, BookOpen } from 'lucide-react';
+import { History, RefreshCw, X, Shield, Calendar, UserCheck, Search, Building, BookOpen } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import type { TableColumn } from '../../types/visitor';
@@ -219,6 +219,15 @@ export default function HRRepeatedVisitorLogPage() {
       label: 'REGISTRY ACTIONS',
       render: (row) => (
         <div className="flex items-center space-x-2">
+          <button 
+            onClick={() => {
+              setSelectedProfile(row);
+              setIsDrawerOpen(true);
+            }}
+            className="px-3 py-1.5 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-slate-800 transition-all shadow-sm flex items-center"
+          >
+            <History className="w-3 h-3 mr-1.5" /> History
+          </button>
           <button 
             onClick={() => handleReRegister(row)}
             className="px-3 py-1.5 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-slate-800 transition-all shadow-sm flex items-center"

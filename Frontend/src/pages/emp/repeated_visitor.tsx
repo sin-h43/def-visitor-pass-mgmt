@@ -1,274 +1,380 @@
-import { useState } from 'react';
-import { X, History, UserCheck, FileText, CheckCircle, RefreshCw, ChevronRight } from 'lucide-react';
+// pages/hr/repeated_visitors.tsx
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { History, RefreshCw, X, Shield, Calendar, UserCheck, Search, Building } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import type { TableColumn } from '../../types/visitor';
+import { supabase } from '../../lib/supabase';
 
-// --- MOCK DATA ---
-const repeatedVisitors = [
-  { id: 'DEF-H001', name: 'Sinchana K', group: 'Repeated Visitor', status: 'Verified / Active' },
-  { id: 'DEF-H002', name: 'Arya K', group: 'Repeated Visitor', status: 'Verified / Active' }
-];
+// Static Auth Context Session Anchor
+const currentUser = {
+  empId: 'EMP001',
+  name: 'Sinchana K',
+  dept: 'Cyber Security Unit'
+};
 
-const mockLogs = [
-  { 
-    dispatchId: 'DISPATCH-K9UXQD', 
-    date: '16/05/2026 10:00:00 AM', 
-    context: 'Quarterly Critical Firmware Audit',
-    details: {
-      dob: '1996-08-24', phone: '+91 9999999999', email: 'sinchana.k@defence.gov.in',
-      clearance: 'Level 3', escorts: 'Security Officer Smith', expiry: '2026-05-28'
-    }
-  },
-  { 
-    dispatchId: 'DISPATCH-TRXX9', 
-    date: '12/04/2026 02:30:00 PM', 
-    context: 'Core Server Room Infrastructure',
-    details: {
-      dob: '1996-08-24', phone: '+91 9999999999', email: 'sinchana.k@defence.gov.in',
-      clearance: 'Level 3', escorts: 'None', expiry: '2026-04-15'
-    }
-  }
-];
+interface VisitHistory {
+  visitId: string;
+  date: string;
+  rawDate: string;
+  purpose: string;
+  department: string;
+  hostName: string;
+  status: string;
+}
 
-export default function RepeatedVisitorPage() {
-  // State Management for the Nested UI
-  const [selectedVisitor, setSelectedVisitor] = useState<any>(null);
+interface VisitorProfile {
+  id: string; // visitor_id
+  name: string;
+  phone: string;
+  email: string;
+  nationality: string;
+  organization: string;
+  idType: string;
+  idNumber: string;
+  dob: string;
+  address: string;
+  docUrl: string | null;
+  totalVisits: number;
+  lastVisitDate: string;
+  rawLastVisit: number;
+  history: VisitHistory[];
+}
+
+export default function HRRepeatedVisitorLogPage() {
+  const navigate = useNavigate();
+  const [directory, setDirectory] = useState<VisitorProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState('All Visitors');
+
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  
-  const [selectedLog, setSelectedLog] = useState<any>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState<VisitorProfile | null>(null);
 
-  // Handlers
-  const openDrawer = (visitor: any) => {
-    setSelectedVisitor(visitor);
-    setIsDrawerOpen(true);
+  const fetchVisitorDirectory = async () => {
+    try {
+      setLoading(true);
+      
+      // EXPLICIT SECURITY FIX: Attached .eq() filter targeting only this employee's created sessions
+      const { data, error } = await supabase
+        .from('visits')
+        .select(`
+          visit_id, start_date, purpose, status, department, created_by_employee_id,
+          visitors (visitor_id, name, phone, email, nationality, organization, designation, dob, document_url, address, id_type, id_number),
+          host:employees!visits_host_employee_id_fkey (name)
+        `)
+        .eq('created_by_employee_id', currentUser.empId) // <-- Filters out records from all other endpoints
+        .order('start_date', { ascending: false });
+
+      if (error) throw error;
+      
+      if (data) {
+        const profileMap = new Map<string, VisitorProfile>();
+
+        data.forEach((row: any) => {
+          if (!row.visitors) return;
+          const v = row.visitors;
+          
+          const visitRecord: VisitHistory = {
+            visitId: row.visit_id,
+            date: new Date(row.start_date).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+            rawDate: row.start_date,
+            purpose: row.purpose || 'General Entry',
+            department: row.department || 'General Unit',
+            hostName: row.host?.name || 'Unassigned',
+            status: row.status
+          };
+
+          if (profileMap.has(v.visitor_id)) {
+            const profile = profileMap.get(v.visitor_id)!;
+            profile.history.push(visitRecord);
+            profile.totalVisits += 1;
+            
+            const rowTime = new Date(row.start_date).getTime();
+            if (rowTime > profile.rawLastVisit) {
+              profile.lastVisitDate = visitRecord.date;
+              profile.rawLastVisit = rowTime;
+            }
+          } else {
+            profileMap.set(v.visitor_id, {
+              id: v.visitor_id,
+              name: v.name || 'Unknown',
+              phone: v.phone || 'N/A',
+              email: v.email || 'N/A',
+              nationality: v.nationality || 'Indian',
+              organization: v.organization || 'N/A',
+              idType: v.id_type || 'Govt ID',
+              idNumber: v.id_number || 'N/A',
+              dob: v.dob || 'N/A',
+              address: v.address || 'N/A',
+              docUrl: v.document_url || null,
+              totalVisits: 1,
+              lastVisitDate: visitRecord.date,
+              rawLastVisit: new Date(row.start_date).getTime(),
+              history: [visitRecord]
+            });
+          }
+        });
+
+        const sortedDirectory = Array.from(profileMap.values()).sort((a, b) => b.rawLastVisit - a.rawLastVisit);
+        setDirectory(sortedDirectory);
+      }
+    } catch (error) {
+      console.error('Error fetching visitor directory:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const closeDrawer = () => {
+  useEffect(() => {
+    fetchVisitorDirectory();
+  }, []);
+
+  const handleReRegister = (profile: VisitorProfile) => {
     setIsDrawerOpen(false);
-    setTimeout(() => setSelectedVisitor(null), 300); // Wait for animation
+
+    let targetPath = '/hr/add_visitor_general';
+    if (profile.nationality && profile.nationality.toLowerCase() !== 'indian') {
+      targetPath = '/hr/add_visitor_foreign';
+    } else if (profile.organization && (profile.organization.toLowerCase().includes('govt') || profile.organization.toLowerCase().includes('defence'))) {
+      targetPath = '/hr/add_visitor_govt';
+    }
+
+    const cleanAutofill = {
+      id: profile.id, 
+      visitorName: profile.name,
+      phone: profile.phone,
+      email: profile.email,
+      dob: profile.dob,
+      id_type: profile.idType,
+      id_number: profile.idNumber,
+      nationality: profile.nationality,
+      organization: profile.organization,
+      address: profile.address,
+      documentUrl: profile.docUrl,
+      pipeline: 'Repeated',
+      purpose: '',
+      department: '',
+      escorts: []
+    };
+
+    navigate(targetPath, { state: { autofill: cleanAutofill } });
   };
 
-  const openModal = (log: any) => {
-    setSelectedLog(log);
-    setIsModalOpen(true);
-  };
+  const processedFilteredQueue = useMemo(() => {
+    return directory.filter(row => {
+      const matchesSearch = row.name.toLowerCase().includes(searchTerm.toLowerCase()) || row.phone.includes(searchTerm);
+      let matchesTab = true;
+      if (activeTab === 'Frequent (2+ Visits)') matchesTab = row.totalVisits > 1;
+      return matchesSearch && matchesTab;
+    });
+  }, [directory, searchTerm, activeTab]);
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setTimeout(() => setSelectedLog(null), 300);
-  };
-
-  // Table Configuration
-  const columns: TableColumn<any>[] = [
-    { key: 'id', label: 'REGISTRY ID', render: (row) => <span className="font-medium text-slate-600">{row.id}</span> },
-    { key: 'name', label: 'VISITOR NAME', render: (row) => <span className="font-bold text-slate-800">{row.name}</span> },
-    { key: 'group', label: 'CLASSIFICATION GROUP', render: (row) => <span className="text-slate-600">{row.group}</span> },
-    { 
-      key: 'status', 
-      label: 'SECURITY REGISTRY STATUS', 
+  const columns: TableColumn<VisitorProfile>[] = [
+    {
+      key: 'name',
+      label: 'IDENTITY PROFILE',
       render: (row) => (
-        <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold rounded-full flex items-center w-fit">
-          <CheckCircle className="w-3 h-3 mr-1" /> {row.status}
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
+            {row.name.substring(0, 2).toUpperCase()}
+          </div>
+          <div>
+            <div className="font-bold text-slate-800 text-sm">{row.name}</div>
+            <div className="text-xs text-slate-500 font-mono">{row.phone}</div>
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'organization',
+      label: 'AFFILIATION',
+      render: (row) => (
+        <div>
+          <div className="text-slate-700 font-medium text-xs truncate max-w-[150px]" title={row.organization}>{row.organization}</div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-400 mt-0.5">{row.nationality}</div>
+        </div>
+      )
+    },
+    {
+      key: 'totalVisits',
+      label: 'HISTORY VOLUME',
+      render: (row) => (
+        <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full border ${
+          row.totalVisits > 1 ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-600 border-slate-200'
+        }`}>
+          {row.totalVisits} {row.totalVisits === 1 ? 'Visit' : 'Visits'}
         </span>
-      ) 
+      )
+    },
+    {
+      key: 'lastVisitDate',
+      label: 'LATEST ENTRY',
+      render: (row) => <span className="text-slate-600 font-medium text-xs font-mono">{row.lastVisitDate}</span>
     },
     {
       key: 'actions',
-      label: '',
+      label: 'REGISTRY ACTIONS',
       render: (row) => (
-        <button 
-          onClick={() => openDrawer(row)}
-          className="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium flex items-center"
-        >
-          View Logs <ChevronRight className="w-4 h-4 ml-1" />
-        </button>
+        <div className="flex items-center space-x-2">
+          <button 
+            onClick={() => { setSelectedProfile(row); setIsDrawerOpen(true); }}
+            className="px-3 py-1.5 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-slate-800 transition-all shadow-sm flex items-center"
+          >
+            <History className="w-3 h-3 mr-1.5" /> History
+          </button>
+          <button 
+            onClick={() => handleReRegister(row)}
+            className="px-3 py-1.5 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-slate-800 transition-all shadow-sm flex items-center"
+          >
+            <RefreshCw className="w-3 h-3 mr-1.5" /> Re-Register
+          </button>
+          <button 
+            onClick={() => navigate(`/hr/visitor/${row.id}`, { state: { profile: row } })} 
+            className="px-3 py-1.5 bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-indigo-100 transition-all border border-indigo-200"
+          >
+            Full Profile
+          </button>
+        </div>
       )
     }
   ];
 
-  return (
-    <DashboardLayout role="emp" userName="Employee">
-      <div className="max-w-6xl mx-auto relative">
-        
-        {/* Header */}
-        <div className="mb-6 flex items-center gap-3">
-          <div className="p-2 bg-blue-100 text-blue-700 rounded-lg">
-            <History className="w-6 h-6" />
+  if (loading) {
+    return (
+      <DashboardLayout role="hr" userName={currentUser.name}>
+        <div className="flex items-center justify-center h-[60vh]">
+          <div className="animate-pulse flex flex-col items-center">
+            <div className="h-8 w-8 bg-indigo-600 rounded-full mb-4"></div>
+            <p className="text-slate-500 text-xs font-bold tracking-wide uppercase">Compiling My Registered Contacts Directory...</p>
           </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  return (
+    <DashboardLayout role="hr" userName={currentUser.name}>
+      <div className="max-w-7xl mx-auto space-y-6 pb-12">
+        
+        <div className="flex items-center space-x-3">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">Repeated Visitor Registry</h1>
-            <p className="text-sm text-slate-500">Frequent clearance credentials management terminal</p>
+            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Personal Visitor Directory</h1>
+            <p className="text-sm text-slate-500">History ledger tracking identities logged.</p>
           </div>
         </div>
 
-        {/* Main Data Table */}
-        <DataTable 
-          title="Master Registry Profiles" 
-          data={repeatedVisitors} 
-          columns={columns}
-        />
-
-        {/* --- SIDE DRAWER (Step 1) --- */}
-        {isDrawerOpen && (
-          <div className="fixed inset-0 z-40 flex justify-end">
-            {/* Backdrop */}
-            <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" onClick={closeDrawer}></div>
-            
-            {/* Drawer Content */}
-            <div className="relative w-[400px] bg-white h-full shadow-2xl border-l border-slate-400/60 flex flex-col animate-slide-in-right">
-              <div className="p-5 border-b border-slate-400/60 bg-slate-50 flex justify-between items-center">
-                <div>
-                  <h3 className="font-bold text-slate-800 flex items-center text-lg">
-                    <UserCheck className="w-5 h-5 mr-2 text-slate-500" />
-                    Visitation Logs
-                  </h3>
-                  <p className="text-sm text-blue-600 font-medium mt-1">{selectedVisitor?.name}</p>
-                </div>
-                <button onClick={closeDrawer} className="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition-colors">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="p-5 flex-1 overflow-y-auto">
-                <p className="text-xs text-slate-500 mb-4 bg-slate-100 p-3 rounded border border-slate-300">
-                  Select an archived dispatch token to inspect file profiles and cryptographic logs.
-                </p>
-                
-                <div className="space-y-3">
-                  {mockLogs.map((log) => (
-                    <div 
-                      key={log.dispatchId}
-                      onClick={() => openModal(log)}
-                      className="p-4 border border-slate-300 rounded-xl hover:border-blue-500 hover:shadow-md cursor-pointer transition-all bg-white group"
-                    >
-                      <div className="text-xs font-bold text-slate-500 mb-1">DISPATCH ID / DATE</div>
-                      <div className="font-semibold text-slate-800 flex justify-between items-center">
-                        {log.dispatchId}
-                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500" />
-                      </div>
-                      <div className="text-xs text-slate-500 mb-3">{log.date}</div>
-                      
-                      <div className="text-xs font-bold text-slate-500 mb-1">LOG CONTEXT</div>
-                      <div className="text-sm text-slate-700 bg-slate-50 p-2 rounded border border-slate-200">
-                        {log.context}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+          <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100 flex items-center">
+            <Search className="w-4 h-4 text-slate-400 mr-3 ml-2" />
+            <input 
+              type="text"
+              placeholder="Search my directory records..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="flex-1 bg-transparent border-none outline-none text-xs font-semibold text-slate-700 placeholder-slate-400"
+            />
           </div>
-        )}
 
-        {/* --- CENTER MODAL (Step 2) --- */}
-        {isModalOpen && selectedLog && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Darker backdrop for modal focus */}
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeModal}></div>
-            
-            <div className="relative bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-400/80 flex flex-col overflow-hidden animate-fade-in">
-              
-              {/* Modal Header */}
-              <div className="p-5 border-b border-slate-400/60 bg-slate-800 text-white flex justify-between items-center">
+          <div className="flex border-b border-slate-200 text-xs font-semibold space-x-4">
+            {['All Visitors', 'Frequent (2+ Visits)'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`pb-2 px-1 relative ${activeTab === tab ? 'text-indigo-600 font-bold border-b-2 border-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          <DataTable data={processedFilteredQueue} columns={columns} />
+        </div>
+
+        {/* VISITOR HISTORY DRAWER */}
+        {isDrawerOpen && selectedProfile && (
+          <div className="fixed inset-0 z-50 overflow-hidden">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setIsDrawerOpen(false)} />
+            <div className="absolute inset-y-0 right-0 max-w-md w-full bg-white shadow-2xl flex flex-col animate-slide-in-right">
+              <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white">
                 <div>
-                  <h3 className="font-bold text-lg">Complete Dispatch Ledger Entry</h3>
-                  <p className="text-xs text-slate-400 mt-1">Pass ID: {selectedLog.dispatchId} • Expired</p>
+                  <h2 className="text-base font-bold text-slate-800">Identity Clearance Ledger</h2>
+                  <p className="text-xs text-slate-400 font-mono mt-0.5">{selectedProfile.id}</p>
                 </div>
-                <button onClick={closeModal} className="p-2 text-slate-400 hover:bg-slate-700 hover:text-white rounded-full transition-colors">
-                  <X className="w-5 h-5" />
+                <button onClick={() => setIsDrawerOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Modal Body */}
-              <div className="p-6 grid grid-cols-3 gap-6 bg-slate-50 h-[500px] overflow-y-auto">
-                
-                {/* Left Column: Data */}
-                <div className="col-span-2 space-y-6">
-                  <div className="grid grid-cols-2 gap-4 bg-white p-5 rounded-xl border border-slate-300 shadow-sm">
-                    <div>
-                      <span className="text-xs font-bold text-slate-400 block mb-1">HOLDER NAME</span>
-                      <span className="font-semibold text-slate-800">{selectedVisitor?.name}</span>
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-slate-400 block mb-1">DATE OF BIRTH</span>
-                      <span className="font-medium text-slate-700">{selectedLog.details.dob}</span>
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-slate-400 block mb-1">EMAIL ADDRESS</span>
-                      <span className="font-medium text-slate-700">{selectedLog.details.email}</span>
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-slate-400 block mb-1">PHONE NUMBER</span>
-                      <span className="font-medium text-slate-700">{selectedLog.details.phone}</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-white p-5 rounded-xl border border-slate-300 shadow-sm">
-                    <span className="text-xs font-bold text-slate-400 block mb-2">PURPOSE OF VISIT</span>
-                    <p className="text-slate-800 font-medium">{selectedLog.context}</p>
-                    
-                    <div className="mt-4 pt-4 border-t border-slate-200">
-                      <span className="text-xs font-bold text-slate-400 block mb-2">ESCORTED MANIFEST DETAILS</span>
-                      <div className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-sm text-slate-700">
-                        {selectedLog.details.escorts}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
+                <section>
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200 pb-1.5 mb-3 flex items-center">
+                    <Shield className="w-3.5 h-3.5 mr-1.5 text-indigo-600" /> Authorized Profile
+                  </h3>
+                  <div className="bg-white p-4 border border-slate-200 rounded-xl shadow-sm">
+                    <div className="flex items-center space-x-3 mb-4 border-b border-slate-100 pb-3">
+                      <div className="w-10 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black text-sm">
+                        {selectedProfile.name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-sm leading-tight">{selectedProfile.name}</h4>
+                        <p className="text-[11px] font-medium text-slate-400 mt-0.5">{selectedProfile.organization}</p>
                       </div>
                     </div>
-                  </div>
-                </div>
-
-                {/* Right Column: Files & Action */}
-                <div className="col-span-1 flex flex-col gap-4">
-                  <div className="bg-white p-4 rounded-xl border border-slate-300 shadow-sm flex-1 flex flex-col">
-                    <span className="text-xs font-bold text-slate-400 block mb-3 flex items-center">
-                      <FileText className="w-4 h-4 mr-1" /> Uploaded Verification File
-                    </span>
-                    <div className="flex-1 bg-slate-100 rounded border border-slate-200 flex items-center justify-center text-slate-400 text-sm italic">
-                      [Document Preview Render Space]
+                    <div className="space-y-2.5 text-xs">
+                      <div className="flex justify-between"><span className="text-slate-400 font-medium">Phone</span><span className="font-bold text-slate-800 font-mono">{selectedProfile.phone}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-400 font-medium">Email</span><span className="font-bold text-slate-800 font-mono break-all">{selectedProfile.email}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-400 font-medium">Nationality</span><span className="font-bold text-slate-800">{selectedProfile.nationality}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-400 font-medium">{selectedProfile.idType}</span><span className="font-bold text-slate-800 font-mono tracking-wide">{selectedProfile.idNumber}</span></div>
                     </div>
                   </div>
-                </div>
+                </section>
+
+                <section>
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200 pb-1.5 mb-3 flex items-center justify-between">
+                    <span className="flex items-center"><Calendar className="w-3.5 h-3.5 mr-1.5 text-indigo-600" /> My Logged Timeline</span>
+                    <span className="text-[9px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded font-bold uppercase tracking-wider">{selectedProfile.totalVisits} Session Passes</span>
+                  </h3>
+                  <div className="space-y-3">
+                    {[...selectedProfile.history].reverse().map((visit, idx) => (
+                      <div key={idx} className="bg-white p-4 border border-slate-200 rounded-xl shadow-sm relative overflow-hidden">
+                        <div className={`absolute left-0 top-0 bottom-0 w-1 ${
+                          visit.status === 'Approved' || visit.status === 'Cleared' ? 'bg-emerald-500' :
+                          visit.status === 'Pending' ? 'bg-amber-400' : 'bg-rose-500'
+                        }`} />
+                        <div className="flex justify-between items-center mb-2 pl-1">
+                          <span className="text-xs font-bold text-slate-800 font-mono">{visit.date}</span>
+                          <span className="text-[10px] font-mono font-bold text-slate-400">{visit.visitId}</span>
+                        </div>
+                        <div className="pl-1 space-y-1 text-xs">
+                          <div className="flex items-center text-slate-600 font-medium"><Building className="w-3 h-3 mr-1.5 text-slate-400" />{visit.department}</div>
+                          <div className="flex items-center text-slate-600 font-medium"><UserCheck className="w-3 h-3 mr-1.5 text-slate-400" />Hosted by <span className="font-bold text-slate-800 ml-1">{visit.hostName}</span></div>
+                        </div>
+                        <div className="mt-2.5 pt-2.5 border-t border-slate-100 pl-1">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Objective Brief</span>
+                          <p className="text-xs text-slate-700 font-medium italic">"{visit.purpose}"</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
               </div>
 
-              {/* Modal Footer (Action) */}
-              <div className="p-5 border-t border-slate-400/60 bg-white flex justify-between items-center">
-                <span className="text-sm text-slate-500 flex items-center">
-                  <CheckCircle className="w-4 h-4 mr-2 text-emerald-500" /> Identity Verified via Session Data
-                </span>
-                
-                {/* The core functionality trigger */}
+              <div className="px-6 py-4 border-t border-slate-100 bg-white flex justify-between items-center shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                <span className="text-[11px] font-semibold font-mono text-slate-400">Latest: {selectedProfile.lastVisitDate}</span>
                 <button 
-                  onClick={() => {
-                    alert('Routing to Registration form with pre-filled session data...');
-                    // In real app: router.push(`/emp/add_visitor?autofill=${selectedVisitor.id}`)
-                  }}
-                  className="flex items-center px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg shadow-sm transition-colors"
+                  onClick={() => handleReRegister(selectedProfile)}
+                  className="px-5 py-2 bg-slate-950 hover:bg-slate-900 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-sm"
                 >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Re-Register & Autofill Profile
+                  <RefreshCw className="w-3.5 h-3.5" /> Re-Register Profile
                 </button>
               </div>
-
             </div>
           </div>
         )}
 
       </div>
-      
-      {/* Required custom CSS for the slide/fade animations */}
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes slide-in-right {
-          from { transform: translateX(100%); }
-          to { transform: translateX(0); }
-        }
-        @keyframes fade-in {
-          from { opacity: 0; transform: scale(0.98); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        .animate-slide-in-right { animation: slide-in-right 0.3s ease-out forwards; }
-        .animate-fade-in { animation: fade-in 0.2s ease-out forwards; }
-      `}} />
     </DashboardLayout>
   );
 }

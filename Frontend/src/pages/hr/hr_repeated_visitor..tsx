@@ -23,6 +23,7 @@ interface VisitorProfile {
   name: string;
   phone: string;
   email: string;
+  gender:string;
   nationality: string;
   organization: string;
   idType: string;
@@ -97,6 +98,7 @@ export default function HRRepeatedVisitorLogPage() {
               name: v.name || 'Unknown',
               phone: v.phone || 'N/A',
               email: v.email || 'N/A',
+              gender: v.gender || 'Others',
               nationality: v.nationality || 'Indian',
               organization: v.organization || 'N/A',
               idType: v.id_type || 'Govt ID',
@@ -139,6 +141,7 @@ export default function HRRepeatedVisitorLogPage() {
     const cleanAutofill = {
       id: profile.id, 
       visitorName: profile.name,
+      gender:profile.gender,  
       phone: profile.phone,
       email: profile.email,
       dob: profile.dob,

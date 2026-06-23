@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { UploadCloud, Users, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { UploadCloud, Users, AlertCircle, CheckCircle2, Search, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 const NATIONALITIES = [
@@ -15,6 +15,21 @@ const NATIONALITIES = [
   { label: 'French', code: '+33' },
   { label: 'Other', code: '' }
 ];
+
+interface ExistingVisitor {
+  visitor_id: string;
+  name: string;
+  gender: string;
+  dob: string;
+  email: string;
+  phone: string;
+  id_type: string;
+  id_number: string;
+  address: string;
+  organization: string;
+  designation: string;
+  nationality: string;
+}
 
 export default function RegistrationForm() {
   const navigate = useNavigate();
@@ -32,6 +47,7 @@ export default function RegistrationForm() {
   const [department, setDepartment] = useState('Research Wing');
 
   // Visitor Core Identity Attributes
+  const [visitorId, setVisitorId] = useState<string | null>(null); // Track existing UUID vs new profile
   const [visitorName, setVisitorName] = useState(prefillData?.visitorName || '');
   const [gender, setGender] = useState(prefillData?.gender && prefillData.gender !== 'Others' ? prefillData.gender : 'Others');
   const [dob, setDob] = useState(prefillData?.dob !== 'N/A' ? (prefillData?.dob || '') : '');
@@ -45,6 +61,10 @@ export default function RegistrationForm() {
   const [designation, setDesignation] = useState('');
   const [nationality, setNationality] = useState('Indian');
 
+  // Autocomplete UI States
+  const [searchResults, setSearchResults] = useState<ExistingVisitor[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+
   // Accompanying Contingent State
   const [headCount, setHeadCount] = useState<number>(0);
   const [escorts, setEscorts] = useState<{name: string, govId: string}[]>([]);
@@ -52,6 +72,68 @@ export default function RegistrationForm() {
   // File Asset Tokens
   const [file, setFile] = useState<File | null>(null);
   const [uploadingText, setUploadingText] = useState('');
+
+  // Live search lookup for repeated visitors
+  useEffect(() => {
+    if (visitorName.trim().length < 2 || visitorId) {
+      setSearchResults([]);
+      return;
+    }
+
+    const searchVisitors = async () => {
+      const { data, error } = await supabase
+        .from('visitors')
+        .select('*')
+        .ilike('name', `%${visitorName}%`)
+        .limit(5);
+
+      if (!error && data) {
+        setSearchResults(data as ExistingVisitor[]);
+      }
+    };
+
+    const debounceTimer = setTimeout(searchVisitors, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [visitorName, visitorId]);
+
+  // Handle auto-fill execution
+  const handleSelectVisitor = (visitor: ExistingVisitor) => {
+    setVisitorId(visitor.visitor_id);
+    setVisitorName(visitor.name);
+    setGender(visitor.gender || 'Others');
+    setDob(visitor.dob || '');
+    setEmail(visitor.email || '');
+    setPhone(visitor.phone || '+91 ');
+    setIdType(visitor.id_type || 'PAN');
+    setIdNumber(visitor.id_number || '');
+    setAddress(visitor.address || '');
+    setOrganization(visitor.organization || '');
+    setDesignation(visitor.designation || '');
+    setNationality(visitor.nationality || 'Indian');
+    setShowDropdown(false);
+    
+    // Automatically flag pipeline if a repeated profile is selected
+    if (pipeline !== 'Pre-Scheduled Visit') {
+      setPipeline('Repeated Visitor');
+    }
+  };
+
+  // Clear filled profile to switch back to a blank new user entry
+  const handleClearSelectedVisitor = () => {
+    setVisitorId(null);
+    setVisitorName('');
+    setGender('Others');
+    setDob('');
+    setEmail('');
+    setPhone('+91 ');
+    setIdType('PAN');
+    setIdNumber('');
+    setAddress('');
+    setOrganization('');
+    setDesignation('');
+    setNationality('Indian');
+    setPipeline('New Visitor / Urgent Access');
+  };
 
   // Dynamically structuralize escort rows based on quantitative input limits
   useEffect(() => {
@@ -91,8 +173,10 @@ export default function RegistrationForm() {
 
     try {
       const timestamp = Date.now().toString().slice(-6);
-      const newVisitorId = `VIS${timestamp}`;
       const newVisitId = `VST${timestamp}`;
+      
+      // Determine final identity token context
+      let activeVisitorId = visitorId;
 
       let documentUrl = null;
       if (file) {
@@ -115,24 +199,29 @@ export default function RegistrationForm() {
       
       setUploadingText('Committing secure records...');
 
-      // 1. Insert transaction row into visitors base table
-      const { error: visitorError } = await supabase.from('visitors').insert({
-        visitor_id: newVisitorId,
-        name: visitorName,
-        email: email || null,
-        phone: phone,
-        gender: gender || 'Others',
-        dob: dob || null,
-        address: address || null,
-        id_type: idType,
-        id_number: idNumber || 'Pending',
-        nationality: nationality,
-        organization: organization || null,
-        designation: designation || null,
-        department: department || null
-      });
+      // 1. If it's a NEW user, insert transaction row into visitors base table
+      if (!activeVisitorId) {
+        const standardGeneratedId = `VIS${timestamp}`;
+        activeVisitorId = standardGeneratedId;
 
-      if (visitorError) throw visitorError;
+        const { error: visitorError } = await supabase.from('visitors').insert({
+          visitor_id: standardGeneratedId,
+          name: visitorName,
+          email: email || null,
+          phone: phone,
+          gender: gender || 'Others',
+          dob: dob || null,
+          address: address || null,
+          id_type: idType,
+          id_number: idNumber || 'Pending',
+          nationality: nationality,
+          organization: organization || null,
+          designation: designation || null,
+          department: department || null
+        });
+
+        if (visitorError) throw visitorError;
+      }
 
       // Bundle context records cleanly into the purpose column string
       let finalPurpose = purpose;
@@ -144,10 +233,10 @@ export default function RegistrationForm() {
       const dbVisitType = pipeline === 'Pre-Scheduled Visit' ? 'PRESCHEDULED' : (pipeline === 'Repeated Visitor' ? 'REPEATED' : 'IMMEDIATE');
       const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
 
-      // 2. Insert transaction row into visits mapping table
+      // 2. Insert transaction row into visits mapping table linked to our profile identifier
       const { error: visitError } = await supabase.from('visits').insert({
         visit_id: newVisitId,
-        visitor_id: newVisitorId,
+        visitor_id: activeVisitorId, // Uses the existing profile ID or the newly generated one
         host_employee_id: 'EMP001', // Standard hardcoded testing anchor
         created_by_employee_id: 'EMP001',
         visit_type: dbVisitType,
@@ -250,15 +339,70 @@ export default function RegistrationForm() {
 
         {/* Primary Identity Section Fields */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
+          
+          {/* Autocomplete Name Field */}
+          <div className="relative">
             <label className="block text-xs font-semibold text-slate-500 mb-1">Full Name *</label>
-            <input required type="text" value={visitorName} onChange={(e) => setVisitorName(e.target.value)} placeholder="e.g. Rahul Verma" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500" />
+            <div className="relative flex items-center">
+              <input 
+                required 
+                type="text" 
+                value={visitorName} 
+                disabled={!!visitorId}
+                onChange={(e) => {
+                  setVisitorName(e.target.value);
+                  setShowDropdown(true);
+                }} 
+                onFocus={() => setShowDropdown(true)}
+                placeholder="Type name to lookup profiles..." 
+                className="w-full p-2.5 pr-8 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-600 font-semibold" 
+              />
+              {visitorId ? (
+                <button 
+                  type="button" 
+                  onClick={handleClearSelectedVisitor}
+                  className="absolute right-2.5 text-slate-400 hover:text-red-500 transition-colors"
+                  title="Clear profile layout"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              ) : (
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 pointer-events-none" />
+              )}
+            </div>
+
+            {/* Live Popover Autocomplete Dropdown Matrix */}
+            {showDropdown && searchResults.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-slate-100">
+                {searchResults.map((visitor) => (
+                  <div 
+                    key={visitor.visitor_id}
+                    onClick={() => handleSelectVisitor(visitor)}
+                    className="px-4 py-2.5 text-xs text-slate-700 hover:bg-blue-50/70 cursor-pointer flex justify-between items-center transition-colors"
+                  >
+                    <div>
+                      <span className="font-bold text-slate-900 block">{visitor.name}</span>
+                      <span className="text-[10px] text-slate-400 font-mono block">{visitor.email || 'No email registered'}</span>
+                    </div>
+                    <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold font-mono">
+                      {visitor.id_type}: {visitor.id_number}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {visitorId && (
+              <span className="text-[10px] text-emerald-600 font-bold mt-1 block">
+                ✓ Linked profile found tracking match.
+              </span>
+            )}
           </div>
           
           <div className="grid grid-cols-3 gap-2">
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1">Gender *</label>
-              <select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500">
+              <select value={gender} disabled={!!visitorId} onChange={(e) => setGender(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
                 <option value="Non-binary">Non-binary</option>
@@ -267,7 +411,7 @@ export default function RegistrationForm() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1">Nationality *</label>
-              <select value={nationality} onChange={handleNationalityChange} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500">
+              <select value={nationality} disabled={!!visitorId} onChange={handleNationalityChange} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
                 {NATIONALITIES.map(nat => (
                   <option key={nat.label} value={nat.label}>{nat.label}</option>
                 ))}
@@ -276,23 +420,23 @@ export default function RegistrationForm() {
             
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1">Contact Phone *</label>
-              <input required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-blue-500" />
+              <input required type="tel" value={phone} disabled={!!visitorId} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-blue-500 disabled:bg-slate-50" />
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1">Date of Birth</label>
-            <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-700 outline-none focus:border-blue-500" />
+            <input type="date" value={dob} disabled={!!visitorId} onChange={(e) => setDob(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-700 outline-none focus:border-blue-500 disabled:bg-slate-50" />
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1">Email Address</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. name@domain.com" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500" />
+            <input type="email" value={email} disabled={!!visitorId} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. name@domain.com" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50" />
           </div>
 
           <div className="grid grid-cols-3 gap-3 md:col-span-2">
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1">ID Type *</label>
-              <select value={idType} onChange={(e) => setIdType(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500">
+              <select value={idType} disabled={!!visitorId} onChange={(e) => setIdType(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
                 <option value="PAN">PAN Card</option>
                 <option value="Passport">Passport</option>
                 <option value="Driving License">Driving License</option>
@@ -301,22 +445,22 @@ export default function RegistrationForm() {
             </div>
             <div className="col-span-2">
               <label className="block text-xs font-semibold text-slate-500 mb-1">Govt Issued ID Number *</label>
-              <input required type="text" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder="Enter Document ID Number" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono uppercase tracking-wider outline-none focus:border-blue-500" />
+              <input required type="text" value={idNumber} disabled={!!visitorId} onChange={(e) => setIdNumber(e.target.value)} placeholder="Enter Document ID Number" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono uppercase tracking-wider outline-none focus:border-blue-500 disabled:bg-slate-50" />
             </div>
           </div>
 
           <div className="md:col-span-2">
             <label className="block text-xs font-semibold text-slate-500 mb-1">Permanent Address</label>
-            <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="House/Office No, Street, City, State, Pincode" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500" />
+            <input type="text" value={address} disabled={!!visitorId} onChange={(e) => setAddress(e.target.value)} placeholder="House/Office No, Street, City, State, Pincode" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50" />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1">Organization / Employer</label>
-            <input type="text" value={organization} onChange={(e) => setOrganization(e.target.value)} placeholder="e.g. Acme Corp Operations" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500" />
+            <input type="text" value={organization} disabled={!!visitorId} onChange={(e) => setOrganization(e.target.value)} placeholder="e.g. Acme Corp Operations" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50" />
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1">Designation</label>
-            <input type="text" value={designation} onChange={(e) => setDesignation(e.target.value)} placeholder="e.g. Technical Director" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500" />
+            <input type="text" value={designation} disabled={!!visitorId} onChange={(e) => setDesignation(e.target.value)} placeholder="e.g. Technical Director" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50" />
           </div>
 
           <div className="md:col-span-2">

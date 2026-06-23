@@ -72,7 +72,7 @@ export default function VisitorMgmtPage() {
             visitor_id, name, phone, email, nationality, organization, designation, dob, document_url, gender, address, id_type, id_number
           ),
           escorts(name, phone, id_number, id_type),
-          host:employees!visits_host_employee_id_fkey (id,name, role)
+          host:employees!visits_host_employee_id_fkey (employee_id,name, role)
         `)
         .order('created_at', { ascending: false });
 
@@ -98,7 +98,7 @@ export default function VisitorMgmtPage() {
             purpose: row.purpose || 'General Entry',
             hostName: row.host?.name || 'Unassigned',
             hostDept: row.host?.role === 'hr' ? 'HR Officer' : 'Staff Member',
-            hostId: row.host?.id || 'N/A',
+            hostId: row.host?.employee_id || 'N/A',
             requestedAt: new Date(row.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
             visitDate: row.start_date ? new Date(row.start_date).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
             status: row.status,

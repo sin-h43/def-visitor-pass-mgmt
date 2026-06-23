@@ -39,9 +39,9 @@ interface VisitorRecord {
 const dynamicBroadcastPool = [
   { id: 1, type: 'FOREIGN REGISTRY', text: 'Passport clearance requested for Sarah Jenkins.', color: 'bg-orange-50 border-orange-100 text-orange-800' },
   { id: 2, type: 'GATE AUTO-SYNC', text: 'Gate 2 badge scanner synchronization completed.', color: 'bg-emerald-50 border-emerald-100 text-emerald-800' },
-  { id: 3, type: 'GOVT CLEARANCE', text: 'Pass DEF-8821 authorized by cyber security command desk.', color: 'bg-purple-50 border-purple-100 text-purple-800' },
-  { id: 4, type: 'VITAL ALERTS', text: 'Contractor Madan Gowda logged departure via South Outpost.', color: 'bg-slate-50 border-slate-200 text-slate-700' },
-  { id: 5, type: 'SYSTEM AUDIT', text: 'Centralized pass pipeline rules updated.', color: 'bg-blue-50 border-blue-100 text-blue-800' }
+  // { id: 3, type: 'GOVT CLEARANCE', text: 'Pass DEF-8821 authorized by cyber security command desk.', color: 'bg-purple-50 border-purple-100 text-purple-800' },
+  // { id: 4, type: 'VITAL ALERTS', text: 'Contractor Madan Gowda logged departure via South Outpost.', color: 'bg-slate-50 border-slate-200 text-slate-700' },
+  // { id: 5, type: 'SYSTEM AUDIT', text: 'Centralized pass pipeline rules updated.', color: 'bg-blue-50 border-blue-100 text-blue-800' }
 ];
 
 export default function HRDashboard() {
@@ -126,7 +126,7 @@ export default function HRDashboard() {
             host:employees!visits_host_employee_id_fkey (
               name,
               role,
-              id
+              employee_id
             ),
             department
           `);
@@ -262,10 +262,11 @@ export default function HRDashboard() {
       label: 'CATEGORY',
       render: (row) => {
         const colors: Record<string, string> = {
-          Govt: 'bg-purple-100 text-purple-800 border-purple-200',
-          Foreign: 'bg-orange-100 text-orange-800 border-orange-200',
-          Service: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-          General: 'bg-slate-100 text-slate-800 border-slate-200'
+          HR:  'bg-purple-50 text-purple-500 border-purple-100',
+          Govt:'bg-emerald-50 text-emerald-500 border-emerald-100', 
+          Foreign: 'bg-amber-50 text-amber-500 border-amber-100',
+          Service: 'bg-orange-50 text-orange-500 border-orange-100',
+          General: 'bg-blue-50 text-blue-500 border-blue-100'
         };
         return <span className={`px-2 py-0.5 text-xs font-bold rounded border ${colors[row.category] || 'bg-slate-100'}`}>{row.category}</span>;
       }
@@ -278,7 +279,7 @@ export default function HRDashboard() {
       label: 'STATUS',
       render: (row) => {
         if (row.status === 'Approved' || row.status === 'Active') return <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-xs rounded font-medium border border-emerald-200">Active</span>;
-        if (row.status === 'Pending') return <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded font-medium border border-amber-200">HR Review</span>;
+        if (row.status === 'Pending') return <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded font-medium border border-amber-200">Pending</span>;
         if (row.status === 'Denied') return <span className="px-2 py-0.5 bg-rose-100 text-rose-800 text-xs rounded font-medium border border-rose-200">Denied</span>;
         return <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded border border-slate-200">{row.status}</span>;
       }

@@ -1,12 +1,29 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Shield, User, CalendarDays, Users, UploadCloud, AlertCircle, CheckCircle2, Wrench } from 'lucide-react';
+import { ArrowLeft,Users, UploadCloud, CheckCircle2, Wrench, Search, X } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { supabase } from '../../lib/supabase';
 
 const NATIONALITIES = [
   { label: 'Indian', code: '+91' }
 ];
+
+// CHANGE: Added interface for existing vendor profiles
+interface ExistingVisitor {
+  visitor_id: string;
+  name: string;
+  gender: string;
+  dob: string;
+  email: string;
+  phone: string;
+  id_type: string;
+  id_number: string;
+  address: string;
+  organization: string;
+  designation: string;
+  nationality: string;
+}
 
 export default function AddVisitorServicePage() {
   const navigate = useNavigate();
@@ -20,6 +37,9 @@ export default function AddVisitorServicePage() {
   const [pipeline, setPipeline] = useState('New Visitor / Urgent Access');
   const [scheduledDate, setScheduledDate] = useState('');
   const [department, setDepartment] = useState('Operations');
+
+  // CHANGE: Tracking state to distinguish between a linked existing vendor vs a brand new one
+  const [visitorId, setVisitorId] = useState<string | null>(null);
 
   // Visitor Profile Metadata
   const [visitorName, setVisitorName] = useState('');
@@ -38,6 +58,10 @@ export default function AddVisitorServicePage() {
   const [idNumber, setIdNumber] = useState('');
   const [hostId, setHostId] = useState('');
 
+  // CHANGE: Autocomplete state nodes for displaying the floating dropdown search matrix
+  const [searchResults, setSearchResults] = useState<ExistingVisitor[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+
   // Accompanying Contingent State
   const [headCount, setHeadCount] = useState<number>(0);
   const [escorts, setEscorts] = useState<{ name: string; govId: string }[]>([]);
@@ -45,6 +69,73 @@ export default function AddVisitorServicePage() {
   // File Upload State
   const [file, setFile] = useState<File | null>(null);
   const [uploadingText, setUploadingText] = useState('');
+
+  // CHANGE: Debounced layout hook to watch the technician's name input and execute search
+  useEffect(() => {
+    if (visitorName.trim().length < 2 || visitorId) {
+      setSearchResults([]);
+      return;
+    }
+
+    const searchVisitors = async () => {
+      const { data, error } = await supabase
+        .from('visitors')
+        .select('*')
+        .ilike('name', `%${visitorName}%`)
+        .limit(5);
+
+      if (!error && data) {
+        setSearchResults(data as ExistingVisitor[]);
+      }
+    };
+
+    const debounceTimer = setTimeout(searchVisitors, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [visitorName, visitorId]);
+
+  // CHANGE: Selection handler mapping to automatically fill base profile blocks and lock inputs
+  const handleSelectVisitor = (visitor: ExistingVisitor) => {
+    setVisitorId(visitor.visitor_id);
+    setVisitorName(visitor.name);
+    setGender(visitor.gender || 'Others');
+    setDob(visitor.dob || '');
+    setEmail(visitor.email || '');
+    setPhone(visitor.phone || '+91 ');
+    setAddress(visitor.address || '');
+    
+    // Map existing organization and designation data to vendor-specific fields
+    setContractingCompany(visitor.organization || '');
+    setTradeType(visitor.designation || 'Facilities Maintenance');
+    setNationality(visitor.nationality || 'Indian');
+    
+    // Autofill vendor verification credentials if they match our dropdown parameters
+    if (visitor.id_type && ['Business Vendor ID', 'Labor Token Certificate', 'PAN Clearance Card'].includes(visitor.id_type)) {
+      setIdType(visitor.id_type);
+    }
+    setIdNumber(visitor.id_number || '');
+    
+    setShowDropdown(false);
+    if (pipeline !== 'Pre-Scheduled Visit') {
+      setPipeline('Repeated Visitor');
+    }
+  };
+
+  // CHANGE: Cleanup reset handler if the HR admin needs to break out of a linked profile to add a new contractor
+  const handleClearSelectedVisitor = () => {
+    setVisitorId(null);
+    setVisitorName('');
+    setGender('Others');
+    setDob('');
+    setEmail('');
+    setPhone('+91 ');
+    setAddress('');
+    setContractingCompany('');
+    setTradeType('Facilities Maintenance');
+    setNationality('Indian');
+    setIdType('Business Vendor ID');
+    setIdNumber('');
+    setPipeline('New Visitor / Urgent Access');
+  };
 
   // Dynamically structure escort rows
   useEffect(() => {
@@ -75,8 +166,10 @@ export default function AddVisitorServicePage() {
 
     try {
       const timestamp = Date.now().toString().slice(-6);
-      const newVisitorId = `VIS${timestamp}`;
       const newVisitId = `VST${timestamp}`;
+
+      // CHANGE: Dynamic ID linker
+      let activeVisitorId = visitorId;
 
       let documentUrl = null;
       if (file) {
@@ -99,25 +192,30 @@ export default function AddVisitorServicePage() {
       
       setUploadingText('Saving vendor credentials logs...');
 
-      // 1. Insert Visitor Identity Record
-      const { error: visitorError } = await supabase.from('visitors').insert({
-        visitor_id: newVisitorId,
-        name: visitorName,
-        email: email || null,
-        phone: phone,
-        gender: gender,
-        dob: dob || null,
-        visit_type: 'Service',
-        address: address || null,
-        id_type: idType,
-        id_number: idNumber || 'Pending Verification',
-        nationality: nationality,
-        organization: contractingCompany || 'Outsourced Firm',
-        designation: tradeType || 'Service Technician',
-        department: department
-      });
+      // CHANGE: Conditional insert logic. Only inserts a fresh profile row if one wasn't linked
+      if (!activeVisitorId) {
+        const standardGeneratedId = `VIS${timestamp}`;
+        activeVisitorId = standardGeneratedId;
 
-      if (visitorError) throw visitorError;
+        const { error: visitorError } = await supabase.from('visitors').insert({
+          visitor_id: standardGeneratedId,
+          name: visitorName,
+          email: email || null,
+          phone: phone,
+          gender: gender,
+          dob: dob || null,
+          visit_type: 'Service',
+          address: address || null,
+          id_type: idType,
+          id_number: idNumber || 'Pending Verification',
+          nationality: nationality,
+          organization: contractingCompany || 'Outsourced Firm',
+          designation: tradeType || 'Service Technician',
+          department: department
+        });
+
+        if (visitorError) throw visitorError;
+      }
 
       // Pack supplemental criteria layout safely
       let finalPurpose = `[VENDOR FIELD TRADE: ${tradeType}] ${purpose}`;
@@ -128,10 +226,10 @@ export default function AddVisitorServicePage() {
 
       const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
 
-      // 2. Insert Visit Record
+      // 2. Insert Visit Record securely using activeVisitorId
       const { error: visitError } = await supabase.from('visits').insert({
         visit_id: newVisitId,
-        visitor_id: newVisitorId,
+        visitor_id: activeVisitorId, // CHANGE: Mapped identifier for existing or new profiles
         host_employee_id: hostId || 'EMP001',
         created_by_employee_id: 'EMP001',
         visit_type: 'SERVICE',
@@ -157,13 +255,14 @@ export default function AddVisitorServicePage() {
       setLoading(false);
     }
   };
+
   if (success) {
       return (
         <DashboardLayout role="hr" userName="Sinchana K">
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-8 max-w-4xl shadow-sm text-center animate-fade-in mx-auto mt-10">
             <CheckCircle2 className="w-16 h-16 text-amber-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-amber-800 mb-2">Border Entry Logged Successfully</h2>
-            <p className="text-amber-600 font-medium">The international delegate profile maps have been securely created.</p>
+            <h2 className="text-2xl font-bold text-amber-800 mb-2">Service Entry Logged Successfully</h2>
+            <p className="text-amber-600 font-medium">The service vendor matrices and entry pass have been securely logged.</p>
           </div>
         </DashboardLayout>
       );
@@ -233,15 +332,70 @@ export default function AddVisitorServicePage() {
 
             {/* Core Identity Parameters Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              
+              {/* CHANGE: Searchable Full Name container */}
+              <div className="relative">
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Technician Full Name *</label>
-                <input required type="text" value={visitorName} onChange={(e) => setVisitorName(e.target.value)} placeholder="Full Name" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-orange-500" />
+                <div className="relative flex items-center">
+                  <input 
+                    required 
+                    type="text" 
+                    value={visitorName} 
+                    disabled={!!visitorId}
+                    onChange={(e) => {
+                      setVisitorName(e.target.value);
+                      setShowDropdown(true);
+                    }} 
+                    onFocus={() => setShowDropdown(true)}
+                    placeholder="Type name to lookup profiles..." 
+                    className="w-full p-2.5 pr-8 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-orange-500 disabled:bg-slate-50 disabled:text-slate-600 font-semibold" 
+                  />
+                  {visitorId ? (
+                    <button 
+                      type="button" 
+                      onClick={handleClearSelectedVisitor}
+                      className="absolute right-2.5 text-slate-400 hover:text-red-500 transition-colors"
+                      title="Clear profile layout"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 pointer-events-none" />
+                  )}
+                </div>
+
+                {/* Popover Matrix Dropdown */}
+                {showDropdown && searchResults.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-slate-100">
+                    {searchResults.map((visitor) => (
+                      <div 
+                        key={visitor.visitor_id}
+                        onClick={() => handleSelectVisitor(visitor)}
+                        className="px-4 py-2.5 text-xs text-slate-700 hover:bg-orange-50/70 cursor-pointer flex justify-between items-center transition-colors"
+                      >
+                        <div>
+                          <span className="font-bold text-slate-900 block">{visitor.name}</span>
+                          <span className="text-[10px] text-slate-400 font-mono block">{visitor.organization || 'Independent Contractor'}</span>
+                        </div>
+                        <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold font-mono">
+                          ID: {visitor.id_number || 'N/A'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {visitorId && (
+                  <span className="text-[10px] text-orange-600 font-bold mt-1 block">
+                    ✓ Linked vendor profile found tracking match.
+                  </span>
+                )}
               </div>
               
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">Nationality *</label>
-                  <select value={nationality} onChange={(e) => setNationality(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-orange-500">
+                  <select value={nationality} disabled={!!visitorId} onChange={(e) => setNationality(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-orange-500 disabled:bg-slate-50">
                     {NATIONALITIES.map(nat => (
                       <option key={nat.label} value={nat.label}>{nat.label}</option>
                     ))}
@@ -249,7 +403,7 @@ export default function AddVisitorServicePage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">Gender *</label>
-                  <select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-orange-500">
+                  <select value={gender} disabled={!!visitorId} onChange={(e) => setGender(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-orange-500 disabled:bg-slate-50">
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
                     <option value="Non-binary">Non-binary</option>
@@ -258,17 +412,17 @@ export default function AddVisitorServicePage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">Contact Phone *</label>
-                  <input required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-orange-500" />
+                  <input required type="tel" value={phone} disabled={!!visitorId} onChange={(e) => setPhone(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-orange-500 disabled:bg-slate-50" />
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Date of Birth</label>
-                <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-700 outline-none focus:border-orange-500" />
+                <input type="date" value={dob} disabled={!!visitorId} onChange={(e) => setDob(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-700 outline-none focus:border-orange-500 disabled:bg-slate-50" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Representative Email Address</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="vendor@firm.com" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-orange-500" />
+                <input type="email" value={email} disabled={!!visitorId} onChange={(e) => setEmail(e.target.value)} placeholder="vendor@firm.com" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-orange-500 disabled:bg-slate-50" />
               </div>
             </div>
 
@@ -278,7 +432,7 @@ export default function AddVisitorServicePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-orange-50/20 p-4 border border-orange-100 rounded-xl">
               <div>
                 <label className="block text-xs font-bold text-orange-800 uppercase tracking-wider mb-1">Field Trade / Classification *</label>
-                <select value={tradeType} onChange={(e) => setTradeType(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-orange-500">
+                <select value={tradeType} disabled={!!visitorId} onChange={(e) => setTradeType(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-slate-50">
                   <option value="Facilities Maintenance">Facilities & Infrastructure Maintenance</option>
                   <option value="IT Equipment Delivery">IT Infrastructure Hardware Vendor</option>
                   <option value="Catering Logistics">Catering & Logistics Vendor</option>
@@ -287,7 +441,7 @@ export default function AddVisitorServicePage() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-orange-800 uppercase tracking-wider mb-1">Contractor Authorization ID *</label>
-                <select value={idType} onChange={(e) => setIdType(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-orange-500">
+                <select value={idType} disabled={!!visitorId} onChange={(e) => setIdType(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-slate-50">
                   <option value="Business Vendor ID">Corporate Work Badge / Vendor ID</option>
                   <option value="Labor Token Certificate">Labor Token Certificate</option>
                   <option value="PAN Clearance Card">PAN Clearance Card</option>
@@ -295,7 +449,7 @@ export default function AddVisitorServicePage() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-orange-800 uppercase tracking-wider mb-1">Credential Serial Reference *</label>
-                <input required type="text" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder="Enter ID string" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono tracking-wider outline-none focus:ring-2 focus:ring-orange-500 uppercase" />
+                <input required type="text" value={idNumber} disabled={!!visitorId} onChange={(e) => setIdNumber(e.target.value)} placeholder="Enter ID string" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono tracking-wider outline-none focus:ring-2 focus:ring-orange-500 uppercase disabled:bg-slate-50" />
               </div>
             </div>
 
@@ -303,7 +457,7 @@ export default function AddVisitorServicePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Contracting Agency / Corporate Employer</label>
-                <input type="text" value={contractingCompany} onChange={(e) => setContractingCompany(e.target.value)} placeholder="e.g. Acme Infrastructure Group" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-orange-500" />
+                <input type="text" value={contractingCompany} disabled={!!visitorId} onChange={(e) => setContractingCompany(e.target.value)} placeholder="e.g. Acme Infrastructure Group" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-orange-500 disabled:bg-slate-50" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Supervising Internal Plant Host Employee ID *</label>
@@ -311,7 +465,7 @@ export default function AddVisitorServicePage() {
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Permanent Corporate Address</label>
-                <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Office Suite No, Tech Park Block, City..." className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-orange-500" />
+                <input type="text" value={address} disabled={!!visitorId} onChange={(e) => setAddress(e.target.value)} placeholder="Office Suite No, Tech Park Block, City..." className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-orange-500 disabled:bg-slate-50" />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Scope of Structural Work Assignment Purpose *</label>

@@ -80,7 +80,7 @@ export default function VisitorMgmtPage() {
       
       if (data) {
         const transformed: VisitorRecord[] = data.map((row: any) => {
-          let uiPipeline = 'Walk-in';
+          let uiPipeline = 'Walk in';
           const dbType = row.visit_type?.toLowerCase();
           if (dbType === 'prescheduled' || dbType === 'scheduled') uiPipeline = 'Pre-Scheduled';
           if (dbType === 'repeated') uiPipeline = 'Repeated';

@@ -1,12 +1,40 @@
 // pages/hr/index.tsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {User,Building,FileText,Check, Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Bell, Eye, CheckCircle, X } from 'lucide-react';
+import { User, Building, FileText, Check, Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Bell, Eye, CheckCircle, X } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
-import type { VisitorRecord, TableColumn } from '../../types/visitor';
+import type { TableColumn } from '../../types/visitor';
 import { supabase } from '../../lib/supabase';
+
+interface VisitorRecord {
+  id: string;
+  visitorName: string;
+  gender: string;
+  phone: string;
+  email: string;
+  category: string;
+  purpose: string;
+  hostName: string;
+  hostDept: string;
+  hostId: string;
+  requestedAt: string;
+  visitDate: string;
+  status: string;
+  passType: string;
+  pipeline: string;
+  nationality: string;
+  organization: string;
+  documentUrl: string | null;
+  escorts: any[];
+  dob: string;
+  id_type: string;
+  id_number: string;
+  address: string;
+  department: string;
+  designation: string;
+}
 
 const dynamicBroadcastPool = [
   { id: 1, type: 'FOREIGN REGISTRY', text: 'Passport clearance requested for Sarah Jenkins.', color: 'bg-orange-50 border-orange-100 text-orange-800' },
@@ -29,10 +57,9 @@ export default function HRDashboard() {
     status: ['Pending', 'Approved', 'Denied', 'Cleared', 'Active']
   });
 
-    // Drawer States
-    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-    const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
-  
+  // Drawer States
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
 
   const hrFilterGroups = [
     {
@@ -80,19 +107,28 @@ export default function HRDashboard() {
             purpose,
             status,
             start_date,
+            created_at,
             visitors (
               visitor_id,
               name,
+              gender,
               phone,
               email,
               nationality,
-              organization
+              organization,
+              designation,
+              document_url,
+              dob,
+              id_type,
+              id_number,
+              address
             ),
             host:employees!visits_host_employee_id_fkey (
               name,
               role,
               id
-            )
+            ),
+            department
           `);
 
         if (error) throw error;
@@ -105,22 +141,34 @@ export default function HRDashboard() {
             if (dbType === 'repeated') uiPipeline = 'repeated';
 
             const computedCategory = row.visitors?.nationality?.toLowerCase() !== 'indian' ? 'Foreign' : 'General';
+            const escortsArray = Array.isArray(row.escorts) ? row.escorts : (row.escorts ? [row.escorts] : []);
 
             return {
               id: row.visit_id,
               visitorName: row.visitors?.name || 'Unknown',
+              gender: row.visitors?.gender || 'Others',
               phone: row.visitors?.phone || '',
-              email: row.visitors?.email,
+              email: row.visitors?.email || '',
               category: computedCategory,
               purpose: row.purpose || '',
               hostName: row.host?.name || 'Unassigned',
               hostDept: row.host?.role === 'hr' ? 'HR Officer' : 'Staff Member',
-              requestDate: row.start_date ? new Date(row.start_date).toLocaleDateString('en-IN') : 'N/A',
-              status: row.status as 'Pending' | 'Approved' | 'Denied' | 'Cleared' | 'Active',
+              hostId: row.host?.id || '',
+              requestedAt: row.created_at ? new Date(row.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
+              visitDate: row.start_date ? new Date(row.start_date).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
+              status: row.status || 'Pending',
               passType: row.pass_type || 'ONE_DAY',
               pipeline: uiPipeline,
               nationality: row.visitors?.nationality || 'Indian',
-              organization: row.visitors?.organization || ''
+              organization: row.visitors?.organization || '',
+              designation: row.visitors?.designation || 'N/A',
+              documentUrl: row.visitors?.document_url || row.document_url || null,
+              escorts: escortsArray,
+              dob: row.visitors?.dob || 'N/A',
+              id_type: row.visitors?.id_type || 'Govt ID',
+              id_number: row.visitors?.id_number || 'N/A',
+              address: row.visitors?.address || 'N/A',
+              department: row.department || 'General Unit'
             };
           });
           setDataList(transformed);
@@ -146,10 +194,15 @@ export default function HRDashboard() {
 
   // 2. Real Database Update for Status Action Buttons
   const handleUpdateStatus = async (id: string, newStatus: VisitorRecord['status']) => {
-    // Instantly update the UI so it feels fast
+    // Instantly update the UI local lists so it feels snappy
     setDataList(prev => prev.map(item => item.id === id ? { ...item, status: newStatus } : item));
     
-    // Update the record in Supabase in the background
+    // Also update the active drawer if open
+    if (selectedVisitor && selectedVisitor.id === id) {
+      setSelectedVisitor(prev => prev ? { ...prev, status: newStatus } : null);
+    }
+    
+    // Update the record in Supabase
     const { error } = await supabase
       .from('visits')
       .update({ status: newStatus })
@@ -169,6 +222,11 @@ export default function HRDashboard() {
         : [...current, value];
       return { ...prev, [groupKey]: updated };
     });
+  };
+
+  const handleOpenDrawer = (visitor: VisitorRecord) => {
+    setSelectedVisitor(visitor);
+    setIsDrawerOpen(true);
   };
 
   const matrixFilteredRows = dataList.filter(row => {
@@ -236,7 +294,7 @@ export default function HRDashboard() {
               <button onClick={() => handleUpdateStatus(row.id, 'Denied')} className="p-1 text-rose-600 hover:bg-rose-50 rounded" title="Deny"><X className="w-4 h-4" /></button>
             </>
           )}
-          <button onClick={() => alert(`Reviewing credentials payload for: ${row.id}`)} className="p-1 text-slate-400 hover:bg-slate-100 rounded"><Eye className="w-4 h-4" /></button>
+          <button onClick={() => handleOpenDrawer(row)} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Open Clearance Drawer"><Eye className="w-4 h-4" /></button>
         </div>
       )
     }
@@ -259,7 +317,7 @@ export default function HRDashboard() {
     <DashboardLayout role="hr" userName="Sinchana K">
       <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* 3. Fully Dynamic Metric Cards */}
+        {/* Dynamic Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { title: 'Total Requests', value: dataList.length.toString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
@@ -277,10 +335,10 @@ export default function HRDashboard() {
           ))}
         </div>
 
-        {/* 60/40 Split Content Workspace */}
-        <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
+        {/* Workspace Splitting Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          <div className="lg:col-span-6 bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+          <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
             <div>
               <h3 className="font-bold text-slate-800 text-base">Centralized Access Management Queue</h3>
               <p className="text-xs text-slate-400 mt-0.5">Real-time gate passes and processing pipelines control panel</p>
@@ -315,136 +373,9 @@ export default function HRDashboard() {
                 columns={columns}
               />
             </div>
-            {/* REVIEW SLIDE-OUT DRAWER */}
-                    {isDrawerOpen && selectedVisitor && (
-                      <div className="fixed inset-0 z-50 overflow-hidden">
-                        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setIsDrawerOpen(false)} />
-                        
-                        <div className="absolute inset-y-0 right-0 max-w-md w-full bg-white shadow-2xl flex flex-col animate-slide-in-right">
-                          
-                          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white">
-                            <div>
-                              <h2 className="text-xl font-bold text-slate-800">Clearance Review</h2>
-                              <p className="text-sm text-slate-500 font-mono mt-0.5">{selectedVisitor.id}</p>
-                            </div>
-                            <button onClick={() => setIsDrawerOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
-                              <X className="w-5 h-5" />
-                            </button>
-                          </div>
-            
-                          <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/50">
-                            
-                            <section>
-                              <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                                <Shield className="w-4 h-4 mr-2 text-amber-600" /> Audit & Request Tracking
-                              </h3>
-                              <div className="space-y-1 text-sm">
-                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Requested By</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.hostName}</span></div>
-                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Request Date</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.requestedAt}</span></div>
-                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Scheduled Visit</span><span className="col-span-2 font-medium text-slate-900 text-blue-600">{selectedVisitor.visitDate}</span></div>
-                              </div>
-                            </section>
-            
-                            <section>
-                              <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                                <User className="w-4 h-4 mr-2 text-blue-600" /> Visitor Identity
-                              </h3>
-                              <div className="space-y-1 text-sm">
-                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Full Name</span><span className="col-span-2 font-bold text-slate-900">{selectedVisitor.visitorName}</span></div>
-                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Gender</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.gender}</span></div>
-                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Nationality</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.nationality}</span></div>
-                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Phone</span><span className="col-span-2 font-medium text-slate-900 font-mono">{selectedVisitor.phone}</span></div>
-                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Email</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.email}</span></div>
-                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">DOB</span><span className="col-span-2 font-medium text-slate-900 font-mono">{selectedVisitor.dob}</span></div>
-                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">ID Type</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.id_type}</span></div>
-                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">ID Number</span><span className="col-span-2 font-medium text-slate-900 font-mono tracking-wider">{selectedVisitor.id_number}</span></div>
-                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Organization</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.organization}</span></div>
-                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Designation</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.designation}</span></div>
-                              </div>
-                            </section>
-            
-                            <section>
-                              <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                                <Building className="w-4 h-4 mr-2 text-blue-600" /> Purpose of Visit
-                              </h3>
-                              <div className="space-y-1 text-sm">
-                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Department</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.department}</span></div>
-                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Pipeline</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.pipeline}</span></div>
-                                <div>
-                                  <span className="text-slate-500 block mb-1">Declared Purpose</span>
-                                  <div className="bg-white p-3 border border-slate-200 rounded-lg leading-relaxed shadow-sm text-slate-800 text-xs font-medium">
-                                    {selectedVisitor.purpose}
-                                  </div>
-                                </div>
-                              </div>
-                            </section>
-            
-                            <section>
-                              <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                                <Users className="w-4 h-4 mr-2 text-blue-600" /> Accompanying Escorts
-                              </h3>
-                              {selectedVisitor.escorts && selectedVisitor.escorts.length > 0 ? (
-                                <div className="space-y-3 mt-2">
-                                  {selectedVisitor.escorts.map((escort, idx) => (
-                                    <div key={idx} className="bg-white p-3 border border-slate-200 rounded-lg shadow-sm text-sm">
-                                      <div className="grid grid-cols-3 gap-1 mb-1"><span className="text-slate-500">Name</span><span className="col-span-2 font-medium text-slate-900">{escort.name}</span></div>
-                                      <div className="grid grid-cols-3 gap-1"><span className="text-slate-500">{escort.id_type || 'ID'}</span><span className="col-span-2 font-medium text-slate-900 font-mono">{escort.id_number}</span></div>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="text-sm text-slate-400 italic">No additional personnel attached.</div>
-                              )}
-                            </section>
-            
-                            <section>
-                              <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                                <FileText className="w-4 h-4 mr-2 text-blue-600" /> Attached Credentials
-                              </h3>
-                              {selectedVisitor.documentUrl ? (
-                                <a href={selectedVisitor.documentUrl} target="_blank" rel="noopener noreferrer" className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex flex-col items-center justify-center text-center hover:bg-blue-100 transition-colors group cursor-pointer">
-                                  <FileText className="w-8 h-8 mb-2 text-blue-500 group-hover:scale-110 transition-transform" />
-                                  <span className="font-bold text-blue-700 text-xs">Review Clearance Document</span>
-                                </a>
-                              ) : (
-                                <div className="bg-slate-50 border border-dashed border-slate-300 p-4 rounded-xl flex flex-col items-center justify-center text-center text-slate-400">
-                                  <span className="text-xs font-medium">No files attached by sponsor.</span>
-                                </div>
-                              )}
-                            </section>
-            
-                          </div>
-            
-                          <div className="px-6 py-4 border-t border-slate-100 bg-white flex justify-between items-center shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-                            <span className={`text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider ${
-                              selectedVisitor.status === 'Cleared' ? 'bg-slate-100 text-slate-700' :
-                              selectedVisitor.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
-                              selectedVisitor.status === 'Pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
-                              'bg-red-100 text-red-800'
-                            }`}>
-                              {selectedVisitor.status}
-                            </span>
-            
-                            <div className="flex items-center gap-3">
-                              {selectedVisitor.status === 'Pending' && (
-                                <>
-                                  <button onClick={() => { handleUpdateStatus(selectedVisitor.id, 'Denied'); setIsDrawerOpen(false); }} className="px-5 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-sm rounded-lg transition-colors">
-                                    Decline
-                                  </button>
-                                  <button onClick={() => { handleUpdateStatus(selectedVisitor.id, 'Approved'); setIsDrawerOpen(false); }} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-lg flex items-center gap-2 transition-colors shadow-sm">
-                                    <Check className="w-4 h-4" /> Approve Entry
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-            
-                        </div>
-                      </div>
-                    )}
           </div>
 
-          <div className="lg:col-span-4 space-y-6">
+          <div className="lg:col-span-1 space-y-6">
             <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
               <h3 className="font-bold text-slate-800 text-base mb-4">Command Quick Actions</h3>
               <div className="grid grid-cols-1 gap-2">
@@ -496,6 +427,132 @@ export default function HRDashboard() {
 
         </div>
       </div>
+
+      {/* REVIEW SLIDE-OUT DRAWER PORTAL */}
+      {isDrawerOpen && selectedVisitor && (
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setIsDrawerOpen(false)} />
+          
+          <div className="absolute inset-y-0 right-0 max-w-md w-full bg-white shadow-2xl flex flex-col animate-slide-in-right">
+            
+            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white">
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">Clearance Review</h2>
+                <p className="text-sm text-slate-500 font-mono mt-0.5">{selectedVisitor.id}</p>
+              </div>
+              <button onClick={() => setIsDrawerOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/50">
+              <section>
+                <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
+                  <Shield className="w-4 h-4 mr-2 text-amber-600" /> Audit & Request Tracking
+                </h3>
+                <div className="space-y-1 text-sm">
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Requested By</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.hostName}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Request Date</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.requestedAt}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Scheduled Visit</span><span className="col-span-2 font-medium text-slate-900 text-blue-600">{selectedVisitor.visitDate}</span></div>
+                </div>
+              </section>
+
+              <section>
+                <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
+                  <User className="w-4 h-4 mr-2 text-blue-600" /> Visitor Identity
+                </h3>
+                <div className="space-y-1 text-sm">
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Full Name</span><span className="col-span-2 font-bold text-slate-900">{selectedVisitor.visitorName}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Gender</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.gender}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Nationality</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.nationality}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Phone</span><span className="col-span-2 font-medium text-slate-900 font-mono">{selectedVisitor.phone}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Email</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.email}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">DOB</span><span className="col-span-2 font-medium text-slate-900 font-mono">{selectedVisitor.dob}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">ID Type</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.id_type}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">ID Number</span><span className="col-span-2 font-medium text-slate-900 font-mono tracking-wider">{selectedVisitor.id_number}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Organization</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.organization}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Designation</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.designation}</span></div>
+                </div>
+              </section>
+
+              <section>
+                <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
+                  <Building className="w-4 h-4 mr-2 text-blue-600" /> Purpose of Visit
+                </h3>
+                <div className="space-y-1 text-sm">
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Department</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.department}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Pipeline</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.pipeline}</span></div>
+                  <div>
+                    <span className="text-slate-500 block mb-1">Declared Purpose</span>
+                    <div className="bg-white p-3 border border-slate-200 rounded-lg leading-relaxed shadow-sm text-slate-800 text-xs font-medium">
+                      {selectedVisitor.purpose}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
+                  <Users className="w-4 h-4 mr-2 text-blue-600" /> Accompanying Escorts
+                </h3>
+                {selectedVisitor.escorts && selectedVisitor.escorts.length > 0 ? (
+                  <div className="space-y-3 mt-2">
+                    {selectedVisitor.escorts.map((escort, idx) => (
+                      <div key={idx} className="bg-white p-3 border border-slate-200 rounded-lg shadow-sm text-sm">
+                        <div className="grid grid-cols-3 gap-1 mb-1"><span className="text-slate-500">Name</span><span className="col-span-2 font-medium text-slate-900">{escort.name}</span></div>
+                        <div className="grid grid-cols-3 gap-1"><span className="text-slate-500">{escort.id_type || 'ID'}</span><span className="col-span-2 font-medium text-slate-900 font-mono">{escort.id_number}</span></div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-400 italic">No additional personnel attached.</div>
+                )}
+              </section>
+
+              <section>
+                <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
+                  <FileText className="w-4 h-4 mr-2 text-blue-600" /> Attached Credentials
+                </h3>
+                {selectedVisitor.documentUrl ? (
+                  <a href={selectedVisitor.documentUrl} target="_blank" rel="noopener noreferrer" className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex flex-col items-center justify-center text-center hover:bg-blue-100 transition-colors group cursor-pointer">
+                    <FileText className="w-8 h-8 mb-2 text-blue-500 group-hover:scale-110 transition-transform" />
+                    <span className="font-bold text-blue-700 text-xs">Review Clearance Document</span>
+                  </a>
+                ) : (
+                  <div className="bg-slate-50 border border-dashed border-slate-300 p-4 rounded-xl flex flex-col items-center justify-center text-center text-slate-400">
+                    <span className="text-xs font-medium">No files attached by sponsor.</span>
+                  </div>
+                )}
+              </section>
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-100 bg-white flex justify-between items-center shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+              <span className={`text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider ${
+                selectedVisitor.status === 'Cleared' ? 'bg-slate-100 text-slate-700' :
+                selectedVisitor.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+                selectedVisitor.status === 'Pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
+                'bg-red-100 text-red-800'
+              }`}>
+                {selectedVisitor.status}
+              </span>
+
+              <div className="flex items-center gap-3">
+                {selectedVisitor.status === 'Pending' && (
+                  <>
+                    <button onClick={() => { handleUpdateStatus(selectedVisitor.id, 'Denied'); setIsDrawerOpen(false); }} className="px-5 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-sm rounded-lg transition-colors">
+                      Decline
+                    </button>
+                    <button onClick={() => { handleUpdateStatus(selectedVisitor.id, 'Approved'); setIsDrawerOpen(false); }} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-lg flex items-center gap-2 transition-colors shadow-sm">
+                      <Check className="w-4 h-4" /> Approve Entry
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

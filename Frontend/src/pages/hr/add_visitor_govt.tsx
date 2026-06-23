@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Shield, User, CalendarDays, Users, UploadCloud, AlertCircle, CheckCircle2, Landmark } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { ArrowLeft, Users, UploadCloud, CheckCircle2, Landmark, Search, X } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { supabase } from '../../lib/supabase';
 
@@ -17,8 +17,25 @@ const NATIONALITIES = [
   { label: 'Other', code: '' }
 ];
 
+interface ExistingVisitor {
+  visitor_id: string;
+  name: string;
+  gender: string;
+  dob: string;
+  email: string;
+  phone: string;
+  id_type: string;
+  id_number: string;
+  address: string;
+  organization: string;
+  designation: string;
+  nationality: string;
+}
+
 export default function AddVisitorGovtPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const prefillData = location.state?.autofill;
 
   // Form Process States
   const [loading, setLoading] = useState(false);
@@ -30,12 +47,15 @@ export default function AddVisitorGovtPage() {
   const [scheduledDate, setScheduledDate] = useState('');
   const [department, setDepartment] = useState('Research Wing');
 
+  // CHANGE: Added visitorId tracking state to distinguish between creating a brand new profile vs referencing an existing row
+  const [visitorId, setVisitorId] = useState<string | null>(null);
+
   // Visitor Profile Metadata
-  const [visitorName, setVisitorName] = useState('');
-  const [gender, setGender] = useState('Others');
-  const [dob, setDob] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('+91 ');
+  const [visitorName, setVisitorName] = useState(prefillData?.visitorName || '');
+  const [gender, setGender] = useState(prefillData?.gender && prefillData.gender !== 'Others' ? prefillData.gender : 'Others');
+  const [dob, setDob] = useState(prefillData?.dob !== 'N/A' ? (prefillData?.dob || '') : '');
+  const [email, setEmail] = useState(prefillData?.email !== 'N/A' ? (prefillData?.email || '') : '');
+  const [phone, setPhone] = useState(prefillData?.phone !== 'N/A' ? (prefillData?.phone || '+91 ') : '+91 ');
   const [nationality, setNationality] = useState('Indian');
   const [address, setAddress] = useState('');
   const [organization, setOrganization] = useState('');
@@ -47,6 +67,10 @@ export default function AddVisitorGovtPage() {
   const [govtIdNumber, setGovtIdNumber] = useState('');
   const [hostId, setHostId] = useState('');
 
+  // CHANGE: Re-added missing state endpoints to manage live query data arrays and dropdown card popover mechanics
+  const [searchResults, setSearchResults] = useState<ExistingVisitor[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  
   // Accompanying Contingent State
   const [headCount, setHeadCount] = useState<number>(0);
   const [escorts, setEscorts] = useState<{ name: string; govId: string }[]>([]);
@@ -54,6 +78,70 @@ export default function AddVisitorGovtPage() {
   // File Upload State
   const [file, setFile] = useState<File | null>(null);
   const [uploadingText, setUploadingText] = useState('');
+
+  // CHANGE: Added debounced layout hook to watch visitorName inputs and execute search strings safely against Supabase table records
+  useEffect(() => {
+    if (visitorName.trim().length < 2 || visitorId) {
+      setSearchResults([]);
+      return;
+    }
+
+    const searchVisitors = async () => {
+      const { data, error } = await supabase
+        .from('visitors')
+        .select('*')
+        .ilike('name', `%${visitorName}%`)
+        .limit(5);
+
+      if (!error && data) {
+        setSearchResults(data as ExistingVisitor[]);
+      }
+    };
+
+    const debounceTimer = setTimeout(searchVisitors, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [visitorName, visitorId]);
+
+  // CHANGE: Formulated selection handler mapping selected indices directly into active form variables, auto-locking targeted blocks
+  const handleSelectVisitor = (visitor: ExistingVisitor) => {
+    setVisitorId(visitor.visitor_id);
+    setVisitorName(visitor.name);
+    setGender(visitor.gender || 'Others');
+    setDob(visitor.dob || '');
+    setEmail(visitor.email || '');
+    setPhone(visitor.phone || '+91 ');
+    setAddress(visitor.address || '');
+    setOrganization(visitor.organization || '');
+    setDesignation(visitor.designation || '');
+    setNationality(visitor.nationality || 'Indian');
+    
+    // Autofill government verification elements if they match the existing profile indices
+    if (visitor.id_type && ['Defense ID Card', 'Ministry Secretarial Token', 'Government Gazetted Pass', 'Diplomatic Passports'].includes(visitor.id_type)) {
+      setGovtIdType(visitor.id_type);
+    }
+    setGovtIdNumber(visitor.id_number || '');
+    
+    setShowDropdown(false);
+    if (pipeline !== 'Pre-Scheduled Visit') {
+      setPipeline('Repeated Visitor');
+    }
+  };
+
+  // CHANGE: Created a manual structural clear routine enabling security to switch out of linked records back to unique workflows
+  const handleClearSelectedVisitor = () => {
+    setVisitorId(null);
+    setVisitorName('');
+    setGender('Others');
+    setDob('');
+    setEmail('');
+    setPhone('+91 ');
+    setAddress('');
+    setOrganization('');
+    setDesignation('');
+    setNationality('Indian');
+    setGovtIdNumber('');
+    setPipeline('New Visitor / Urgent Access');
+  };
 
   // Dynamically structure escort rows
   useEffect(() => {
@@ -93,8 +181,10 @@ export default function AddVisitorGovtPage() {
 
     try {
       const timestamp = Date.now().toString().slice(-6);
-      const newVisitorId = `VIS${timestamp}`;
       const newVisitId = `VST${timestamp}`;
+      
+      // CHANGE: Bind dynamic variable reference keeping track of the target ID routing index context safely
+      let activeVisitorId = visitorId;
 
       let documentUrl = null;
       if (file) {
@@ -117,24 +207,29 @@ export default function AddVisitorGovtPage() {
       
       setUploadingText('Saving secure government manifests...');
 
-      // 1. Insert Visitor Identity Record
-      const { error: visitorError } = await supabase.from('visitors').insert({
-        visitor_id: newVisitorId,
-        name: visitorName,
-        email: email || null,
-        phone: phone,
-        gender: gender,
-        dob: dob || null,
-        address: address || null,
-        id_type: govtIdType,
-        id_number: govtIdNumber || 'Pending Verification',
-        nationality: nationality,
-        organization: organization || 'Government Ministry Command',
-        designation: designation || 'Official Delegate',
-        department: department
-      });
+      // CHANGE: Wrapped visitor generation inside a conditional block ensuring system avoids duplicating base profiles
+      if (!activeVisitorId) {
+        const standardGeneratedId = `VIS${timestamp}`;
+        activeVisitorId = standardGeneratedId;
 
-      if (visitorError) throw visitorError;
+        const { error: visitorError } = await supabase.from('visitors').insert({
+          visitor_id: standardGeneratedId,
+          name: visitorName,
+          email: email || null,
+          phone: phone,
+          gender: gender,
+          dob: dob || null,
+          address: address || null,
+          id_type: govtIdType,
+          id_number: govtIdNumber || 'Pending Verification',
+          nationality: nationality,
+          organization: organization || 'Government Ministry Command',
+          designation: designation || 'Official Delegate',
+          department: department
+        });
+
+        if (visitorError) throw visitorError;
+      }
 
       // Pack escort assets into final text stream securely
       let finalPurpose = `[GOVT CLEARANCE: ${govtIdType}] ${purpose}`;
@@ -148,7 +243,7 @@ export default function AddVisitorGovtPage() {
       // 2. Insert Visit Record
       const { error: visitError } = await supabase.from('visits').insert({
         visit_id: newVisitId,
-        visitor_id: newVisitorId,
+        visitor_id: activeVisitorId, // CHANGE: Links perfectly via newly instantiated or pre-existing base profiles
         host_employee_id: hostId || 'EMP001',
         created_by_employee_id: 'EMP001',
         visit_type: 'Govt',
@@ -251,15 +346,70 @@ export default function AddVisitorGovtPage() {
 
             {/* Core Profiler Identity Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1">Official Full Name *</label>
-                <input required type="text" value={visitorName} onChange={(e) => setVisitorName(e.target.value)} placeholder="Personnel Full Name" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-emerald-500" />
+              
+              {/* CHANGE: Replaced standard full name element blocks with our interactive floating lookup interface layouts */}
+              <div className="relative">
+                <label className="block text-xs font-semibold text-slate-500 mb-1">Full Name *</label>
+                <div className="relative flex items-center">
+                  <input 
+                    required 
+                    type="text" 
+                    value={visitorName} 
+                    disabled={!!visitorId}
+                    onChange={(e) => {
+                      setVisitorName(e.target.value);
+                      setShowDropdown(true);
+                    }} 
+                    onFocus={() => setShowDropdown(true)}
+                    placeholder="Type name to lookup profiles..." 
+                    className="w-full p-2.5 pr-8 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-emerald-500 disabled:bg-slate-50 disabled:text-slate-600 font-semibold" 
+                  />
+                  {visitorId ? (
+                    <button 
+                      type="button" 
+                      onClick={handleClearSelectedVisitor}
+                      className="absolute right-2.5 text-slate-400 hover:text-red-500 transition-colors"
+                      title="Clear profile layout"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 pointer-events-none" />
+                  )}
+                </div>
+
+                {/* Popover Card Matrix */}
+                {showDropdown && searchResults.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-slate-100">
+                    {searchResults.map((visitor) => (
+                      <div 
+                        key={visitor.visitor_id}
+                        onClick={() => handleSelectVisitor(visitor)}
+                        className="px-4 py-2.5 text-xs text-slate-700 hover:bg-emerald-50/70 cursor-pointer flex justify-between items-center transition-colors"
+                      >
+                        <div>
+                          <span className="font-bold text-slate-900 block">{visitor.name}</span>
+                          <span className="text-[10px] text-slate-400 font-mono block">{visitor.email || 'No email registered'}</span>
+                        </div>
+                        <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold font-mono">
+                          {visitor.id_type || 'ID'}: {visitor.id_number || 'N/A'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {visitorId && (
+                  <span className="text-[10px] text-emerald-600 font-bold mt-1 block">
+                    ✓ Linked official profile found tracking match.
+                  </span>
+                )}
               </div>
               
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">Nationality *</label>
-                  <select value={nationality} onChange={handleNationalityChange} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-emerald-500">
+                  <select value={nationality} disabled={!!visitorId} onChange={handleNationalityChange} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-emerald-500 disabled:bg-slate-50">
                     {NATIONALITIES.map(nat => (
                       <option key={nat.label} value={nat.label}>{nat.label}</option>
                     ))}
@@ -267,7 +417,7 @@ export default function AddVisitorGovtPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">Gender *</label>
-                  <select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-emerald-500">
+                  <select value={gender} disabled={!!visitorId} onChange={(e) => setGender(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-emerald-500 disabled:bg-slate-50">
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
                     <option value="Non-binary">Non-binary</option>
@@ -276,17 +426,17 @@ export default function AddVisitorGovtPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">Contact Phone *</label>
-                  <input required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-emerald-500" />
+                  <input required type="tel" value={phone} disabled={!!visitorId} onChange={(e) => setPhone(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-emerald-500 disabled:bg-slate-50" />
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Date of Birth</label>
-                <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-700 outline-none focus:border-emerald-500" />
+                <input type="date" value={dob} disabled={!!visitorId} onChange={(e) => setDob(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-700 outline-none focus:border-emerald-500 disabled:bg-slate-50" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Official Network Email Address</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="officer@nic.in" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-emerald-500" />
+                <input type="email" value={email} disabled={!!visitorId} onChange={(e) => setEmail(e.target.value)} placeholder="officer@nic.in" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-emerald-500 disabled:bg-slate-50" />
               </div>
             </div>
 
@@ -296,7 +446,7 @@ export default function AddVisitorGovtPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-emerald-50/20 p-4 border border-emerald-100 rounded-xl">
               <div>
                 <label className="block text-xs font-bold text-emerald-800 uppercase tracking-wider mb-1">Government ID Type Dropdown *</label>
-                <select value={govtIdType} onChange={(e) => setGovtIdType(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-emerald-500">
+                <select value={govtIdType} disabled={!!visitorId} onChange={(e) => setGovtIdType(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-50">
                   <option value="Defense ID Card">Defense ID / Armed Forces Card</option>
                   <option value="Ministry Secretarial Token">Ministry Secretarial Token</option>
                   <option value="Government Gazetted Pass">Government Gazetted Pass</option>
@@ -305,7 +455,7 @@ export default function AddVisitorGovtPage() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-emerald-800 uppercase tracking-wider mb-1">Government ID Input Field *</label>
-                <input required type="text" value={govtIdNumber} onChange={(e) => setGovtIdNumber(e.target.value)} placeholder="Enter Official Credential ID String" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono tracking-wider outline-none focus:ring-2 focus:ring-emerald-500 uppercase" />
+                <input required type="text" value={govtIdNumber} disabled={!!visitorId} onChange={(e) => setGovtIdNumber(e.target.value)} placeholder="Enter Official Credential ID String" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono tracking-wider outline-none focus:ring-2 focus:ring-emerald-500 uppercase disabled:bg-slate-50" />
               </div>
             </div>
 
@@ -313,11 +463,11 @@ export default function AddVisitorGovtPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Command Ministry / Department Group Name</label>
-                <input type="text" value={organization} onChange={(e) => setOrganization(e.target.value)} placeholder="e.g. Ministry of Defence Command" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-emerald-500" />
+                <input type="text" value={organization} disabled={!!visitorId} onChange={(e) => setOrganization(e.target.value)} placeholder="e.g. Ministry of Defence Command" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-emerald-500 disabled:bg-slate-50" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Official Assignment Rank / Designation</label>
-                <input type="text" value={designation} onChange={(e) => setDesignation(e.target.value)} placeholder="e.g. Wing Commander / Joint Secretary" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-emerald-500" />
+                <input type="text" value={designation} disabled={!!visitorId} onChange={(e) => setDesignation(e.target.value)} placeholder="e.g. Wing Commander / Joint Secretary" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-emerald-500 disabled:bg-slate-50" />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Internal Liaison Host Employee ID Reference *</label>
@@ -325,11 +475,11 @@ export default function AddVisitorGovtPage() {
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Permanent Residential / Operational Address</label>
-                <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Base Quarters, Complex Suite No, City, State..." className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-emerald-500" />
+                <input type="text" value={address} disabled={!!visitorId} onChange={(e) => setAddress(e.target.value)} placeholder="Base Quarters, Complex Suite No, City, State..." className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-emerald-500 disabled:bg-slate-50" />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Detailed Briefing Mission Purpose Statement *</label>
-                <input required type="text" value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="State dynamic mission objectives explicitly..." className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-emerald-500" />
+                <input required type="text" value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="State dynamic mission objectives explicitly..." className="w-full p-2.5 border border-slate-200xl border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-emerald-500" />
               </div>
             </div>
 

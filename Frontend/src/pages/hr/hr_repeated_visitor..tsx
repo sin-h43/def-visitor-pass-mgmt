@@ -1,7 +1,7 @@
 // pages/hr/repeated_visitors.tsx
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { History, RefreshCw, X, Shield, Calendar, UserCheck, Search, Building, BookOpen } from 'lucide-react';
+import { History, RefreshCw, X, Shield, Calendar, UserCheck, Search, Building } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import type { TableColumn } from '../../types/visitor';

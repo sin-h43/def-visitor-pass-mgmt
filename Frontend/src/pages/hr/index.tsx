@@ -1,7 +1,7 @@
 // pages/hr/index.tsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Bell, Eye, CheckCircle, X } from 'lucide-react';
+import {User,Building,FileText,Check, Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Bell, Eye, CheckCircle, X } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
@@ -28,6 +28,11 @@ export default function HRDashboard() {
     pipeline: ['immediate', 'scheduled', 'repeated'],
     status: ['Pending', 'Approved', 'Denied', 'Cleared', 'Active']
   });
+
+    // Drawer States
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+    const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
+  
 
   const hrFilterGroups = [
     {
@@ -310,6 +315,133 @@ export default function HRDashboard() {
                 columns={columns}
               />
             </div>
+            {/* REVIEW SLIDE-OUT DRAWER */}
+                    {isDrawerOpen && selectedVisitor && (
+                      <div className="fixed inset-0 z-50 overflow-hidden">
+                        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setIsDrawerOpen(false)} />
+                        
+                        <div className="absolute inset-y-0 right-0 max-w-md w-full bg-white shadow-2xl flex flex-col animate-slide-in-right">
+                          
+                          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white">
+                            <div>
+                              <h2 className="text-xl font-bold text-slate-800">Clearance Review</h2>
+                              <p className="text-sm text-slate-500 font-mono mt-0.5">{selectedVisitor.id}</p>
+                            </div>
+                            <button onClick={() => setIsDrawerOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+            
+                          <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/50">
+                            
+                            <section>
+                              <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
+                                <Shield className="w-4 h-4 mr-2 text-amber-600" /> Audit & Request Tracking
+                              </h3>
+                              <div className="space-y-1 text-sm">
+                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Requested By</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.hostName}</span></div>
+                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Request Date</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.requestedAt}</span></div>
+                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Scheduled Visit</span><span className="col-span-2 font-medium text-slate-900 text-blue-600">{selectedVisitor.visitDate}</span></div>
+                              </div>
+                            </section>
+            
+                            <section>
+                              <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
+                                <User className="w-4 h-4 mr-2 text-blue-600" /> Visitor Identity
+                              </h3>
+                              <div className="space-y-1 text-sm">
+                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Full Name</span><span className="col-span-2 font-bold text-slate-900">{selectedVisitor.visitorName}</span></div>
+                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Gender</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.gender}</span></div>
+                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Nationality</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.nationality}</span></div>
+                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Phone</span><span className="col-span-2 font-medium text-slate-900 font-mono">{selectedVisitor.phone}</span></div>
+                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Email</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.email}</span></div>
+                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">DOB</span><span className="col-span-2 font-medium text-slate-900 font-mono">{selectedVisitor.dob}</span></div>
+                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">ID Type</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.id_type}</span></div>
+                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">ID Number</span><span className="col-span-2 font-medium text-slate-900 font-mono tracking-wider">{selectedVisitor.id_number}</span></div>
+                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Organization</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.organization}</span></div>
+                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Designation</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.designation}</span></div>
+                              </div>
+                            </section>
+            
+                            <section>
+                              <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
+                                <Building className="w-4 h-4 mr-2 text-blue-600" /> Purpose of Visit
+                              </h3>
+                              <div className="space-y-1 text-sm">
+                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Department</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.department}</span></div>
+                                <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Pipeline</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.pipeline}</span></div>
+                                <div>
+                                  <span className="text-slate-500 block mb-1">Declared Purpose</span>
+                                  <div className="bg-white p-3 border border-slate-200 rounded-lg leading-relaxed shadow-sm text-slate-800 text-xs font-medium">
+                                    {selectedVisitor.purpose}
+                                  </div>
+                                </div>
+                              </div>
+                            </section>
+            
+                            <section>
+                              <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
+                                <Users className="w-4 h-4 mr-2 text-blue-600" /> Accompanying Escorts
+                              </h3>
+                              {selectedVisitor.escorts && selectedVisitor.escorts.length > 0 ? (
+                                <div className="space-y-3 mt-2">
+                                  {selectedVisitor.escorts.map((escort, idx) => (
+                                    <div key={idx} className="bg-white p-3 border border-slate-200 rounded-lg shadow-sm text-sm">
+                                      <div className="grid grid-cols-3 gap-1 mb-1"><span className="text-slate-500">Name</span><span className="col-span-2 font-medium text-slate-900">{escort.name}</span></div>
+                                      <div className="grid grid-cols-3 gap-1"><span className="text-slate-500">{escort.id_type || 'ID'}</span><span className="col-span-2 font-medium text-slate-900 font-mono">{escort.id_number}</span></div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-sm text-slate-400 italic">No additional personnel attached.</div>
+                              )}
+                            </section>
+            
+                            <section>
+                              <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
+                                <FileText className="w-4 h-4 mr-2 text-blue-600" /> Attached Credentials
+                              </h3>
+                              {selectedVisitor.documentUrl ? (
+                                <a href={selectedVisitor.documentUrl} target="_blank" rel="noopener noreferrer" className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex flex-col items-center justify-center text-center hover:bg-blue-100 transition-colors group cursor-pointer">
+                                  <FileText className="w-8 h-8 mb-2 text-blue-500 group-hover:scale-110 transition-transform" />
+                                  <span className="font-bold text-blue-700 text-xs">Review Clearance Document</span>
+                                </a>
+                              ) : (
+                                <div className="bg-slate-50 border border-dashed border-slate-300 p-4 rounded-xl flex flex-col items-center justify-center text-center text-slate-400">
+                                  <span className="text-xs font-medium">No files attached by sponsor.</span>
+                                </div>
+                              )}
+                            </section>
+            
+                          </div>
+            
+                          <div className="px-6 py-4 border-t border-slate-100 bg-white flex justify-between items-center shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                            <span className={`text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider ${
+                              selectedVisitor.status === 'Cleared' ? 'bg-slate-100 text-slate-700' :
+                              selectedVisitor.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+                              selectedVisitor.status === 'Pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {selectedVisitor.status}
+                            </span>
+            
+                            <div className="flex items-center gap-3">
+                              {selectedVisitor.status === 'Pending' && (
+                                <>
+                                  <button onClick={() => { handleUpdateStatus(selectedVisitor.id, 'Denied'); setIsDrawerOpen(false); }} className="px-5 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-sm rounded-lg transition-colors">
+                                    Decline
+                                  </button>
+                                  <button onClick={() => { handleUpdateStatus(selectedVisitor.id, 'Approved'); setIsDrawerOpen(false); }} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-lg flex items-center gap-2 transition-colors shadow-sm">
+                                    <Check className="w-4 h-4" /> Approve Entry
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+            
+                        </div>
+                      </div>
+                    )}
           </div>
 
           <div className="lg:col-span-4 space-y-6">

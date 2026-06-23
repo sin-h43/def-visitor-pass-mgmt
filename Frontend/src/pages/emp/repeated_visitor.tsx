@@ -261,7 +261,7 @@ export default function HRRepeatedVisitorLogPage() {
         <div className="flex items-center space-x-3">
           <div>
             <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Personal Visitor Directory</h1>
-            <p className="text-sm text-slate-500">History ledger tracking identities logged.</p>
+            <p className="text-sm text-slate-500">History ledger tracking identities logged .</p>
           </div>
         </div>
 

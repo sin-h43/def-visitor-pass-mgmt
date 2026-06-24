@@ -394,20 +394,20 @@ export default function AddVisitorServicePage() {
               
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1">Nationality *</label>
-                  <select value={nationality} disabled={!!visitorId} onChange={(e) => setNationality(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-orange-500 disabled:bg-slate-50">
-                    {NATIONALITIES.map(nat => (
-                      <option key={nat.label} value={nat.label}>{nat.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">Gender *</label>
                   <select value={gender} disabled={!!visitorId} onChange={(e) => setGender(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-orange-500 disabled:bg-slate-50">
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
                     <option value="Non-binary">Non-binary</option>
                     <option value="Others">Others</option>
+                  </select>
+                </div>                
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1">Nationality *</label>
+                  <select value={nationality} disabled={!!visitorId} onChange={(e) => setNationality(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-orange-500 disabled:bg-slate-50">
+                    {NATIONALITIES.map(nat => (
+                      <option key={nat.label} value={nat.label}>{nat.label}</option>
+                    ))}
                   </select>
                 </div>
                 <div>

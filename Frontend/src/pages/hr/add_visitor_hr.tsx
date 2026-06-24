@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Shield, User, CalendarDays, Users, UploadCloud, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft,Shield,Users, UploadCloud, CheckCircle2 } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { supabase } from '../../lib/supabase';
 
@@ -257,14 +257,6 @@ export default function AddVisitorHRPage() {
               
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1">Nationality *</label>
-                  <select value={nationality} onChange={handleNationalityChange} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-purple-500">
-                    {NATIONALITIES.map(nat => (
-                      <option key={nat.label} value={nat.label}>{nat.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">Gender *</label>
                   <select value={gender} onChange={(e) => setGender(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-purple-500">
                     <option value="Male">Male</option>
@@ -272,7 +264,16 @@ export default function AddVisitorHRPage() {
                     <option value="Non-binary">Non-binary</option>
                     <option value="Others">Others</option>
                   </select>
+                </div>                
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1">Nationality *</label>
+                  <select value={nationality} onChange={handleNationalityChange} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-purple-500">
+                    {NATIONALITIES.map(nat => (
+                      <option key={nat.label} value={nat.label}>{nat.label}</option>
+                    ))}
+                  </select>
                 </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">Contact Phone *</label>
                   <input required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-purple-500" />

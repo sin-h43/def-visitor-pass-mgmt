@@ -402,14 +402,6 @@ export default function AddVisitorForeignPage() {
               
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1">Nationality *</label>
-                  <select value={nationality} disabled={!!visitorId} onChange={handleNationalityChange} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-amber-500 disabled:bg-slate-50">
-                    {NATIONALITIES.map(nat => (
-                      <option key={nat.label} value={nat.label}>{nat.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">Gender *</label>
                   <select value={gender} disabled={!!visitorId} onChange={(e) => setGender(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-amber-500 disabled:bg-slate-50">
                     <option value="Male">Male</option>
@@ -417,7 +409,16 @@ export default function AddVisitorForeignPage() {
                     <option value="Non-binary">Non-binary</option>
                     <option value="Others">Others</option>
                   </select>
+                </div>                
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1">Nationality *</label>
+                  <select value={nationality} disabled={!!visitorId} onChange={handleNationalityChange} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-amber-500 disabled:bg-slate-50">
+                    {NATIONALITIES.map(nat => (
+                      <option key={nat.label} value={nat.label}>{nat.label}</option>
+                    ))}
+                  </select>
                 </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">Contact Phone *</label>
                   <input required type="tel" value={phone} disabled={!!visitorId} onChange={(e) => setPhone(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-amber-500 disabled:bg-slate-50" />

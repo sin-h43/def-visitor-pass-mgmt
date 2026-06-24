@@ -55,6 +55,12 @@ export default function AddVisitorHRPage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploadingText, setUploadingText] = useState('');
 
+  // Calculate max allowed date for 12+ age requirement
+  const maxAllowedDate = new Date();
+  maxAllowedDate.setFullYear(maxAllowedDate.getFullYear() - 12);
+  const maxDob = maxAllowedDate.toISOString().split('T')[0];
+
+
   // Dynamically structure escort rows
   useEffect(() => {
     const count = Math.max(0, Math.min(headCount, 10));
@@ -282,7 +288,7 @@ export default function AddVisitorHRPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Date of Birth</label>
-                <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-700 outline-none focus:border-purple-500" />
+                <input type="date" value={dob} max={maxDob} onChange={(e) => setDob(e.target.value)}  className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-700 outline-none focus:border-purple-500" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Secure Email Address *</label>

@@ -79,6 +79,12 @@ export default function AddVisitorGovtPage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploadingText, setUploadingText] = useState('');
 
+    // Calculate max allowed date for 12+ age requirement
+  const maxAllowedDate = new Date();
+  maxAllowedDate.setFullYear(maxAllowedDate.getFullYear() - 12);
+  const maxDob = maxAllowedDate.toISOString().split('T')[0];
+
+
   // CHANGE: Added debounced layout hook to watch visitorName inputs and execute search strings safely against Supabase table records
   useEffect(() => {
     if (visitorName.trim().length < 2 || visitorId) {
@@ -432,7 +438,7 @@ export default function AddVisitorGovtPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Date of Birth</label>
-                <input type="date" value={dob} disabled={!!visitorId} onChange={(e) => setDob(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-700 outline-none focus:border-emerald-500 disabled:bg-slate-50" />
+                <input type="date" value={dob} disabled={!!visitorId} max={maxDob} onChange={(e) => setDob(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-700 outline-none focus:border-emerald-500 disabled:bg-slate-50" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Official Network Email Address</label>

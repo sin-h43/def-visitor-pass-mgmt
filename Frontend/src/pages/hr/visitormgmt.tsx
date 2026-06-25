@@ -34,6 +34,7 @@ interface VisitorRecord {
   address: string;
   department: string;
   designation: string;
+  hr_remarks: string; // Added remark field
 }
 
 export default function VisitorMgmtPage() {
@@ -54,6 +55,27 @@ export default function VisitorMgmtPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
 
+  // NEW: Commentary Box States
+  const [panelRemark, setPanelRemark] = useState('');
+  const [remarkModal, setRemarkModal] = useState<{
+    isOpen: boolean;
+    visitId: string | null;
+    action: 'Approved' | 'Denied' | null;
+    text: string;
+  }>({
+    isOpen: false,
+    visitId: null,
+    action: null,
+    text: '',
+  });
+
+  // Sync drawer remark when a visitor is selected
+  useEffect(() => {
+    if (selectedVisitor) {
+      setPanelRemark(selectedVisitor.hr_remarks || '');
+    }
+  }, [selectedVisitor]);
+
   const fetchVisitorLogs = async () => {
     try {
       setLoading(true);
@@ -65,6 +87,7 @@ export default function VisitorMgmtPage() {
           pass_type,
           purpose,
           status,
+          hr_remarks, 
           start_date,
           created_at,
           department,
@@ -113,7 +136,8 @@ export default function VisitorMgmtPage() {
             id_type: row.visitors?.id_type || 'Govt ID',
             id_number: row.visitors?.id_number || 'N/A',
             address: row.visitors?.address || 'N/A',
-            department: row.department || 'General Unit'
+            department: row.department || 'General Unit',
+            hr_remarks: row.hr_remarks || ''
           };
         });
 
@@ -130,18 +154,52 @@ export default function VisitorMgmtPage() {
     fetchVisitorLogs();
   }, []);
 
-  const handleUpdateStatus = async (id: string, newStatus: string) => {
+  // NEW: Handle both Status & Remark updates
+  const handleConfirmAction = async (visitId: string | null, newStatus: 'Approved' | 'Denied' | null, remarkText: string) => {
+    if (!visitId || !newStatus) return;
     try {
-      const { error } = await supabase.from('visits').update({ status: newStatus }).eq('visit_id', id);
+      const { error } = await supabase
+        .from('visits')
+        .update({ 
+          status: newStatus,
+          hr_remarks: remarkText 
+        })
+        .eq('visit_id', visitId);
+
       if (error) throw error;
       
-      setVisitorLogs(prev => prev.map(log => log.id === id ? { ...log, status: newStatus } : log));
-      if (selectedVisitor?.id === id) {
-        setSelectedVisitor(prev => prev ? { ...prev, status: newStatus } : null);
+      setVisitorLogs(prev => prev.map(log => log.id === visitId ? { ...log, status: newStatus, hr_remarks: remarkText } : log));
+      if (selectedVisitor?.id === visitId) {
+        setSelectedVisitor(prev => prev ? { ...prev, status: newStatus, hr_remarks: remarkText } : null);
       }
+      
+      // Close overlays
+      setRemarkModal({ isOpen: false, visitId: null, action: null, text: '' });
+      setIsDrawerOpen(false);
     } catch (err) {
       console.error("Failed to update status", err);
       alert("Failed to process status change.");
+    }
+  };
+
+  // NEW: Handle ONLY updating the remark text in the drawer without changing status
+  const handleUpdateRemarkOnly = async (visitId: string, remarkText: string) => {
+    try {
+      const { error } = await supabase
+        .from('visits')
+        .update({ hr_remarks: remarkText })
+        .eq('visit_id', visitId);
+
+      if (error) throw error;
+      
+      setVisitorLogs(prev => prev.map(log => log.id === visitId ? { ...log, hr_remarks: remarkText } : log));
+      if (selectedVisitor?.id === visitId) {
+        setSelectedVisitor(prev => prev ? { ...prev, hr_remarks: remarkText } : null);
+      }
+      alert("Internal note updated successfully!");
+    } catch (error) {
+      console.error('Error updating remark:', error);
+      alert("Failed to save note.");
     }
   };
 
@@ -287,10 +345,19 @@ export default function VisitorMgmtPage() {
         <div className="flex items-center space-x-1">
           {row.status === 'Pending' && (
             <>
-              <button onClick={() => handleUpdateStatus(row.id, 'Approved')} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Approve Request">
+              {/* TRIGGER POPUP MODAL INSTEAD OF INSTANT UPDATE */}
+              <button 
+                onClick={() => setRemarkModal({ isOpen: true, visitId: row.id, action: 'Approved', text: row.hr_remarks || '' })} 
+                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" 
+                title="Approve Request"
+              >
                 <CheckCircle className="w-4 h-4" />
               </button>
-              <button onClick={() => handleUpdateStatus(row.id, 'Denied')} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Decline Request">
+              <button 
+                onClick={() => setRemarkModal({ isOpen: true, visitId: row.id, action: 'Denied', text: row.hr_remarks || '' })} 
+                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" 
+                title="Decline Request"
+              >
                 <XCircle className="w-4 h-4" />
               </button>
             </>
@@ -386,7 +453,7 @@ export default function VisitorMgmtPage() {
 
         {/* REVIEW SLIDE-OUT DRAWER */}
         {isDrawerOpen && selectedVisitor && (
-          <div className="fixed inset-0 z-50 overflow-hidden">
+          <div className="fixed inset-0 z-[80] overflow-hidden">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setIsDrawerOpen(false)} />
             
             <div className="absolute inset-y-0 right-0 max-w-md w-full bg-white shadow-2xl flex flex-col animate-slide-in-right">
@@ -396,9 +463,19 @@ export default function VisitorMgmtPage() {
                   <h2 className="text-xl font-bold text-slate-800">Clearance Review</h2>
                   <p className="text-sm text-slate-500 font-mono mt-0.5">{selectedVisitor.id}</p>
                 </div>
-                <button onClick={() => setIsDrawerOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-3">
+                  <span className={`text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider ${
+                    selectedVisitor.status === 'Cleared' ? 'bg-slate-100 text-slate-700' :
+                    selectedVisitor.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+                    selectedVisitor.status === 'Pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {selectedVisitor.status}
+                  </span>
+                  <button onClick={() => setIsDrawerOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/50">
@@ -440,7 +517,7 @@ export default function VisitorMgmtPage() {
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Department</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.department}</span></div>
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Pipeline</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.pipeline}</span></div>
                     <div>
-                      <span className="text-slate-500 block mb-1">Declared Purpose</span>
+                      <span className="text-slate-500 block mb-1 mt-2">Declared Purpose</span>
                       <div className="bg-white p-3 border border-slate-200 rounded-lg leading-relaxed shadow-sm text-slate-800 text-xs font-medium">
                         {selectedVisitor.purpose}
                       </div>
@@ -484,30 +561,89 @@ export default function VisitorMgmtPage() {
 
               </div>
 
-              <div className="px-6 py-4 border-t border-slate-100 bg-white flex justify-between items-center shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-                <span className={`text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider ${
-                  selectedVisitor.status === 'Cleared' ? 'bg-slate-100 text-slate-700' :
-                  selectedVisitor.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
-                  selectedVisitor.status === 'Pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
-                  'bg-red-100 text-red-800'
-                }`}>
-                  {selectedVisitor.status}
-                </span>
-
-                <div className="flex items-center gap-3">
-                  {selectedVisitor.status === 'Pending' && (
-                    <>
-                      <button onClick={() => { handleUpdateStatus(selectedVisitor.id, 'Denied'); setIsDrawerOpen(false); }} className="px-5 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-sm rounded-lg transition-colors">
-                        Decline
-                      </button>
-                      <button onClick={() => { handleUpdateStatus(selectedVisitor.id, 'Approved'); setIsDrawerOpen(false); }} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-lg flex items-center gap-2 transition-colors shadow-sm">
-                        <Check className="w-4 h-4" /> Approve Entry
-                      </button>
-                    </>
-                  )}
+              {/* NEW: ALWAYS EDITABLE COMMENTARY BOX IN DRAWER FOOTER */}
+              <div className="p-6 border-t border-slate-100 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                <div className="flex justify-between items-end mb-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Internal HR Remarks
+                  </label>
+                  <button 
+                    onClick={() => handleUpdateRemarkOnly(selectedVisitor.id, panelRemark)}
+                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded transition-colors"
+                  >
+                    Save Note
+                  </button>
                 </div>
+                
+                <textarea
+                  rows={2}
+                  value={panelRemark}
+                  onChange={(e) => setPanelRemark(e.target.value)}
+                  placeholder="Add context, acceptance reasoning, or decline criteria..."
+                  className="w-full p-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 resize-none mb-4"
+                />
+
+                {selectedVisitor.status === 'Pending' && (
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => handleConfirmAction(selectedVisitor.id, 'Denied', panelRemark)}
+                      className="flex-1 py-2.5 bg-red-50 text-red-700 font-bold text-xs rounded-xl hover:bg-red-100 border border-red-100 transition-colors"
+                    >
+                      Decline Access
+                    </button>
+                    <button 
+                      onClick={() => handleConfirmAction(selectedVisitor.id, 'Approved', panelRemark)}
+                      className="flex-1 py-2.5 bg-emerald-600 text-white font-bold text-xs rounded-xl hover:bg-emerald-700 shadow-sm transition-colors"
+                    >
+                      Authorize Access
+                    </button>
+                  </div>
+                )}
               </div>
 
+            </div>
+          </div>
+        )}
+
+        {/* NEW: FOOD DELIVERY STYLE ACTION MODAL (From Table Buttons) */}
+        {remarkModal.isOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform scale-100 transition-all">
+              
+              <div className={`p-5 text-center ${remarkModal.action === 'Approved' ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                <h3 className={`text-lg font-bold ${remarkModal.action === 'Approved' ? 'text-emerald-800' : 'text-red-800'}`}>
+                  {remarkModal.action === 'Approved' ? 'Approve Visitor Clearance' : 'Decline Visitor Access'}
+                </h3>
+                <p className="text-xs mt-1 text-slate-500">Leave an optional note for audit logs.</p>
+              </div>
+
+              <div className="p-6">
+                <textarea
+                  autoFocus
+                  rows={3}
+                  placeholder="e.g., 'ID verified, escort required' or 'Denied due to expired visa...'"
+                  value={remarkModal.text}
+                  onChange={(e) => setRemarkModal(prev => ({ ...prev, text: e.target.value }))}
+                  className="w-full p-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-slate-800 bg-slate-50 resize-none"
+                />
+
+                <div className="flex gap-3 mt-5">
+                  <button 
+                    onClick={() => setRemarkModal({ isOpen: false, visitId: null, action: null, text: '' })}
+                    className="flex-1 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => handleConfirmAction(remarkModal.visitId, remarkModal.action, remarkModal.text)}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm transition-all ${
+                      remarkModal.action === 'Approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
+                    }`}
+                  >
+                    Confirm {remarkModal.action}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -517,6 +653,8 @@ export default function VisitorMgmtPage() {
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes slide-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
         .animate-slide-in-right { animation: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes fade-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .animate-fade-in { animation: fade-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       `}} />
     </DashboardLayout>
   );

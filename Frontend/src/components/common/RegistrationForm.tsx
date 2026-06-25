@@ -71,6 +71,29 @@ export default function RegistrationForm() {
   const [designation, setDesignation] = useState('');
   const [nationality, setNationality] = useState(prefillData?.nationality || 'Indian');
 
+  // NEW AUTOFILL SYNCHRONIZATION HOOK: Fills in missed parameters on mount
+  useEffect(() => {
+    if (prefillData) {
+      // 1. Autofill Designation field if it exists
+      if (prefillData.designation && prefillData.designation !== 'N/A') {
+        setDesignation(prefillData.designation);
+      }
+      
+      // 2. Format and Autofill Scheduled arrival target date if editing a pre-scheduled log
+      if (prefillData.requestDate && prefillData.pipeline === 'Pre-Scheduled') {
+        // Parse "DD/MM/YYYY, HH:mm" structure into standard "YYYY-MM-DDTHH:mm" format for datetime-local
+        try {
+          const [datePart, timePart] = prefillData.requestDate.split(', ');
+          const [day, month, year] = datePart.split('/');
+          const formattedIso = `${year}-${month}-${day}T${timePart.substring(0, 5)}`;
+          setScheduledDate(formattedIso);
+        } catch (e) {
+          console.error("Failed to format pre-scheduled entry date parameter", e);
+        }
+      }
+    }
+  }, [prefillData]);
+  
   // Autocomplete UI States
   const [searchResults, setSearchResults] = useState<ExistingVisitor[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -119,7 +142,7 @@ export default function RegistrationForm() {
     setDob(visitor.dob || '');
     setEmail(visitor.email || '');
     setPhone(visitor.phone || '+91 ');
-    setIdType(visitor.id_type || 'PAN');
+    setIdType(visitor.id_type || 'Aadhar');
     setIdNumber(visitor.id_number || '');
     setAddress(visitor.address || '');
     setOrganization(visitor.organization || '');
@@ -139,7 +162,7 @@ export default function RegistrationForm() {
     setDob('');
     setEmail('');
     setPhone('+91 ');
-    setIdType('PAN');
+    setIdType('Aadhar');
     setIdNumber('');
     setAddress('');
     setOrganization('');

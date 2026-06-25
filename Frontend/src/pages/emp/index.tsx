@@ -1,6 +1,6 @@
 // pages/emp/index.tsx
 import { useState, useMemo, useEffect } from 'react';
-import { UserPlus, FileText, AlertCircle, X, Shield, User, Building, Users } from 'lucide-react';
+import { UserPlus, FileText, AlertCircle, X, User, Building, Bell, Send, CheckCircle } from 'lucide-react'; // Added notification icons
 import { Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import SearchFilterMatrix from '../../components/common/SearchFilterMatrix';
@@ -12,6 +12,9 @@ export default function EmployeeDashboard() {
   const navigate = useNavigate();
   const [shiftData, setShiftData] = useState<VisitorRecord[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Added state to track ignored notification IDs locally so employees can dismiss them
+  const [ignoredNotificationIds, setIgnoredNotificationIds] = useState<string[]>([]);
 
   // Drawer States
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -78,7 +81,8 @@ export default function EmployeeDashboard() {
             hostDept: currentUser.dept,
             escorts: escortsArray,
             requestDate: new Date(row.start_date || row.created_at).toLocaleString('en-GB', { hour12: false, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-            status: row.status === 'Approved' ? 'Cleared' : row.status,
+            // Cleaned trailing spaces matching to ensure exact filtering string comparisons
+            status: row.status === 'Approved' ? 'Cleared' : (row.status === 'Denied' ? 'Denied' : row.status),
             organization: row.visitors?.organization || 'N/A',
             created_at: row.visitors?.created_at,
             hr_remarks: row.hr_remarks || '' 
@@ -114,6 +118,7 @@ export default function EmployeeDashboard() {
         { label: 'Cleared', value: 'Cleared' },
         { label: 'Pending', value: 'Pending' },
         { label: 'Expired', value: 'Expired' },
+        { label: 'Denied', value: 'Denied' },
       ]
     },
     {
@@ -172,6 +177,7 @@ export default function EmployeeDashboard() {
   };
 
   const handleEdit = (visitor: VisitorRecord) => {
+    // Navigates directly into the Registry Form with autofill variables intact
     navigate('/emp/add_visitor', { state: { autofill: visitor, isEdit: true } });
   }
 
@@ -184,43 +190,71 @@ export default function EmployeeDashboard() {
     setIsDrawerOpen(true);
   };
 
-  const deniedVisits = shiftData.filter(v => v.status === 'Denied');
+  // Filter active notifications that have not been explicitly hidden via the ignore button
+  const activeNotifications = useMemo(() => {
+    return shiftData.filter(v => v.status.trim() === 'Denied' && !ignoredNotificationIds.includes(v.id));
+  }, [shiftData, ignoredNotificationIds]);
+
+  const handleIgnoreNotification = (id: string) => {
+    setIgnoredNotificationIds(prev => [...prev, id]);
+  };
 
   return (
     <DashboardLayout role="emp" userName={currentUser.name}>
       <div className="max-w-7xl mx-auto">
         
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-800">Welcome Back, {currentUser.name}!</h1>
-          <p className="text-sm text-slate-500">Gate 1 Reception • Entry Dashboard</p>
+        <div className="mb-6 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">Welcome Back, {currentUser.name}!</h1>
+            <p className="text-sm text-slate-500">Gate 1 Reception • Entry Dashboard</p>
+          </div>
         </div>
 
-        {deniedVisits.length > 0 && (
-          <div className="mb-8">
-            <h3 className="text-sm font-bold text-rose-700 flex items-center mb-3 uppercase tracking-wider">
-              <AlertCircle className="w-4 h-4 mr-2" /> Requires Attention: Declined Requests
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {deniedVisits.map(visit => (
-                <div key={visit.id} className="bg-rose-50/50 border border-rose-200 rounded-xl p-4 shadow-sm relative overflow-hidden group">
-                  <div className="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
-                  <div className="flex justify-between items-start mb-3 pl-2">
-                    <div>
-                      <h4 className="font-bold text-rose-950 text-sm truncate">{visit.visitorName}</h4>
-                      <p className="text-[11px] text-rose-700 font-mono mt-0.5">{visit.id}</p>
+        {/* IT WORKFLOW STYLE ACTIONABLE NOTIFICATION PANEL */}
+        {activeNotifications.length > 0 && (
+          <div className="mb-8 border border-slate-200 bg-slate-50/50 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
+              <h3 className="text-sm font-bold text-slate-800 flex items-center uppercase tracking-wider">
+                <Bell className="w-4 h-4 mr-2 text-rose-500 animate-pulse" /> System Notifications ({activeNotifications.length})
+              </h3>
+              <span className="text-[10px] bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded-full">Requires Attention</span>
+            </div>
+            
+            <div className="space-y-3">
+              {activeNotifications.map(visit => (
+                <div key={visit.id} className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all hover:border-slate-300 shadow-sm relative overflow-hidden">
+                  <div className="absolute left-0 top-0 h-full w-1.5 bg-rose-500"></div>
+                  
+                  <div className="flex items-start gap-3 pl-2 max-w-xl">
+                    <div className="p-2 bg-rose-50 text-rose-600 rounded-lg mt-0.5">
+                      <AlertCircle className="w-4 h-4" />
                     </div>
-                    <span className="px-2 py-1 bg-rose-100 text-rose-800 text-[10px] uppercase font-bold rounded">Denied</span>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-bold text-slate-900 text-sm">{visit.visitorName}</h4>
+                        <span className="text-[10px] font-mono text-slate-400">({visit.id})</span>
+                        <span className="px-1.5 py-0.5 bg-rose-50 text-rose-700 border border-rose-100 font-bold text-[9px] uppercase rounded">Request Rejected</span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        <span className="font-semibold text-slate-700">HR Feedback: </span>
+                        <span className="italic">"{visit.hr_remarks || 'Identity credential mismatch or policy conflict.'}"</span>
+                      </p>
+                    </div>
                   </div>
-                  <div className="bg-white p-3 rounded-lg border border-rose-100 mb-4 ml-2">
-                    <span className="block text-[10px] uppercase font-bold text-slate-400 mb-1">HR Rejection Remark:</span>
-                    <p className="text-xs text-slate-700 font-medium italic">"{visit.hr_remarks || 'No specific reason provided by HR.'}"</p>
-                  </div>
-                  <div className="ml-2">
+
+                  {/* Operational Action Row Buttons */}
+                  <div className="flex items-center gap-2 w-full md:w-auto shrink-0 border-t md:border-t-0 pt-3 md:pt-0 justify-end">
                     <button 
-                      onClick={() => handleReRegister(visit)}
-                      className="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
+                      onClick={() => handleIgnoreNotification(visit.id)}
+                      className="px-3 py-1.5 border border-slate-200 text-slate-500 hover:bg-slate-50 font-bold text-xs rounded-lg transition-colors flex items-center gap-1"
                     >
-                      Correct & Resend Request
+                      <X className="w-3.5 h-3.5" /> Dismiss
+                    </button>
+                    <button 
+                      onClick={() => handleEdit(visit)}
+                      className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+                    >
+                      <Send className="w-3 h-3" /> Resend Request
                     </button>
                   </div>
                 </div>
@@ -232,9 +266,9 @@ export default function EmployeeDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div onClick={() => navigate('/emp/add_visitor')} className="flex items-center justify-between p-6 bg-white border border-slate-200 rounded-xl hover:shadow-md transition-all group cursor-pointer">
             <div>
-              <h3 className="text-lg font-semibold text-blue-400">New Visitor Request</h3>
+              <h3 className="text-lg font-semibold text-blue-500">New Visitor Request</h3>
               <p className="text-sm text-slate-400 mt-2">Create a new gate pass request or pre-schedule an upcoming visit.</p>
-              <span className="text-blue-400 text-sm font-medium mt-4 inline-block group-hover:text-blue-500">Open Form →</span>
+              <span className="text-blue-500 text-sm font-medium mt-4 inline-block group-hover:text-blue-600">Open Form →</span>
             </div>
             <div className="flex flex-col items-center justify-center p-4 border border-blue-100 bg-blue-50 rounded-lg text-blue-600 shrink-0">
               <UserPlus className="w-8 h-8 mb-2" />
@@ -245,9 +279,9 @@ export default function EmployeeDashboard() {
           <Link to="/emp/dispatchedlogs" className="block">
             <div className="flex items-center justify-between p-6 bg-white border border-slate-200 rounded-xl hover:shadow-md transition-all group cursor-pointer h-full">
               <div>
-                <h3 className="text-lg font-semibold text-amber-400">Pass History Logs</h3>
+                <h3 className="text-lg font-semibold text-amber-500">Pass History Logs</h3>
                 <p className="text-sm text-slate-500 mt-2">View previously dispatched passes, expired credentials, and exit logs.</p>
-                <span className="text-amber-400 text-sm font-medium mt-4 inline-block group-hover:text-amber-500">View Logs →</span>
+                <span className="text-amber-400 text-sm font-medium mt-4 inline-block group-hover:text-amber-600">View Logs →</span>
               </div>
               <div className="flex flex-col items-center justify-center p-4 border border-slate-200 bg-amber-50 rounded-lg text-amber-500 shrink-0">
                 <FileText className="w-8 h-8 mb-2" />
@@ -274,7 +308,6 @@ export default function EmployeeDashboard() {
             </div>
           </div>
 
-          {/* Pass onView prop to the table */}
           <VisitorTable 
             data={visibleRows} 
             loading={loading}
@@ -329,7 +362,7 @@ export default function EmployeeDashboard() {
                 </section>
               </div>
 
-              {/* READ ONLY REMARKS PANEL */}
+              {/* ACTION REMARKS PANEL */}
               <div className="p-6 border-t border-slate-100 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                   HR Review Commentary
@@ -342,9 +375,20 @@ export default function EmployeeDashboard() {
                   )}
                 </div>
                 {selectedVisitor.status === 'Denied' && (
-                  <button onClick={() => handleReRegister(selectedVisitor)} className="mt-4 w-full py-2.5 bg-blue-600 text-white font-bold rounded-xl shadow-sm hover:bg-blue-700 transition-colors">
-                    Correct & Resend Request
-                  </button>
+                  <div className="mt-4 flex gap-2">
+                    <button 
+                      onClick={() => { setIsDrawerOpen(false); handleIgnoreNotification(selectedVisitor.id); }}
+                      className="w-1/3 py-2.5 border border-slate-200 font-bold text-slate-600 rounded-xl hover:bg-slate-50 transition-colors text-xs"
+                    >
+                      Dismiss
+                    </button>
+                    <button 
+                      onClick={() => { setIsDrawerOpen(false); handleEdit(selectedVisitor); }} 
+                      className="w-2/3 py-2.5 bg-blue-600 text-white font-bold rounded-xl shadow-sm hover:bg-blue-700 transition-colors text-xs"
+                    >
+                      Correct & Resend
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

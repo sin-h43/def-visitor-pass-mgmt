@@ -49,7 +49,7 @@ export default function AddVisitorHRPage() {
 
   // Accompanying Contingent State
   const [headCount, setHeadCount] = useState<number>(0);
-  const [escorts, setEscorts] = useState<{ name: string; govId: string }[]>([]);
+  const [escorts, setEscorts] = useState<{name: string, govId: string, email:string, nationality:string, phone: string, gender:string}[]>([]);
 
   // File Upload State
   const [file, setFile] = useState<File | null>(null);
@@ -68,7 +68,7 @@ export default function AddVisitorHRPage() {
       const newEscorts = [...prev];
       if (count > prev.length) {
         for (let i = prev.length; i < count; i++) {
-          newEscorts.push({ name: '', govId: '' });
+          newEscorts.push({ name: '', govId: '', email:'', phone:'', nationality: '', gender:'Others' });
         }
       } else {
         newEscorts.length = count;
@@ -77,7 +77,7 @@ export default function AddVisitorHRPage() {
     });
   }, [headCount]);
 
-  const handleEscortChange = (index: number, field: 'name' | 'govId', value: string) => {
+  const handleEscortChange = (index: number, field: 'name' | 'govId' | 'phone' | 'nationality' | 'gender'| 'email', value: string) => {
     const updatedEscorts = [...escorts];
     updatedEscorts[index][field] = value;
     setEscorts(updatedEscorts);
@@ -356,19 +356,105 @@ export default function AddVisitorHRPage() {
 
               {escorts.length > 0 && (
                 <div className="p-4 bg-white space-y-3.5">
-                  {escorts.map((escort, index) => (
-                    <div key={index} className="flex flex-col sm:flex-row gap-3 p-3.5 border border-slate-200 rounded-xl bg-slate-50/50 relative">
-                      <div className="absolute -left-2 -top-2 w-5 h-5 bg-purple-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white shadow-sm">{index + 1}</div>
-                      <div className="flex-1">
-                        <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Member Full Name</label>
-                        <input required type="text" value={escort.name} onChange={(e) => handleEscortChange(index, 'name', e.target.value)} placeholder="Enter name" className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-purple-500" />
-                      </div>
-                      <div className="flex-1">
-                        <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Identification Serial ID</label>
-                        <input required type="text" value={escort.govId} onChange={(e) => handleEscortChange(index, 'govId', e.target.value)} placeholder="Enter Document Serial ID" className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-bold font-mono outline-none focus:border-purple-500" />
-                      </div>
-                    </div>
-                  ))}
+              {escorts.map((escort, index) => (
+  <div key={index} className="flex flex-col gap-3 p-3.5 border border-slate-200 rounded-xl bg-slate-50/50 relative">
+    {/* Row Index Badge */}
+    <div className="absolute -left-2 -top-2 w-5 h-5 bg-purple-800 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white shadow-sm">
+      {index + 1}
+    </div>
+    
+    {/* All fields wrapped in a single container with two rows */}
+    <div className="flex flex-col gap-3 w-full">
+      
+      {/* FIRST ROW: Name, Gender, Nationality, Contact Phone */}
+      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+        {/* 1. Member Full Name */}
+        <div className='sm:col-span-2'>
+          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Member Full Name *</label>
+          <input 
+            required
+            type="text" 
+            value={escort.name}
+            onChange={(e) => handleEscortChange(index, 'name', e.target.value)}
+            placeholder="Enter name" 
+            className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" 
+          />
+        </div>
+
+        {/* 2. Gender */}
+        <div>
+          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Gender *</label>
+          <select 
+            value={escort.gender} 
+            onChange={(e) => handleEscortChange(index, 'gender', e.target.value)} 
+            className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50"
+          >
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Non-binary">Non-binary</option>
+            <option value="Others">Others</option>
+          </select>
+        </div>
+
+        {/* 3. Nationality */}
+        <div>
+          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Nationality *</label>
+          <select 
+            value={escort.nationality} 
+            onChange={(e) => handleEscortChange(index, 'nationality', e.target.value)} 
+            className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50"
+          >
+            {NATIONALITIES.map(nat => (
+              <option key={nat.label} value={nat.label}>{nat.label}</option>
+            ))}
+          </select>
+        </div>
+        
+        {/* 4. Contact Phone */}
+        <div>
+          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Contact Phone *</label>
+          <input 
+            required 
+            type="tel" 
+            value={escort.phone} 
+            onChange={(e) => handleEscortChange(index, 'phone', e.target.value)} 
+            placeholder="+91 98765 43210" 
+            className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500 disabled:bg-slate-50" 
+          />
+        </div>
+      </div>
+
+      {/* SECOND ROW: Serial ID & Email Address */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+        {/* 5. Identification Serial ID */}
+        <div>
+          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Identification Serial ID *</label>
+          <input 
+            required
+            type="text" 
+            value={escort.govId}
+            onChange={(e) => handleEscortChange(index, 'govId', e.target.value)}
+            placeholder="Enter Serial ID" 
+            className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500" 
+          />
+        </div>
+
+        {/* 6. Email Address */}
+        <div>
+          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Email Address</label>
+          <input 
+            type="email" 
+            value={escort.email || ''}
+            onChange={(e) => handleEscortChange(index, 'email', e.target.value)}
+            placeholder="e.g. name@domain.com" 
+            className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" 
+          />
+        </div>
+      </div>
+
+    </div>
+  </div>
+))}
                 </div>
               )}
             </div>

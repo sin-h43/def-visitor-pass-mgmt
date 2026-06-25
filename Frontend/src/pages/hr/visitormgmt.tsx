@@ -1,7 +1,7 @@
 // pages/hr/visitormgmt.tsx
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, User, Landmark, Globe, ShieldAlert, Wrench, Eye, CheckCircle, XCircle, X, Shield, Building, FileText, Check } from 'lucide-react';
+import { Users, User, Landmark, Globe, ShieldAlert, Wrench, Eye, CheckCircle, XCircle, X, Shield, Building, FileText } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';

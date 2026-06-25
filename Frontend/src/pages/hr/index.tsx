@@ -1,47 +1,16 @@
 // pages/hr/index.tsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Building, FileText, Check, Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Bell, Eye, CheckCircle, X } from 'lucide-react';
+import { User, Building, FileText, Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Bell, Eye, CheckCircle, X } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
-import type { TableColumn } from '../../types/visitor';
+import type { TableColumn, VisitorRecord } from '../../types/visitor';
 import { supabase } from '../../lib/supabase';
-
-interface VisitorRecord {
-  id: string;
-  visitorName: string;
-  gender: string;
-  phone: string;
-  email: string;
-  category: string;
-  purpose: string;
-  hostName: string;
-  hostDept: string;
-  hostId: string;
-  requestedAt: string;
-  visitDate: string;
-  status: string;
-  passType: string;
-  pipeline: string;
-  nationality: string;
-  organization: string;
-  documentUrl: string | null;
-  escorts: any[];
-  dob: string;
-  id_type: string;
-  id_number: string;
-  address: string;
-  department: string;
-  designation: string;
-}
 
 const dynamicBroadcastPool = [
   { id: 1, type: 'FOREIGN REGISTRY', text: 'Passport clearance requested for Sarah Jenkins.', color: 'bg-orange-50 border-orange-100 text-orange-800' },
   { id: 2, type: 'GATE AUTO-SYNC', text: 'Gate 2 badge scanner synchronization completed.', color: 'bg-emerald-50 border-emerald-100 text-emerald-800' },
-  // { id: 3, type: 'GOVT CLEARANCE', text: 'Pass DEF-8821 authorized by cyber security command desk.', color: 'bg-purple-50 border-purple-100 text-purple-800' },
-  // { id: 4, type: 'VITAL ALERTS', text: 'Contractor Madan Gowda logged departure via South Outpost.', color: 'bg-slate-50 border-slate-200 text-slate-700' },
-  // { id: 5, type: 'SYSTEM AUDIT', text: 'Centralized pass pipeline rules updated.', color: 'bg-blue-50 border-blue-100 text-blue-800' }
 ];
 
 export default function HRDashboard() {
@@ -57,9 +26,32 @@ export default function HRDashboard() {
     status: ['Pending', 'Approved', 'Denied', 'Cleared', 'Active']
   });
 
+  // CHANGE: Added new states to manage the always-editable text box (panelRemark) 
+  // and the table popup modal (remarkModal).
+  const [panelRemark, setPanelRemark] = useState('');
+  const [remarkModal, setRemarkModal] = useState<{
+    isOpen: boolean;
+    visitId: string | null;
+    action: 'Approved' | 'Denied' | null;
+    text: string;
+  }>({
+    isOpen: false,
+    visitId: null,
+    action: null,
+    text: '',
+  });
+
   // Drawer States
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
+
+  // CHANGE: Added a hook to auto-fill the drawer's text box with the existing comment 
+  // from the database whenever an HR officer clicks on a visitor row.
+  useEffect(() => {
+    if (selectedVisitor) {
+      setPanelRemark(selectedVisitor.hr_remarks || '');
+    }
+  }, [selectedVisitor]);
 
   const hrFilterGroups = [
     {
@@ -108,6 +100,7 @@ export default function HRDashboard() {
             status,
             start_date,
             created_at,
+            hr_remarks,
             visitors (
               visitor_id,
               name,
@@ -168,7 +161,8 @@ export default function HRDashboard() {
               id_type: row.visitors?.id_type || 'Govt ID',
               id_number: row.visitors?.id_number || 'N/A',
               address: row.visitors?.address || 'N/A',
-              department: row.department || 'General Unit'
+              department: row.department || 'General Unit',
+              hr_remarks: row.hr_remarks || ''
             };
           });
           setDataList(transformed);
@@ -192,25 +186,54 @@ export default function HRDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // 2. Real Database Update for Status Action Buttons
-  const handleUpdateStatus = async (id: string, newStatus: VisitorRecord['status']) => {
-    // Instantly update the UI local lists so it feels snappy
-    setDataList(prev => prev.map(item => item.id === id ? { ...item, status: newStatus } : item));
-    
-    // Also update the active drawer if open
-    if (selectedVisitor && selectedVisitor.id === id) {
-      setSelectedVisitor(prev => prev ? { ...prev, status: newStatus } : null);
-    }
-    
-    // Update the record in Supabase
-    const { error } = await supabase
-      .from('visits')
-      .update({ status: newStatus })
-      .eq('visit_id', id);
+  // CHANGE: Master function that updates BOTH the visitor's status (Approved/Denied) 
+  // AND pushes the newly typed HR remark to the Supabase database.
+  const handleUpdateStatus = async (visitId: string | null, newStatus: 'Approved' | 'Denied' | null, remarkText: string) => {
+    if (!visitId || !newStatus) return;
+    try {
+      const { error } = await supabase
+        .from('visits')
+        .update({ 
+          status: newStatus,
+          hr_remarks: remarkText 
+        })
+        .eq('visit_id', visitId);
+
+      if (error) throw error;
       
-    if (error) {
-      console.error("Failed to update status in DB:", error);
-      alert("Failed to update pass status. Please try again.");
+      setDataList(prev => prev.map(log => log.id === visitId ? { ...log, status: newStatus, hr_remarks: remarkText } : log));
+      if (selectedVisitor?.id === visitId) {
+        setSelectedVisitor(prev => prev ? { ...prev, status: newStatus, hr_remarks: remarkText } : null);
+      }
+      
+      // Close overlays
+      setRemarkModal({ isOpen: false, visitId: null, action: null, text: '' });
+      setIsDrawerOpen(false);
+    } catch (err) {
+      console.error("Failed to update status", err);
+      alert("Failed to process status change.");
+    }
+  };
+
+  // CHANGE: Secondary function just for the "Save Note" button. This allows HR to 
+  // edit and save comments without accidentally changing the approval status.
+  const handleUpdateRemarkOnly = async (visitId: string, remarkText: string) => {
+    try {
+      const { error } = await supabase
+        .from('visits')
+        .update({ hr_remarks: remarkText })
+        .eq('visit_id', visitId);
+
+      if (error) throw error;
+      
+      setDataList(prev => prev.map(log => log.id === visitId ? { ...log, hr_remarks: remarkText } : log));
+      if (selectedVisitor?.id === visitId) {
+        setSelectedVisitor(prev => prev ? { ...prev, hr_remarks: remarkText } : null);
+      }
+      alert("Internal note updated successfully!");
+    } catch (error) {
+      console.error('Error updating remark:', error);
+      alert("Failed to save note.");
     }
   };
 
@@ -291,8 +314,9 @@ export default function HRDashboard() {
         <div className="flex items-center space-x-1">
           {row.status === 'Pending' && (
             <>
-              <button onClick={() => handleUpdateStatus(row.id, 'Approved')} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded" title="Approve"><CheckCircle className="w-4 h-4" /></button>
-              <button onClick={() => handleUpdateStatus(row.id, 'Denied')} className="p-1 text-rose-600 hover:bg-rose-50 rounded" title="Deny"><X className="w-4 h-4" /></button>
+              {/* CHANGE: Trigger remark modal instead of instant update */}
+              <button onClick={() => setRemarkModal({ isOpen: true, visitId: row.id, action: 'Approved', text: row.hr_remarks || '' })} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded" title="Approve"><CheckCircle className="w-4 h-4" /></button>
+              <button onClick={() => setRemarkModal({ isOpen: true, visitId: row.id, action: 'Denied', text: row.hr_remarks || '' })} className="p-1 text-rose-600 hover:bg-rose-50 rounded" title="Deny"><X className="w-4 h-4" /></button>
             </>
           )}
           <button onClick={() => handleOpenDrawer(row)} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Open Clearance Drawer"><Eye className="w-4 h-4" /></button>
@@ -527,33 +551,101 @@ export default function HRDashboard() {
               </section>
             </div>
 
-            <div className="px-6 py-4 border-t border-slate-100 bg-white flex justify-between items-center shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-              <span className={`text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider ${
-                selectedVisitor.status === 'Cleared' ? 'bg-slate-100 text-slate-700' :
-                selectedVisitor.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
-                selectedVisitor.status === 'Pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
-                'bg-red-100 text-red-800'
-              }`}>
-                {selectedVisitor.status}
-              </span>
-
-              <div className="flex items-center gap-3">
-                {selectedVisitor.status === 'Pending' && (
-                  <>
-                    <button onClick={() => { handleUpdateStatus(selectedVisitor.id, 'Denied'); setIsDrawerOpen(false); }} className="px-5 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-sm rounded-lg transition-colors">
-                      Decline
-                    </button>
-                    <button onClick={() => { handleUpdateStatus(selectedVisitor.id, 'Approved'); setIsDrawerOpen(false); }} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-lg flex items-center gap-2 transition-colors shadow-sm">
-                      <Check className="w-4 h-4" /> Approve Entry
-                    </button>
-                  </>
-                )}
+            {/* CHANGE: ALWAYS EDITABLE COMMENTARY BOX IN DRAWER FOOTER */}
+            <div className="p-6 border-t border-slate-100 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+              <div className="flex justify-between items-end mb-2">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Internal HR Remarks
+                </label>
+                <button 
+                  onClick={() => handleUpdateRemarkOnly(selectedVisitor.id, panelRemark)}
+                  className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded transition-colors"
+                >
+                  Save Note
+                </button>
               </div>
+              
+              <textarea
+                rows={2}
+                value={panelRemark}
+                onChange={(e) => setPanelRemark(e.target.value)}
+                placeholder="Add context, acceptance reasoning, or decline criteria..."
+                className="w-full p-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 resize-none mb-4"
+              />
+
+              {selectedVisitor.status === 'Pending' && (
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => handleUpdateStatus(selectedVisitor.id, 'Denied', panelRemark)}
+                    className="flex-1 py-2.5 bg-red-50 text-red-700 font-bold text-xs rounded-xl hover:bg-red-100 border border-red-100 transition-colors"
+                  >
+                    Decline Access
+                  </button>
+                  <button 
+                    onClick={() => handleUpdateStatus(selectedVisitor.id, 'Approved', panelRemark)}
+                    className="flex-1 py-2.5 bg-emerald-600 text-white font-bold text-xs rounded-xl hover:bg-emerald-700 shadow-sm transition-colors"
+                  >
+                    Authorize Access
+                  </button>
+                </div>
+              )}
             </div>
 
           </div>
         </div>
       )}
+
+      {/* CHANGE: FOOD DELIVERY STYLE ACTION MODAL 
+          This is the new popup that appears when clicking Accept/Decline directly from the table.
+          It binds to the remarkModal state and conditionally styles itself based on the action. */}
+      {remarkModal.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform scale-100 transition-all">
+            
+            <div className={`p-5 text-center ${remarkModal.action === 'Approved' ? 'bg-emerald-50' : 'bg-red-50'}`}>
+              <h3 className={`text-lg font-bold ${remarkModal.action === 'Approved' ? 'text-emerald-800' : 'text-red-800'}`}>
+                {remarkModal.action === 'Approved' ? 'Approve Visitor Clearance' : 'Decline Visitor Access'}
+              </h3>
+              <p className="text-xs mt-1 text-slate-500">Leave an optional note for audit logs.</p>
+            </div>
+
+            <div className="p-6">
+              <textarea
+                autoFocus
+                rows={3}
+                placeholder="e.g., 'ID verified, escort required' or 'Denied due to expired visa...'"
+                value={remarkModal.text}
+                onChange={(e) => setRemarkModal(prev => ({ ...prev, text: e.target.value }))}
+                className="w-full p-3 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-slate-800 bg-slate-50 resize-none"
+              />
+
+              <div className="flex gap-3 mt-5">
+                <button 
+                  onClick={() => setRemarkModal({ isOpen: false, visitId: null, action: null, text: '' })}
+                  className="flex-1 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => handleUpdateStatus(remarkModal.visitId, remarkModal.action, remarkModal.text)}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm transition-all ${
+                    remarkModal.action === 'Approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
+                  }`}
+                >
+                  Confirm {remarkModal.action}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes slide-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .animate-slide-in-right { animation: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes fade-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .animate-fade-in { animation: fade-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      `}} />
     </DashboardLayout>
   );
 }

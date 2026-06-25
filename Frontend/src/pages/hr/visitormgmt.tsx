@@ -5,37 +5,37 @@ import { Users, User, Landmark, Globe, ShieldAlert, Wrench, Eye, CheckCircle, XC
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
-import type { TableColumn } from '../../types/visitor';
+import type { VisitorRecord,TableColumn } from '../../types/visitor';
 import { supabase } from '../../lib/supabase';
 
-interface VisitorRecord {
-  id: string;
-  visitorName: string;
-  gender: string;
-  phone: string;
-  email: string;
-  category: string;
-  purpose: string;
-  hostName: string;
-  hostDept: string;
-  hostId: string;
-  requestedAt: string;
-  visitDate: string;
-  status: string;
-  passType: string;
-  pipeline: string;
-  nationality: string;
-  organization: string;
-  documentUrl: string | null;
-  escorts: any[];
-  dob: string;
-  id_type: string;
-  id_number: string;
-  address: string;
-  department: string;
-  designation: string;
-  hr_remarks: string; // Added remark field
-}
+// interface VisitorRecord {
+//   id: string;
+//   visitorName: string;
+//   gender: string;
+//   phone: string;
+//   email: string;
+//   category: string;
+//   purpose: string;
+//   hostName: string;
+//   hostDept: string;
+//   hostId: string;
+//   requestedAt: string;
+//   visitDate: string;
+//   status: string;
+//   passType: string;
+//   pipeline: string;
+//   nationality: string;
+//   organization: string;
+//   documentUrl: string | null;
+//   escorts: any[];
+//   dob: string;
+//   id_type: string;
+//   id_number: string;
+//   address: string;
+//   department: string;
+//   designation: string;
+//   hr_remarks: string; // Added remark field
+// }
 
 export default function VisitorMgmtPage() {
   const navigate = useNavigate();

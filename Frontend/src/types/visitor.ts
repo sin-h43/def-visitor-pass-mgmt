@@ -1,18 +1,30 @@
 export interface VisitorRecord {
   id: string;
   visitorName: string;
+  gender: string;
   phone: string;
-  email?: string;
-  category: 'General' | 'HR' | 'Govt' | 'Foreign' | 'Service';
+  email: string;
+  category: string;
   purpose: string;
   hostName: string;
-  hostDept?: string;
-  requestDate: string;
-  status: 'Pending' | 'Approved' | 'Denied' | 'Cleared' | 'Active';
-  passType?: string;
-  pipeline: 'immediate' | 'scheduled' | 'repeated';
-  nationality?: string;
-  organization?:string;
+  hostDept: string;
+  hostId: string;
+  requestedAt: string;
+  visitDate: string;
+  status: string;
+  passType: string;
+  pipeline: string;
+  nationality: string;
+  organization: string;
+  documentUrl: string | null;
+  escorts: any[];
+  dob: string;
+  id_type: string;
+  id_number: string;
+  address: string;
+  department: string;
+  designation: string;
+  hr_remarks: string; // Added remark field
 }
 
 // Defines how the reusable table should render columns

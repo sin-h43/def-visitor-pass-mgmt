@@ -38,6 +38,7 @@ interface VisitorTableProps {
   onEdit: (visitor: VisitorRecord) => void;
   onRevoke: (id: string) => void;
   onReRegister: (visitor: VisitorRecord) => void;
+  onView?: (visitor: VisitorRecord) => void;
 }
 
 export default function VisitorTable({ 

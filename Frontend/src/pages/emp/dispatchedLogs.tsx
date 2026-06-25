@@ -37,9 +37,9 @@ export default function DispatchedLogsPage() {
             department,
             purpose,
             status,
+            hr_remarks, /* CHANGE: Pulling the HR remarks */
             start_date,
             created_at,
-             
             visitors (visitor_id, name,document_url, phone, address, email, dob, organization, designation, id_type, id_number, nationality),
             escorts(name,phone,id_number, id_type)
           `)
@@ -74,7 +74,8 @@ export default function DispatchedLogsPage() {
               escorts: escortsArray,
               requestDate: new Date(row.start_date || row.created_at).toLocaleString('en-GB', { hour12: false, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
               status: row.status === 'Approved' ? 'Cleared' : row.status,
-              organization: row.visitors?.organization || 'N/A'
+              organization: row.visitors?.organization || 'N/A',
+              hr_remarks: row.hr_remarks || '' // CHANGE: Mapping the remark
             };
           });
           setLogs(transformed);

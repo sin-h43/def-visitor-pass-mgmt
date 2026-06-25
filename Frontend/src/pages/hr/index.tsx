@@ -1,7 +1,7 @@
 // pages/hr/index.tsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Building, FileText, Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Bell, Eye, CheckCircle, X } from 'lucide-react';
+import { User, Building, FileText , Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Bell, Eye, CheckCircle, X } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';

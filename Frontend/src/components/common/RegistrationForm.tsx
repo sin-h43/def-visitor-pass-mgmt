@@ -35,6 +35,10 @@ export default function RegistrationForm() {
   const navigate = useNavigate();
   const location = useLocation();
   const prefillData = location.state?.autofill;
+  
+  // NEW: Determines if we are fixing a declined pass or making a new one
+  const isEdit = location.state?.isEdit; 
+  const existingVisitId = prefillData?.id;
 
   // Form Process States
   const [loading, setLoading] = useState(false);
@@ -42,12 +46,12 @@ export default function RegistrationForm() {
   const [success, setSuccess] = useState(false);
 
   // Field Target Operations
-  const [pipeline, setPipeline] = useState(prefillData?.pipeline === 'Pre-Scheduled' ? 'Pre-Scheduled Visit' : 'New Visitor / Urgent Access');
+  const [pipeline, setPipeline] = useState(prefillData?.pipeline === 'Pre-Scheduled' ? 'Pre-Scheduled Visit' : (prefillData?.pipeline === 'Repeated' ? 'Repeated Visitor' : 'New Visitor / Urgent Access'));
   const [scheduledDate, setScheduledDate] = useState('');
-  const [department, setDepartment] = useState('Research Wing');
+  const [department, setDepartment] = useState(prefillData?.department || 'Research Wing');
 
   // Visitor Core Identity Attributes
-  const [visitorId, setVisitorId] = useState<string | null>(null); // Track existing UUID vs new profile
+  const [visitorId, setVisitorId] = useState<string | null>(null); 
   const [visitorName, setVisitorName] = useState(prefillData?.visitorName || '');
   const [gender, setGender] = useState(prefillData?.gender && prefillData.gender !== 'Others' ? prefillData.gender : 'Others');
   const [dob, setDob] = useState(prefillData?.dob !== 'N/A' ? (prefillData?.dob || '') : '');
@@ -56,26 +60,38 @@ export default function RegistrationForm() {
   const [idType, setIdType] = useState(prefillData?.id_type || 'PAN');
   const [idNumber, setIdNumber] = useState(prefillData?.id_number !== 'N/A' ? (prefillData?.id_number || '') : '');
   const [address, setAddress] = useState(prefillData?.address !== 'N/A' ? (prefillData?.address || '') : '');
-  const [purpose, setPurpose] = useState(prefillData?.purpose || '');
+  
+  // Clean the purpose string if it previously contained escort data
+  const [purpose, setPurpose] = useState(() => {
+    if (prefillData?.purpose) return prefillData.purpose.split(' | Accompanying:')[0];
+    return '';
+  });
+  
   const [organization, setOrganization] = useState(prefillData?.organization !== 'N/A' ? (prefillData?.organization || '') : '');
   const [designation, setDesignation] = useState('');
-  const [nationality, setNationality] = useState('Indian');
+  const [nationality, setNationality] = useState(prefillData?.nationality || 'Indian');
 
   // Autocomplete UI States
   const [searchResults, setSearchResults] = useState<ExistingVisitor[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // Accompanying Contingent State
-  const [headCount, setHeadCount] = useState<number>(0);
-  const [escorts, setEscorts] = useState<{name: string, govId: string, email:string, nationality:string, phone: string, gender:string}[]>([]);
+  // Accompanying Contingent State mapped from existing data
+  const [headCount, setHeadCount] = useState<number>(prefillData?.escorts?.length || 0);
+  const [escorts, setEscorts] = useState<{name: string, govId: string}[]>(
+    prefillData?.escorts?.map((e: any) => ({ name: e.name, govId: e.id_number })) || []
+  );
 
   // File Asset Tokens
   const [file, setFile] = useState<File | null>(null);
   const [uploadingText, setUploadingText] = useState('');
 
-  // Live search lookup for repeated visitors
+  // 12+ Age Requirement Calculator
+  const maxAllowedDate = new Date();
+  maxAllowedDate.setFullYear(maxAllowedDate.getFullYear() - 12);
+  const maxDob = maxAllowedDate.toISOString().split('T')[0];
+
   useEffect(() => {
-    if (visitorName.trim().length < 2 || visitorId) {
+    if (visitorName.trim().length < 2 || visitorId || isEdit) {
       setSearchResults([]);
       return;
     }
@@ -94,9 +110,8 @@ export default function RegistrationForm() {
 
     const debounceTimer = setTimeout(searchVisitors, 300);
     return () => clearTimeout(debounceTimer);
-  }, [visitorName, visitorId]);
+  }, [visitorName, visitorId, isEdit]);
 
-  // Handle auto-fill execution
   const handleSelectVisitor = (visitor: ExistingVisitor) => {
     setVisitorId(visitor.visitor_id);
     setVisitorName(visitor.name);
@@ -112,13 +127,11 @@ export default function RegistrationForm() {
     setNationality(visitor.nationality || 'Indian');
     setShowDropdown(false);
     
-    // Automatically flag pipeline if a repeated profile is selected
     if (pipeline !== 'Pre-Scheduled Visit') {
       setPipeline('Repeated Visitor');
     }
   };
 
-  // Clear filled profile to switch back to a blank new user entry
   const handleClearSelectedVisitor = () => {
     setVisitorId(null);
     setVisitorName('');
@@ -135,14 +148,13 @@ export default function RegistrationForm() {
     setPipeline('New Visitor / Urgent Access');
   };
 
-  // Dynamically structuralize escort rows based on quantitative input limits
   useEffect(() => {
-    const count = Math.max(0, Math.min(headCount, 10)); // Caps rows at 10 to protect DOM performance
+    const count = Math.max(0, Math.min(headCount, 10));
     setEscorts(prev => {
       const newEscorts = [...prev];
       if (count > prev.length) {
         for (let i = prev.length; i < count; i++) {
-          newEscorts.push({ name: '', govId: '', email:'', phone:'', nationality: '', gender:'Others' });
+          newEscorts.push({ name: '', govId: '' });
         }
       } else {
         newEscorts.length = count;
@@ -151,7 +163,7 @@ export default function RegistrationForm() {
     });
   }, [headCount]);
 
-  const handleEscortChange = (index: number, field: 'name' | 'govId' | 'phone' | 'nationality' | 'gender'| 'email', value: string) => {
+  const handleEscortChange = (index: number, field: 'name' | 'govId', value: string) => {
     const updatedEscorts = [...escorts];
     updatedEscorts[index][field] = value;
     setEscorts(updatedEscorts);
@@ -173,82 +185,87 @@ export default function RegistrationForm() {
 
     try {
       const timestamp = Date.now().toString().slice(-6);
-      const newVisitId = `VST${timestamp}`;
-      
-      // Determine final identity token context
+      const activeVisitId = isEdit ? existingVisitId : `VST${timestamp}`;
       let activeVisitorId = visitorId;
 
-      let documentUrl = null;
+      let documentUrl = prefillData?.documentUrl || null;
       if (file) {
         setUploadingText('Uploading document binary...');
         const fileExt = file.name.split('.').pop();
-        const fileName = `${newVisitId}_doc.${fileExt}`;
+        const fileName = `${activeVisitId}_doc_${Date.now()}.${fileExt}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('visitor-documents')
-          .upload(fileName, file);
-
+        const { error: uploadError } = await supabase.storage.from('visitor-documents').upload(fileName, file);
         if (uploadError) throw uploadError;
 
-        const { data: publicUrlData } = supabase.storage
-          .from('visitor-documents')
-          .getPublicUrl(fileName);
-          
+        const { data: publicUrlData } = supabase.storage.from('visitor-documents').getPublicUrl(fileName);
         documentUrl = publicUrlData.publicUrl;
       }
       
-      setUploadingText('Committing secure records...');
+      setUploadingText(isEdit ? 'Updating corrected records...' : 'Committing secure records...');
 
-      // 1. If it's a NEW user, insert transaction row into visitors base table
-      if (!activeVisitorId) {
-        const standardGeneratedId = `VIS${timestamp}`;
-        activeVisitorId = standardGeneratedId;
+      // Find the existing visitor ID if we are editing an older request
+      if (isEdit && !activeVisitorId) {
+        const { data: vData } = await supabase.from('visits').select('visitor_id').eq('visit_id', existingVisitId).single();
+        if (vData) activeVisitorId = vData.visitor_id;
+      }
 
-        const { error: visitorError } = await supabase.from('visitors').insert({
-          visitor_id: standardGeneratedId,
-          name: visitorName,
-          email: email || null,
-          phone: phone,
-          gender: gender || 'Others',
-          dob: dob || null,
-          address: address || null,
-          id_type: idType,
-          id_number: idNumber || 'Pending',
-          nationality: nationality,
-          organization: organization || null,
-          designation: designation || null,
-          department: department || null
+      // Handle Database Operations
+      if (isEdit) {
+        // UPDATE MODE: Update existing profile and overwrite the denied visit
+        if (activeVisitorId) {
+          await supabase.from('visitors').update({
+            name: visitorName, email: email || null, phone: phone, gender: gender || 'Others',
+            dob: dob || null, address: address || null, id_type: idType, id_number: idNumber || 'Pending',
+            nationality: nationality, organization: organization || null, designation: designation || null, department: department || null
+          }).eq('visitor_id', activeVisitorId);
+        }
+
+        let finalPurpose = purpose;
+        if (escorts.length > 0) {
+          const guestList = escorts.map(esc => `${esc.name} (ID: ${esc.govId})`).join(', ');
+          finalPurpose += ` | Accompanying: ${guestList}`;
+        }
+        const dbVisitType = pipeline === 'Pre-Scheduled Visit' ? 'PRESCHEDULED' : (pipeline === 'Repeated Visitor' ? 'REPEATED' : 'IMMEDIATE');
+        const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
+
+        // CHANGE: Pushes update back to Pending, and explicitly erases the old HR remark
+        const { error: updateError } = await supabase.from('visits').update({
+          visit_type: dbVisitType, purpose: finalPurpose, start_date: startDate, end_date: startDate,
+          status: 'Pending', hr_remarks: null, department: department,
+          ...(documentUrl && { document_url: documentUrl })
+        }).eq('visit_id', activeVisitId);
+
+        if (updateError) throw updateError;
+
+      } else {
+        // INSERT MODE: Brand new form logic
+        if (!activeVisitorId) {
+          const standardGeneratedId = `VIS${timestamp}`;
+          activeVisitorId = standardGeneratedId;
+          const { error: visitorError } = await supabase.from('visitors').insert({
+            visitor_id: standardGeneratedId, name: visitorName, email: email || null, phone: phone,
+            gender: gender || 'Others', dob: dob || null, address: address || null, id_type: idType,
+            id_number: idNumber || 'Pending', nationality: nationality, organization: organization || null,
+            designation: designation || null, department: department || null
+          });
+          if (visitorError) throw visitorError;
+        }
+
+        let finalPurpose = purpose;
+        if (escorts.length > 0) {
+          const guestList = escorts.map(esc => `${esc.name} (ID: ${esc.govId})`).join(', ');
+          finalPurpose += ` | Accompanying: ${guestList}`;
+        }
+        const dbVisitType = pipeline === 'Pre-Scheduled Visit' ? 'PRESCHEDULED' : (pipeline === 'Repeated Visitor' ? 'REPEATED' : 'IMMEDIATE');
+        const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
+
+        const { error: visitError } = await supabase.from('visits').insert({
+          visit_id: activeVisitId, visitor_id: activeVisitorId, host_employee_id: 'EMP001', created_by_employee_id: 'EMP001',
+          visit_type: dbVisitType, pass_type: 'ONE_DAY', purpose: finalPurpose, start_date: startDate, end_date: startDate,
+          status: 'Pending', document_url: documentUrl
         });
-
-        if (visitorError) throw visitorError;
+        if (visitError) throw visitError;
       }
-
-      // Bundle context records cleanly into the purpose column string
-      let finalPurpose = purpose;
-      if (escorts.length > 0) {
-        const guestList = escorts.map(esc => `${esc.name} (ID: ${esc.govId})`).join(', ');
-        finalPurpose += ` | Accompanying: ${guestList}`;
-      }
-
-      const dbVisitType = pipeline === 'Pre-Scheduled Visit' ? 'PRESCHEDULED' : (pipeline === 'Repeated Visitor' ? 'REPEATED' : 'IMMEDIATE');
-      const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
-
-      // 2. Insert transaction row into visits mapping table linked to our profile identifier
-      const { error: visitError } = await supabase.from('visits').insert({
-        visit_id: newVisitId,
-        visitor_id: activeVisitorId, // Uses the existing profile ID or the newly generated one
-        host_employee_id: 'EMP001', // Standard hardcoded testing anchor
-        created_by_employee_id: 'EMP001',
-        visit_type: dbVisitType,
-        pass_type: 'ONE_DAY',
-        purpose: finalPurpose,
-        start_date: startDate,
-        end_date: startDate,
-        status: 'Pending',
-        document_url: documentUrl
-      });
-
-      if (visitError) throw visitError;
 
       setSuccess(true);
       setTimeout(() => {
@@ -267,8 +284,10 @@ export default function RegistrationForm() {
     return (
       <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-8 max-w-4xl shadow-sm text-center animate-fade-in mx-auto mt-10">
         <CheckCircle2 className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold text-emerald-800 mb-2">Clearance Registration Successful</h2>
-        <p className="text-emerald-600 font-medium">The identity matrix and entry pass have been securely logged.</p>
+        <h2 className="text-2xl font-bold text-emerald-800 mb-2">
+          {isEdit ? 'Request Successfully Resent' : 'Clearance Registration Successful'}
+        </h2>
+        <p className="text-emerald-600 font-medium">The identity matrix and entry pass have been securely routed.</p>
         <p className="text-xs text-emerald-400 mt-4 font-mono">Routing back to Terminal Dashboard...</p>
       </div>
     );
@@ -277,8 +296,12 @@ export default function RegistrationForm() {
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-4xl shadow-sm font-sans text-slate-800">
       <div className="border-b border-slate-100 pb-4 mb-5">
-        <h2 className="text-xl font-bold text-slate-900 tracking-tight">Security Access Registry Form</h2>
-        <p className="text-xs text-slate-400 mt-0.5">Complete all required deployment identity fields to formulate access pass authorizations.</p>
+        <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+          {isEdit ? 'Correct & Resend Application' : 'Security Access Registry Form'}
+        </h2>
+        <p className="text-xs text-slate-400 mt-0.5">
+          {isEdit ? 'Fix any errors flagged by HR and resubmit this request for review.' : 'Complete all required deployment identity fields to formulate access pass authorizations.'}
+        </p>
       </div>
 
       {error && (
@@ -295,9 +318,7 @@ export default function RegistrationForm() {
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Pass Processing Pipeline *</label>
             <select 
-              required
-              value={pipeline}
-              onChange={(e) => setPipeline(e.target.value)}
+              required value={pipeline} onChange={(e) => setPipeline(e.target.value)}
               className="w-full p-2.5 border border-slate-200 rounded-xl bg-white text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option>New Visitor / Urgent Access</option>
@@ -308,9 +329,7 @@ export default function RegistrationForm() {
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Target Destination Unit *</label>
             <select 
-              required
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
+              required value={department} onChange={(e) => setDepartment(e.target.value)}
               className="w-full p-2.5 border border-slate-200 rounded-xl bg-white text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="Research Wing">Research Wing</option>
@@ -326,10 +345,7 @@ export default function RegistrationForm() {
           <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl animate-fade-in">
             <label className="block text-xs font-bold text-blue-800 uppercase tracking-wider mb-1.5">Requested Arrival Window Target *</label>
             <input 
-              required
-              type="datetime-local" 
-              value={scheduledDate}
-              onChange={(e) => setScheduledDate(e.target.value)}
+              required type="datetime-local" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)}
               className="w-full p-2.5 border border-blue-200 rounded-lg bg-white text-xs font-bold font-mono text-slate-700 outline-none" 
             />
           </div>
@@ -345,25 +361,13 @@ export default function RegistrationForm() {
             <label className="block text-xs font-semibold text-slate-500 mb-1">Full Name *</label>
             <div className="relative flex items-center">
               <input 
-                required 
-                type="text" 
-                value={visitorName} 
-                disabled={!!visitorId}
-                onChange={(e) => {
-                  setVisitorName(e.target.value);
-                  setShowDropdown(true);
-                }} 
-                onFocus={() => setShowDropdown(true)}
-                placeholder="Type name to lookup profiles..." 
+                required type="text" value={visitorName} disabled={!!visitorId || isEdit}
+                onChange={(e) => { setVisitorName(e.target.value); setShowDropdown(true); }} 
+                onFocus={() => setShowDropdown(true)} placeholder="Type name to lookup profiles..." 
                 className="w-full p-2.5 pr-8 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-600 font-semibold" 
               />
-              {visitorId ? (
-                <button 
-                  type="button" 
-                  onClick={handleClearSelectedVisitor}
-                  className="absolute right-2.5 text-slate-400 hover:text-red-500 transition-colors"
-                  title="Clear profile layout"
-                >
+              {visitorId && !isEdit ? (
+                <button type="button" onClick={handleClearSelectedVisitor} className="absolute right-2.5 text-slate-400 hover:text-red-500 transition-colors" title="Clear profile layout">
                   <X className="w-4 h-4" />
                 </button>
               ) : (
@@ -371,15 +375,10 @@ export default function RegistrationForm() {
               )}
             </div>
 
-            {/* Live Popover Autocomplete Dropdown Matrix */}
             {showDropdown && searchResults.length > 0 && (
               <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-slate-100">
                 {searchResults.map((visitor) => (
-                  <div 
-                    key={visitor.visitor_id}
-                    onClick={() => handleSelectVisitor(visitor)}
-                    className="px-4 py-2.5 text-xs text-slate-700 hover:bg-blue-50/70 cursor-pointer flex justify-between items-center transition-colors"
-                  >
+                  <div key={visitor.visitor_id} onClick={() => handleSelectVisitor(visitor)} className="px-4 py-2.5 text-xs text-slate-700 hover:bg-blue-50/70 cursor-pointer flex justify-between items-center transition-colors">
                     <div>
                       <span className="font-bold text-slate-900 block">{visitor.name}</span>
                       <span className="text-[10px] text-slate-400 font-mono block">{visitor.email || 'No email registered'}</span>
@@ -391,18 +390,12 @@ export default function RegistrationForm() {
                 ))}
               </div>
             )}
-            
-            {visitorId && (
-              <span className="text-[10px] text-emerald-600 font-bold mt-1 block">
-                ✓ Linked profile found tracking match.
-              </span>
-            )}
           </div>
           
           <div className="grid grid-cols-3 gap-2">
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1">Gender *</label>
-              <select value={gender} disabled={!!visitorId} onChange={(e) => setGender(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
+              <select value={gender} disabled={!!visitorId && !isEdit} onChange={(e) => setGender(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
                 <option value="Non-binary">Non-binary</option>
@@ -411,7 +404,7 @@ export default function RegistrationForm() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1">Nationality *</label>
-              <select value={nationality} disabled={!!visitorId} onChange={handleNationalityChange} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
+              <select value={nationality} disabled={!!visitorId && !isEdit} onChange={handleNationalityChange} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
                 {NATIONALITIES.map(nat => (
                   <option key={nat.label} value={nat.label}>{nat.label}</option>
                 ))}
@@ -420,23 +413,30 @@ export default function RegistrationForm() {
             
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1">Contact Phone *</label>
-              <input required type="tel" value={phone} disabled={!!visitorId} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-blue-500 disabled:bg-slate-50" />
+              <input required type="tel" value={phone} disabled={!!visitorId && !isEdit} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-blue-500 disabled:bg-slate-50" />
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1">Date of Birth</label>
-            <input type="date" value={dob} disabled={!!visitorId} onChange={(e) => setDob(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-700 outline-none focus:border-blue-500 disabled:bg-slate-50" />
+            <input 
+              type="date" 
+              value={dob} 
+              disabled={!!visitorId && !isEdit} 
+              max={maxDob} /* RESTRICTED TO 12+ YEARS OLD */
+              onChange={(e) => setDob(e.target.value)} 
+              className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-700 outline-none focus:border-blue-500 disabled:bg-slate-50" 
+            />
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1">Email Address</label>
-            <input type="email" value={email} disabled={!!visitorId} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. name@domain.com" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50" />
+            <input type="email" value={email} disabled={!!visitorId && !isEdit} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. name@domain.com" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50" />
           </div>
 
           <div className="grid grid-cols-3 gap-3 md:col-span-2">
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1">ID Type *</label>
-              <select value={idType} disabled={!!visitorId} onChange={(e) => setIdType(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
+              <select value={idType} disabled={!!visitorId && !isEdit} onChange={(e) => setIdType(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
                 <option value="PAN">PAN Card</option>
                 <option value="Passport">Passport</option>
                 <option value="Driving License">Driving License</option>
@@ -445,22 +445,22 @@ export default function RegistrationForm() {
             </div>
             <div className="col-span-2">
               <label className="block text-xs font-semibold text-slate-500 mb-1">Govt Issued ID Number *</label>
-              <input required type="text" value={idNumber} disabled={!!visitorId} onChange={(e) => setIdNumber(e.target.value)} placeholder="Enter Document ID Number" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono uppercase tracking-wider outline-none focus:border-blue-500 disabled:bg-slate-50" />
+              <input required type="text" value={idNumber} disabled={!!visitorId && !isEdit} onChange={(e) => setIdNumber(e.target.value)} placeholder="Enter Document ID Number" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono uppercase tracking-wider outline-none focus:border-blue-500 disabled:bg-slate-50" />
             </div>
           </div>
 
           <div className="md:col-span-2">
             <label className="block text-xs font-semibold text-slate-500 mb-1">Permanent Address</label>
-            <input type="text" value={address} disabled={!!visitorId} onChange={(e) => setAddress(e.target.value)} placeholder="House/Office No, Street, City, State, Pincode" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50" />
+            <input type="text" value={address} disabled={!!visitorId && !isEdit} onChange={(e) => setAddress(e.target.value)} placeholder="House/Office No, Street, City, State, Pincode" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50" />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1">Organization / Employer</label>
-            <input type="text" value={organization} disabled={!!visitorId} onChange={(e) => setOrganization(e.target.value)} placeholder="e.g. Acme Corp Operations" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50" />
+            <input type="text" value={organization} disabled={!!visitorId && !isEdit} onChange={(e) => setOrganization(e.target.value)} placeholder="e.g. Acme Corp Operations" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50" />
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1">Designation</label>
-            <input type="text" value={designation} disabled={!!visitorId} onChange={(e) => setDesignation(e.target.value)} placeholder="e.g. Technical Director" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50" />
+            <input type="text" value={designation} disabled={!!visitorId && !isEdit} onChange={(e) => setDesignation(e.target.value)} placeholder="e.g. Technical Director" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50" />
           </div>
 
           <div className="md:col-span-2">
@@ -477,124 +477,28 @@ export default function RegistrationForm() {
                 <Users className="w-4 h-4 mr-1.5 text-slate-500" />
                 Accompanying Contingent Head Count
               </label>
-              <p className="text-[11px] text-slate-400 mt-0.5">Specify companion additions processing entry authorization bounds.</p>
             </div>
             <input 
-              type="number" 
-              min="0"
-              max="10"
-              value={headCount || ''}
-              onChange={(e) => setHeadCount(parseInt(e.target.value) || 0)}
-              placeholder="0 (Single Personnel)" 
-              className="w-full sm:w-40 p-2 text-xs border border-slate-200 rounded-xl bg-white outline-none font-bold text-center focus:border-blue-500" 
+              type="number" min="0" max="10" value={headCount || ''} onChange={(e) => setHeadCount(parseInt(e.target.value) || 0)}
+              placeholder="0 (Single Personnel)" className="w-full sm:w-40 p-2 text-xs border border-slate-200 rounded-xl bg-white outline-none font-bold text-center focus:border-blue-500" 
             />
           </div>
 
           {escorts.length > 0 && (
             <div className="p-4 bg-white space-y-3.5">
-              <div className="text-[10px] font-bold text-amber-700 bg-amber-50/60 border border-amber-200 px-2.5 py-1 rounded w-fit uppercase tracking-wider">
-                Group Manifest Tracking: {escorts.length} profiles required.
-              </div>
-              
               {escorts.map((escort, index) => (
-  <div key={index} className="flex flex-col gap-3 p-3.5 border border-slate-200 rounded-xl bg-slate-50/50 relative">
-    {/* Row Index Badge */}
-    <div className="absolute -left-2 -top-2 w-5 h-5 bg-slate-800 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white shadow-sm">
-      {index + 1}
-    </div>
-    
-    {/* All fields wrapped in a single container with two rows */}
-    <div className="flex flex-col gap-3 w-full">
-      
-      {/* FIRST ROW: Name, Gender, Nationality, Contact Phone */}
-      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
-        {/* 1. Member Full Name */}
-        <div className='sm:col-span-2'>
-          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Member Full Name *</label>
-          <input 
-            required
-            type="text" 
-            value={escort.name}
-            onChange={(e) => handleEscortChange(index, 'name', e.target.value)}
-            placeholder="Enter name" 
-            className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" 
-          />
-        </div>
-
-        {/* 2. Gender */}
-        <div>
-          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Gender *</label>
-          <select 
-            value={escort.gender} 
-            onChange={(e) => handleEscortChange(index, 'gender', e.target.value)} 
-            className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50"
-          >
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-            <option value="Non-binary">Non-binary</option>
-            <option value="Others">Others</option>
-          </select>
-        </div>
-
-        {/* 3. Nationality */}
-        <div>
-          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Nationality *</label>
-          <select 
-            value={escort.nationality} 
-            onChange={(e) => handleEscortChange(index, 'nationality', e.target.value)} 
-            className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50"
-          >
-            {NATIONALITIES.map(nat => (
-              <option key={nat.label} value={nat.label}>{nat.label}</option>
-            ))}
-          </select>
-        </div>
-        
-        {/* 4. Contact Phone */}
-        <div>
-          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Contact Phone *</label>
-          <input 
-            required 
-            type="tel" 
-            value={escort.phone} 
-            onChange={(e) => handleEscortChange(index, 'phone', e.target.value)} 
-            placeholder="+91 98765 43210" 
-            className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500 disabled:bg-slate-50" 
-          />
-        </div>
-      </div>
-
-      {/* SECOND ROW: Serial ID & Email Address */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
-        {/* 5. Identification Serial ID */}
-        <div>
-          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Identification Serial ID *</label>
-          <input 
-            required
-            type="text" 
-            value={escort.govId}
-            onChange={(e) => handleEscortChange(index, 'govId', e.target.value)}
-            placeholder="Enter Serial ID" 
-            className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500" 
-          />
-        </div>
-
-        {/* 6. Email Address */}
-        <div>
-          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Email Address</label>
-          <input 
-            type="email" 
-            value={escort.email || ''}
-            onChange={(e) => handleEscortChange(index, 'email', e.target.value)}
-            placeholder="e.g. name@domain.com" 
-            className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" 
-          />
-        </div>
-      </div>
-
-    </div>
-  </div>
-))}
+                <div key={index} className="flex flex-col sm:flex-row gap-3 p-3.5 border border-slate-200 rounded-xl bg-slate-50/50 relative">
+                  <div className="absolute -left-2 -top-2 w-5 h-5 bg-slate-800 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white shadow-sm">{index + 1}</div>
+                  <div className="flex-1">
+                    <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Member Full Name</label>
+                    <input required type="text" value={escort.name} onChange={(e) => handleEscortChange(index, 'name', e.target.value)} placeholder="Enter name" className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Identification Serial ID</label>
+                    <input required type="text" value={escort.govId} onChange={(e) => handleEscortChange(index, 'govId', e.target.value)} placeholder="Enter Serial ID" className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-bold font-mono outline-none focus:border-blue-500" />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -608,23 +512,18 @@ export default function RegistrationForm() {
             <span className="font-bold text-slate-700 text-xs">
               {file ? (file as File).name : 'Upload Authorization Credentials'}
             </span>
-            <span className="text-[10px] mt-0.5 text-slate-400">PDF, PNG, or JPG formats up to 5MB</span>
-            
-            <input 
-              type="file" 
-              accept=".pdf,.png,.jpg,.jpeg"
-              onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            />
+            {prefillData?.documentUrl && !file && (
+              <span className="text-[10px] text-blue-500 mt-1 font-bold">Existing document attached. Click to replace.</span>
+            )}
+            <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
           </label>
 
-          {/* Action Submission Trigger Controls */}
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-50 mt-4">
             <button type="button" onClick={() => navigate('/emp')} className="px-5 py-2 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-colors text-xs">
               Cancel
             </button>
             <button type="submit" disabled={loading} className="px-6 py-2 rounded-xl font-bold bg-slate-950 text-white hover:bg-slate-900 shadow-sm transition-all text-xs disabled:opacity-50 flex items-center">
-              {loading ? (uploadingText || 'Processing...') : 'Commit Application'}
+              {loading ? (uploadingText || 'Processing...') : (isEdit ? 'Update & Resend Application' : 'Commit Application')}
             </button>
           </div>
         </div>

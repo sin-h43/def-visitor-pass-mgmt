@@ -1,4 +1,4 @@
-// components/common/VisitorTable.tsx
+// components/common/eVisitorTable.tsx
 import { useState } from 'react';
 import { Eye, MoreVertical, Pencil, RefreshCw, X, Shield, User, Building, FileText } from 'lucide-react';
 
@@ -7,6 +7,7 @@ export interface EscortRecord {
   phone: string;
   id_number: string;
   id_type: string;
+  email:string;
 }
 
 export interface VisitorRecord {
@@ -28,6 +29,7 @@ export interface VisitorRecord {
   status: string;
   organization: string;
   documentUrl: string | null;
+  hr_remarks?: string; // Optional property for the HR remark
 }
 
 interface VisitorTableProps {
@@ -38,7 +40,13 @@ interface VisitorTableProps {
   onReRegister: (visitor: VisitorRecord) => void;
 }
 
-export default function VisitorTable({ data, loading, onEdit, onRevoke, onReRegister }: VisitorTableProps) {
+export default function VisitorTable({ 
+  data, 
+  loading, 
+  onEdit, 
+  onRevoke, 
+  onReRegister 
+}: VisitorTableProps) {
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -238,39 +246,59 @@ export default function VisitorTable({ data, loading, onEdit, onRevoke, onReRegi
               </section>
             </div>
 
-            <div className="px-6 py-4 border-t border-slate-100 bg-white flex justify-between items-center">
-              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                selectedVisitor.status === 'Cleared' ? 'bg-emerald-100 text-emerald-700' :
-                selectedVisitor.status === 'Pending' ? 'bg-amber-100 text-amber-700' :
-                selectedVisitor.status === 'Revoked' ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'bg-red-100 text-red-700'
-              }`}>
-                Status: {selectedVisitor.status}
-              </span>
+            {/* DRAWER FOOTER WITH SIMPLE HR REMARK BOX */}
+            <div className="p-5 border-t border-slate-100 bg-slate-50 flex flex-col gap-4">
+              
+              {/* HR Remark Display */}
+              {selectedVisitor.hr_remarks ? (
+                <div className="w-full">
+                  <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">HR Review Note</span>
+                  <div className="bg-white p-3 border border-slate-200 rounded-lg text-sm text-slate-700 italic shadow-sm">
+                    "{selectedVisitor.hr_remarks}"
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full">
+                  <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">HR Review Note</span>
+                  <div className="text-xs text-slate-400 italic">No notes provided.</div>
+                </div>
+              )}
 
-              <div className="flex items-center gap-2">
-                {selectedVisitor.status === 'Pending' ? (
-                  <>
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between w-full pt-1">
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                  selectedVisitor.status === 'Cleared' ? 'bg-emerald-100 text-emerald-700' :
+                  selectedVisitor.status === 'Pending' ? 'bg-amber-100 text-amber-700' :
+                  selectedVisitor.status === 'Revoked' ? 'bg-slate-200 text-slate-600 border border-slate-300' : 'bg-red-100 text-red-700'
+                }`}>
+                  Status: {selectedVisitor.status}
+                </span>
+
+                <div className="flex items-center gap-2">
+                  {selectedVisitor.status === 'Pending' ? (
+                    <>
+                      <button 
+                        onClick={() => { handleCloseDrawer(); onRevoke(selectedVisitor.id); }}
+                        className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-medium text-sm rounded-lg transition-colors shadow-sm"
+                      >
+                        Revoke
+                      </button>
+                      <button 
+                        onClick={() => { handleCloseDrawer(); onEdit(selectedVisitor); }}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                      >
+                        <Pencil className="w-4 h-4" /> Edit
+                      </button>
+                    </>
+                  ) : (
                     <button 
-                      onClick={() => { handleCloseDrawer(); onRevoke(selectedVisitor.id); }}
-                      className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-medium text-sm rounded-lg transition-colors shadow-sm"
+                      onClick={() => { handleCloseDrawer(); onReRegister(selectedVisitor); }}
+                      className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors shadow-sm"
                     >
-                      Revoke
+                      <RefreshCw className="w-4 h-4" /> Re-Register
                     </button>
-                    <button 
-                      onClick={() => { handleCloseDrawer(); onEdit(selectedVisitor); }}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-                    >
-                      <Pencil className="w-4 h-4" /> Edit
-                    </button>
-                  </>
-                ) : (
-                  <button 
-                    onClick={() => { handleCloseDrawer(); onReRegister(selectedVisitor); }}
-                    className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-                  >
-                    <RefreshCw className="w-4 h-4" /> Re-Register Visitor
-                  </button>
-                )}
+                  )}
+                </div>
               </div>
             </div>
 

@@ -31,12 +31,21 @@ interface ExistingVisitor {
   nationality: string;
 }
 
+interface EscortPersonnel {
+  name: string;
+  idType: string;
+  govId: string;
+  email: string;
+  nationality: string;
+  phone: string;
+  gender: string;
+}
+
 export default function RegistrationForm() {
   const navigate = useNavigate();
   const location = useLocation();
   const prefillData = location.state?.autofill;
   
-  // NEW: Determines if we are fixing a declined pass or making a new one
   const isEdit = location.state?.isEdit; 
   const existingVisitId = prefillData?.id;
 
@@ -61,7 +70,6 @@ export default function RegistrationForm() {
   const [idNumber, setIdNumber] = useState(prefillData?.id_number !== 'N/A' ? (prefillData?.id_number || '') : '');
   const [address, setAddress] = useState(prefillData?.address !== 'N/A' ? (prefillData?.address || '') : '');
   
-  // Clean the purpose string if it previously contained escort data
   const [purpose, setPurpose] = useState(() => {
     if (prefillData?.purpose) return prefillData.purpose.split(' | Accompanying:')[0];
     return '';
@@ -71,17 +79,14 @@ export default function RegistrationForm() {
   const [designation, setDesignation] = useState('');
   const [nationality, setNationality] = useState(prefillData?.nationality || 'Indian');
 
-  // NEW AUTOFILL SYNCHRONIZATION HOOK: Fills in missed parameters on mount
+  // Autofill Synchronization Hook
   useEffect(() => {
     if (prefillData) {
-      // 1. Autofill Designation field if it exists
       if (prefillData.designation && prefillData.designation !== 'N/A') {
         setDesignation(prefillData.designation);
       }
       
-      // 2. Format and Autofill Scheduled arrival target date if editing a pre-scheduled log
       if (prefillData.requestDate && prefillData.pipeline === 'Pre-Scheduled') {
-        // Parse "DD/MM/YYYY, HH:mm" structure into standard "YYYY-MM-DDTHH:mm" format for datetime-local
         try {
           const [datePart, timePart] = prefillData.requestDate.split(', ');
           const [day, month, year] = datePart.split('/');
@@ -98,11 +103,19 @@ export default function RegistrationForm() {
   const [searchResults, setSearchResults] = useState<ExistingVisitor[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // Accompanying Contingent State mapped from existing data
+  // Accompanying Contingent State
   const [headCount, setHeadCount] = useState<number>(prefillData?.escorts?.length || 0);
-  const [escorts, setEscorts] = useState<{name: string, govId: string}[]>(
-    prefillData?.escorts?.map((e: any) => ({ name: e.name, govId: e.id_number })) || []
-  );
+const [escorts, setEscorts] = useState<EscortPersonnel[]>(
+  prefillData?.escorts?.map((e: any) => ({ 
+    name: e.name || '', 
+    idType: e.idType || e.id_type || 'PAN',
+    govId: e.govId || e.id_number || e.gov_id || '',  
+    email: e.email || '', 
+    nationality: e.nationality || 'Indian', 
+    phone: e.phone || '', 
+    gender: e.gender || 'Others' 
+  })) || []
+);
 
   // File Asset Tokens
   const [file, setFile] = useState<File | null>(null);
@@ -171,24 +184,36 @@ export default function RegistrationForm() {
     setPipeline('New Visitor / Urgent Access');
   };
 
-  useEffect(() => {
-    const count = Math.max(0, Math.min(headCount, 10));
-    setEscorts(prev => {
-      const newEscorts = [...prev];
-      if (count > prev.length) {
-        for (let i = prev.length; i < count; i++) {
-          newEscorts.push({ name: '', govId: '' });
-        }
-      } else {
-        newEscorts.length = count;
+useEffect(() => {
+  const count = Math.max(0, Math.min(headCount, 10));
+  setEscorts(prev => {
+    const newEscorts = [...prev];
+    if (count > prev.length) {
+      for (let i = prev.length; i < count; i++) {
+        // Enforce safe default initialization fields per escort block
+        newEscorts.push({ 
+          name: '', 
+          idType: 'PAN', 
+          govId: '', 
+          email: '', 
+          phone: '', 
+          nationality: 'Indian', 
+          gender: 'Others' 
+        });
       }
-      return newEscorts;
-    });
-  }, [headCount]);
+    } else {
+      newEscorts.length = count;
+    }
+    return newEscorts;
+  });
+}, [headCount]);
 
-  const handleEscortChange = (index: number, field: 'name' | 'govId', value: string) => {
+  const handleEscortChange = (index: number, field: keyof EscortPersonnel, value: string) => {
     const updatedEscorts = [...escorts];
-    updatedEscorts[index][field] = value;
+    updatedEscorts[index] = {
+      ...updatedEscorts[index],
+      [field]: value
+    };
     setEscorts(updatedEscorts);
   };
 
@@ -226,15 +251,20 @@ export default function RegistrationForm() {
       
       setUploadingText(isEdit ? 'Updating corrected records...' : 'Committing secure records...');
 
-      // Find the existing visitor ID if we are editing an older request
       if (isEdit && !activeVisitorId) {
         const { data: vData } = await supabase.from('visits').select('visitor_id').eq('visit_id', existingVisitId).single();
         if (vData) activeVisitorId = vData.visitor_id;
       }
 
-      // Handle Database Operations
+      let finalPurpose = purpose;
+      if (escorts.length > 0) {
+        const guestList = escorts.map(esc => `${esc.name} (${esc.idType}: ${esc.govId})`).join(', ');
+        finalPurpose += ` | Accompanying: ${guestList}`;
+      }
+      const dbVisitType = pipeline === 'Pre-Scheduled Visit' ? 'PRESCHEDULED' : (pipeline === 'Repeated Visitor' ? 'REPEATED' : 'IMMEDIATE');
+      const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
+
       if (isEdit) {
-        // UPDATE MODE: Update existing profile and overwrite the denied visit
         if (activeVisitorId) {
           await supabase.from('visitors').update({
             name: visitorName, email: email || null, phone: phone, gender: gender || 'Others',
@@ -243,15 +273,6 @@ export default function RegistrationForm() {
           }).eq('visitor_id', activeVisitorId);
         }
 
-        let finalPurpose = purpose;
-        if (escorts.length > 0) {
-          const guestList = escorts.map(esc => `${esc.name} (ID: ${esc.govId})`).join(', ');
-          finalPurpose += ` | Accompanying: ${guestList}`;
-        }
-        const dbVisitType = pipeline === 'Pre-Scheduled Visit' ? 'PRESCHEDULED' : (pipeline === 'Repeated Visitor' ? 'REPEATED' : 'IMMEDIATE');
-        const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
-
-        // CHANGE: Pushes update back to Pending, and explicitly erases the old HR remark
         const { error: updateError } = await supabase.from('visits').update({
           visit_type: dbVisitType, purpose: finalPurpose, start_date: startDate, end_date: startDate,
           status: 'Pending', hr_remarks: null, department: department,
@@ -261,7 +282,6 @@ export default function RegistrationForm() {
         if (updateError) throw updateError;
 
       } else {
-        // INSERT MODE: Brand new form logic
         if (!activeVisitorId) {
           const standardGeneratedId = `VIS${timestamp}`;
           activeVisitorId = standardGeneratedId;
@@ -273,14 +293,6 @@ export default function RegistrationForm() {
           });
           if (visitorError) throw visitorError;
         }
-
-        let finalPurpose = purpose;
-        if (escorts.length > 0) {
-          const guestList = escorts.map(esc => `${esc.name} (ID: ${esc.govId})`).join(', ');
-          finalPurpose += ` | Accompanying: ${guestList}`;
-        }
-        const dbVisitType = pipeline === 'Pre-Scheduled Visit' ? 'PRESCHEDULED' : (pipeline === 'Repeated Visitor' ? 'REPEATED' : 'IMMEDIATE');
-        const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
 
         const { error: visitError } = await supabase.from('visits').insert({
           visit_id: activeVisitId, visitor_id: activeVisitorId, host_employee_id: 'EMP001', created_by_employee_id: 'EMP001',
@@ -446,7 +458,7 @@ export default function RegistrationForm() {
               type="date" 
               value={dob} 
               disabled={!!visitorId && !isEdit} 
-              max={maxDob} /* RESTRICTED TO 12+ YEARS OLD */
+              max={maxDob}
               onChange={(e) => setDob(e.target.value)} 
               className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-700 outline-none focus:border-blue-500 disabled:bg-slate-50" 
             />
@@ -510,15 +522,110 @@ export default function RegistrationForm() {
           {escorts.length > 0 && (
             <div className="p-4 bg-white space-y-3.5">
               {escorts.map((escort, index) => (
-                <div key={index} className="flex flex-col sm:flex-row gap-3 p-3.5 border border-slate-200 rounded-xl bg-slate-50/50 relative">
-                  <div className="absolute -left-2 -top-2 w-5 h-5 bg-slate-800 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white shadow-sm">{index + 1}</div>
-                  <div className="flex-1">
-                    <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Member Full Name</label>
-                    <input required type="text" value={escort.name} onChange={(e) => handleEscortChange(index, 'name', e.target.value)} placeholder="Enter name" className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" />
+                <div key={index} className="flex flex-col gap-3 p-3.5 border border-slate-200 rounded-xl bg-slate-50/50 relative">
+                  <div className="absolute -left-2 -top-2 w-5 h-5 bg-slate-800 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white shadow-sm">
+                    {index + 1}
                   </div>
-                  <div className="flex-1">
-                    <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Identification Serial ID</label>
-                    <input required type="text" value={escort.govId} onChange={(e) => handleEscortChange(index, 'govId', e.target.value)} placeholder="Enter Serial ID" className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-bold font-mono outline-none focus:border-blue-500" />
+                  
+                  <div className="flex flex-col gap-3 w-full">
+                    
+                    {/* FIRST ROW: Name, Gender, Nationality, Contact Phone */}
+                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+                      <div className='sm:col-span-2'>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Member Full Name *</label>
+                        <input 
+                          required
+                          type="text" 
+                          value={escort.name}
+                          onChange={(e) => handleEscortChange(index, 'name', e.target.value)}
+                          placeholder="Enter name" 
+                          className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" 
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Gender *</label>
+                        <select 
+                          value={escort.gender} 
+                          onChange={(e) => handleEscortChange(index, 'gender', e.target.value)} 
+                          className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500"
+                        >
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Non-binary">Non-binary</option>
+                          <option value="Others">Others</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Nationality *</label>
+                        <select 
+                          value={escort.nationality} 
+                          onChange={(e) => handleEscortChange(index, 'nationality', e.target.value)} 
+                          className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500"
+                        >
+                          {NATIONALITIES.map(nat => (
+                            <option key={nat.label} value={nat.label}>{nat.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Contact Phone *</label>
+                        <input 
+                          required 
+                          type="tel" 
+                          value={escort.phone} 
+                          onChange={(e) => handleEscortChange(index, 'phone', e.target.value)} 
+                          placeholder="+91 98765 43210" 
+                          className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500" 
+                        />
+                      </div>
+                    </div>
+
+                    {/* SECOND ROW: ID Type, ID Number & Email Address */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">ID Type *</label>
+                        <select 
+                          value={escort.idType} 
+                          onChange={(e) => handleEscortChange(index, 'idType', e.target.value)} 
+                          className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500"
+                        >
+                          <option value="Aadhar">Aadhar</option>
+                          <option value="PAN">PAN Card</option>
+                          <option value="Passport">Passport</option>
+                          <option value="Driving License">Driving License</option>
+                          <option value="Voter ID">Voter ID</option>
+                        </select>
+                      </div>
+
+                      <div>
+  <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">
+    {escort.idType} Serial ID *
+  </label>
+  <input 
+    required
+    type="text" 
+    value={escort.govId}
+    onChange={(e) => handleEscortChange(index, 'govId', e.target.value)}
+    placeholder={`Enter ${escort.idType} Number`} 
+    className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono uppercase tracking-wider outline-none focus:border-blue-500" 
+  />
+</div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Email Address</label>
+                        <input 
+                          type="email" 
+                          value={escort.email}
+                          onChange={(e) => handleEscortChange(index, 'email', e.target.value)}
+                          placeholder="e.g. name@domain.com" 
+                          className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" 
+                        />
+                      </div>
+                    </div>
+
                   </div>
                 </div>
               ))}

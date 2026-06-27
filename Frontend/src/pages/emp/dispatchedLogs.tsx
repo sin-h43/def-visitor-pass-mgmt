@@ -19,7 +19,6 @@ export default function DispatchedLogsPage() {
     department: []
   });
 
-  // Drawer States
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
 
@@ -29,7 +28,7 @@ export default function DispatchedLogsPage() {
     dept: 'Cyber Security Unit'
   };
 
-  useEffect(() => {
+useEffect(() => {
     async function fetchDispatchedLogs() {
       try {
         setLoading(true);
@@ -41,11 +40,11 @@ export default function DispatchedLogsPage() {
             department,
             purpose,
             status,
-            hr_remarks, /* FETCHES THE HR COMMENT */
+            hr_remarks,
             start_date,
             created_at,
-            visitors (visitor_id, name,document_url, phone, address, email, dob, organization, designation, id_type, id_number, nationality),
-            escorts(name,phone,id_number, id_type)
+            visitors (visitor_id, gender, name, document_url, phone, address, email, dob, organization, designation, id_type, id_number, nationality),
+            escorts (name, phone, id_number, id_type, email, gender)
           `)
           .eq('host_employee_id', currentUser.empId)
           .order('created_at', { ascending: false });
@@ -53,16 +52,18 @@ export default function DispatchedLogsPage() {
         if (error) throw error;
 
         if (data) {
-          const transformed: VisitorRecord[] = data.map((row: any) => {
+          const transformed: any[] = data.map((row: any) => {
             let uiPipeline = 'Walk-in';
-            if (row.visit_type === 'PRESCHEDULED') uiPipeline = 'Pre-Scheduled';
-            if (row.visit_type === 'REPEATED') uiPipeline = 'Repeated';
+            if (row.visit_type === 'scheduled') uiPipeline = 'Pre-Scheduled';
+            if (row.visit_type === 'repeated') uiPipeline = 'Repeated';
 
             const escortsArray = Array.isArray(row.escorts) ? row.escorts : (row.escorts ? [row.escorts] : []);
             
             return {
               id: row.visit_id,
+              visitorId: row.visitors?.visitor_id, 
               visitorName: row.visitors?.name || 'Unknown',
+              gender: row.visitors?.gender || 'N/A', 
               phone: row.visitors?.phone || 'N/A',
               email: row.visitors?.email || 'N/A',
               dob: row.visitors?.dob || 'N/A',
@@ -79,7 +80,7 @@ export default function DispatchedLogsPage() {
               requestDate: new Date(row.start_date || row.created_at).toLocaleString('en-GB', { hour12: false, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
               status: row.status === 'Approved' ? 'Cleared' : row.status,
               organization: row.visitors?.organization || 'N/A',
-              hr_remarks: row.hr_remarks || '' // MAPS THE COMMENT TO THE UI
+              hr_remarks: row.hr_remarks || ''
             };
           });
           setLogs(transformed);
@@ -198,8 +199,20 @@ export default function DispatchedLogsPage() {
             loading={loading}
             onEdit={handleEdit}
             onRevoke={handleRevoke}
-            onReRegister={(visitor) => navigate('/emp/add_visitor', { state: { autofill: visitor } })}
-            onView = {handleView}
+            onReRegister={(visitor: any) => {
+              // FIX: Construct a clean autofill object so it links to the existing profile ID
+              const cleanAutofill = {
+                ...visitor,
+                visitorId: visitor.visitorId, // Links to the database profile
+                id: undefined, // Removes the old visit ID so it doesn't trigger 'Edit' mode
+                purpose: '', // Blank out old purpose
+                department: '', // Blank out old department
+                escorts: [], // Clear escorts
+                pipeline: 'Repeated' 
+              };
+              navigate('/emp/add_visitor', { state: { autofill: cleanAutofill } });
+            }}
+            onView={handleView}
           />
 
         </div>
@@ -248,7 +261,6 @@ export default function DispatchedLogsPage() {
                 </section>
               </div>
 
-              {/* READ ONLY REMARKS PANEL */}
               <div className="p-6 border-t border-slate-100 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                   HR Review Commentary

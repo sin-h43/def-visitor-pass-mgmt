@@ -274,10 +274,14 @@ const dbVisitType = pipeline === 'Pre-Scheduled Visit' ? 'scheduled' : (pipeline
           }).eq('visitor_id', activeVisitorId);
         }
 
-        const { error: updateError } = await supabase.from('visits').update({
-          visit_type: dbVisitType, purpose: finalPurpose, start_date: startDate, end_date: startDate,
-          status: 'Pending', hr_remarks: null, department: department
-          // REMOVED from here
+const { error: updateError } = await supabase.from('visits').update({
+          visit_type: dbVisitType, 
+          purpose: finalPurpose, 
+          start_date: startDate, 
+          end_date: startDate,
+          status: 'Pending',       // <--- Resets the status
+          hr_remarks: null,        // <--- Clears the old rejection note
+          department: department
         }).eq('visit_id', activeVisitId);
 
         if (updateError) throw updateError;

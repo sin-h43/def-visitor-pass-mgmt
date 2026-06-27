@@ -7,7 +7,8 @@ export interface EscortRecord {
   phone: string;
   id_number: string;
   id_type: string;
-  email:string;
+  email: string;
+  gender: string;
 }
 
 export interface VisitorRecord {
@@ -19,6 +20,7 @@ export interface VisitorRecord {
   email: string;
   dob: string;
   address: string;
+  gender?: string;
   pipeline: string;
   department: string;
   purpose: string;
@@ -29,7 +31,10 @@ export interface VisitorRecord {
   status: string;
   organization: string;
   documentUrl: string | null;
-  hr_remarks?: string; // Optional property for the HR remark
+  hr_remarks?: string;
+  created_at?: string;
+  nationality?: string;
+  designation?: string;
 }
 
 interface VisitorTableProps {
@@ -59,7 +64,7 @@ export default function VisitorTable({
 
   const handleCloseDrawer = () => {
     setIsDetailDrawerOpen(false);
-    setTimeout(() => setSelectedVisitor(null), 300); // Wait for animation to finish
+    setTimeout(() => setSelectedVisitor(null), 300);
   };
 
   return (
@@ -171,6 +176,7 @@ export default function VisitorTable({
                 </h3>
                 <div className="space-y-4 text-sm">
                   <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Full Name</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.visitorName}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Gender</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.gender || 'N/A'}</span></div>
                   <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Phone</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.phone}</span></div>
                   <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Email</span><span className="col-span-2 font-medium text-slate-900 break-all">{selectedVisitor.email}</span></div>
                   <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Date of Birth</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.dob}</span></div>
@@ -212,6 +218,8 @@ export default function VisitorTable({
                       <div key={idx} className="bg-white p-3 border border-slate-200 rounded-lg shadow-sm text-sm">
                         <div className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Escort {idx + 1}</div>
                         <div className="grid grid-cols-3 gap-1 mb-1"><span className="text-slate-500">Name</span><span className="col-span-2 font-medium text-slate-900">{escort.name || 'N/A'}</span></div>
+                        <div className="grid grid-cols-3 gap-1 mb-1"><span className="text-slate-500">Gender</span><span className="col-span-2 font-medium text-slate-900">{escort.gender || 'N/A'}</span></div>
+                        <div className="grid grid-cols-3 gap-1 mb-1"><span className="text-slate-500">Email</span><span className="col-span-2 font-medium text-slate-900 break-all">{escort.email || 'N/A'}</span></div>
                         <div className="grid grid-cols-3 gap-1 mb-1"><span className="text-slate-500">Phone</span><span className="col-span-2 font-medium text-slate-900">{escort.phone || 'N/A'}</span></div>
                         <div className="grid grid-cols-3 gap-1"><span className="text-slate-500">{escort.id_type || 'ID'}</span><span className="col-span-2 font-medium text-slate-900 font-mono">{escort.id_number || 'N/A'}</span></div>
                       </div>
@@ -247,10 +255,9 @@ export default function VisitorTable({
               </section>
             </div>
 
-            {/* DRAWER FOOTER WITH SIMPLE HR REMARK BOX */}
+            {/* DRAWER FOOTER */}
             <div className="p-5 border-t border-slate-100 bg-slate-50 flex flex-col gap-4">
               
-              {/* HR Remark Display */}
               {selectedVisitor.hr_remarks ? (
                 <div className="w-full">
                   <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">HR Review Note</span>
@@ -265,7 +272,6 @@ export default function VisitorTable({
                 </div>
               )}
 
-              {/* Action Buttons */}
               <div className="flex items-center justify-between w-full pt-1">
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
                   selectedVisitor.status === 'Cleared' ? 'bg-emerald-100 text-emerald-700' :
@@ -306,6 +312,11 @@ export default function VisitorTable({
           </div>
         </div>
       )}
+
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes slide-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .animate-slide-in-right { animation: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      `}} />
     </>
   );
 }

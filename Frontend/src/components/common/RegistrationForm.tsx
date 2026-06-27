@@ -109,7 +109,7 @@ const [escorts, setEscorts] = useState<EscortPersonnel[]>(
   prefillData?.escorts?.map((e: any) => ({ 
     name: e.name || '', 
     idType: e.idType || e.id_type || 'PAN',
-    govId: e.govId || e.id_number || e.gov_id || '',  
+    govId: e.govId || e.id_number || e.gov_id || '', 
     email: e.email || '', 
     nationality: e.nationality || 'Indian', 
     phone: e.phone || '', 

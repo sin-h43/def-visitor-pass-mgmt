@@ -49,7 +49,7 @@ export default function EmployeeDashboard() {
           start_date,
           created_at,
           visitors (visitor_id,gender, name, phone,document_url,  address, email, dob, organization, designation, id_type, id_number, nationality),
-          escorts(name,phone,id_number, id_type)
+          escorts(name,phone,id_number,id_type,email,gender)
         `)
         .eq('host_employee_id', currentUser.empId)
         .order('created_at', { ascending: false });
@@ -67,6 +67,7 @@ export default function EmployeeDashboard() {
           return {
             id: row.visit_id,
             visitorName: row.visitors?.name || 'Unknown',
+            gender: row.visitors?.gender || 'N/A',
             phone: row.visitors?.phone || 'N/A',
             email: row.visitors?.email || 'N/A',
             dob: row.visitors?.dob || 'N/A',

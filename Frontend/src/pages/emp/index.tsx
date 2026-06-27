@@ -1,6 +1,6 @@
 // pages/emp/index.tsx
 import { useState, useMemo, useEffect } from 'react';
-import { UserPlus, FileText, AlertCircle, X, User, Building, Bell, Send, CheckCircle } from 'lucide-react'; // Added notification icons
+import { UserPlus, FileText, AlertCircle, X, User, Building, Bell, Send } from 'lucide-react'; // Added notification icons
 import { Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import SearchFilterMatrix from '../../components/common/SearchFilterMatrix';

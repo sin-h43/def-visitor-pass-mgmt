@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import { Camera, Upload, CheckCircle, Clock, FileText, Users, ExternalLink, ShieldAlert, AlertOctagon, X } from 'lucide-react';
+import { Camera, Upload, MessageSquare, CheckCircle, Clock, FileText, Users, ExternalLink, ShieldAlert, AlertOctagon, X } from 'lucide-react';
 
 export default function VisitorVerification() {
   const { visitorId } = useParams<{ visitorId: string }>();
@@ -21,6 +21,7 @@ export default function VisitorVerification() {
   const [escorts, setEscorts] = useState<any[]>([]);
 
   // Security Deny Modal State
+  const [securityNote, setSecurityNote] = useState('');
   const [denyModal, setDenyModal] = useState(false);
   const [denyReason, setDenyReason] = useState('');
 
@@ -144,12 +145,23 @@ export default function VisitorVerification() {
     setUploading(true);
     try {
       const checkInStamp = new Date().toISOString();
-      await supabase.from('visits').update({ status: 'Active', expected_out: visitor.expiry }).eq('visit_id', visitor.visit_id); 
-      await supabase.from('visitors').update({ checked_in_time: checkInStamp }).eq('visitor_id', visitor.id); 
-      
+
+      const updates = { 
+        status: 'Active', 
+        expected_out: visitor.expiry,
+        security_remarks: securityNote || null // Save the note if it exists
+      };
+
+      await supabase.from('visits').update(updates).eq('visit_id', visitor.visit_id); 
+      await supabase.from('visitors').update({ checked_in_time: checkInStamp }).eq('visitor_id', visitor.id);
+
       // Centralized Audit Logging for Check-in
       await supabase.from('audit_logs').insert([{
-        visitor_id: visitor.id, action: 'checked_in', performed_by: 'Gate Security', performed_by_role: 'security', remarks: `Checked in at Desk ${deskNumber}. Expiry set to ${visitor.expiry_display}`
+        visitor_id: visitor.id,
+        action: 'checked_in',
+        performed_by: 'Gate Security',
+        performed_by_role: 'security',
+        remarks: `Checked in at Desk ${deskNumber}. Expiry set to ${visitor.expiry_display}`
       }]);
       
       alert('Access Granted. Monitoring initiated.');
@@ -157,17 +169,22 @@ export default function VisitorVerification() {
     } catch (error) { alert('Check-in failed.'); } finally { setUploading(false); }
   };
 
-  const handleDenyEntry = async () => {
+const handleDenyEntry = async () => {
     if (!visitor || !denyReason) return;
     setUploading(true);
     try {
-      const currentRemarks = visitor.hr_remarks ? visitor.hr_remarks + '\n\n' : '';
-      const appendedRemarks = currentRemarks + `[SECURITY DENIAL - ${new Date().toLocaleString('en-GB')}]: ${denyReason}`;
-
-      await supabase.from('visits').update({ status: 'Denied', hr_remarks: appendedRemarks }).eq('visit_id', visitor.visit_id); 
+      // FIX: Now writing safely to the dedicated security_remarks column
+      await supabase.from('visits').update({ 
+        status: 'Denied', 
+        security_remarks: `[DENIED AT GATE]: ${denyReason}` 
+      }).eq('visit_id', visitor.visit_id); 
       
       await supabase.from('audit_logs').insert([{
-        visitor_id: visitor.id, action: 'rejected', performed_by: 'Gate Security', performed_by_role: 'security', remarks: `Entry denied at gate: ${denyReason}`
+        visitor_id: visitor.id, 
+        action: 'rejected', 
+        performed_by: 'Gate Security', 
+        performed_by_role: 'security', 
+        remarks: `Entry denied at gate: ${denyReason}`
       }]);
       
       alert('Visitor denied. HR has been notified.');
@@ -308,6 +325,18 @@ export default function VisitorVerification() {
                     <p className={`text-sm font-bold ${step.completed ? 'text-emerald-900' : 'text-slate-700'}`}>{step.title} {step.required && <span className="text-red-500 ml-0.5">*</span>}</p>
                   </div>
                 ))}
+              </div>
+                <div className="mb-6">
+                <label className="flex items-center text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  <MessageSquare className="w-3 h-3 mr-1" /> Security Officer Notes (Optional)
+                </label>
+                <textarea 
+                  value={securityNote} 
+                  onChange={(e) => setSecurityNote(e.target.value)} 
+                  rows={2} 
+                  placeholder="e.g. Issued physical badge #402, Visitor brought laptop..." 
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-50 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-shadow resize-none"
+                />
               </div>
 
               <div className="flex flex-col gap-3">

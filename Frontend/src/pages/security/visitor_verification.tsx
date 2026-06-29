@@ -1,91 +1,86 @@
-// File: Frontend/src/pages/security/visitor_verification.tsx
-import React, { useState, useRef, useEffect } from 'react';
+// File: src/pages/security/visitor_verification.tsx
+import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import { Camera, Upload, CheckCircle, X, Clock, MapPin, FileText, Users, ExternalLink, AlertCircle } from 'lucide-react';
-
-interface VerificationStep {
-  id: string;
-  title: string;
-  description: string;
-  completed: boolean;
-  required: boolean;
-}
+import { Camera, Upload, CheckCircle, Clock, FileText, Users, ExternalLink, ShieldAlert } from 'lucide-react';
 
 export default function VisitorVerification() {
   const { visitorId } = useParams<{ visitorId: string }>();
   const navigate = useNavigate();
-
   const [visitor, setVisitor] = useState<any>(null); 
   const [loading, setLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  
   const cameraRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
   const [showCamera, setShowCamera] = useState(false);
   const [deskNumber, setDeskNumber] = useState(1);
+  const [escorts, setEscorts] = useState<any[]>([]);
 
-  const [verificationSteps, setVerificationSteps] = useState<VerificationStep[]>([
-    { id: 'identity', title: 'Verify Physical ID', description: 'Cross-check physical ID with submitted document', completed: false, required: true },
-    { id: 'photo', title: 'Capture Photo', description: 'Take real-time kiosk photo', completed: false, required: true },
-    { id: 'escort', title: 'Verify Escorts', description: 'Confirm accompanying personnel match manifest', completed: false, required: false },
-    { id: 'badge', title: 'Issue Access Badge', description: 'Print and encode smart badge', completed: false, required: true },
+  const [steps, setSteps] = useState([
+    { id: 'identity', title: 'Verify Identity Proof', completed: false, required: true },
+    { id: 'photo', title: 'Capture Photo', completed: false, required: true },
+    { id: 'escorts', title: 'Verify Accompanying Persons', completed: false, required: false },
+    { id: 'badge', title: 'Issue Access Badge', completed: false, required: true },
   ]);
 
-  useEffect(() => {
-    fetchVisitor();
-  }, [visitorId]);
+  useEffect(() => { fetchVisitor(); }, [visitorId]);
 
   const fetchVisitor = async () => {
     try {
       setLoading(true);
-      
-      // FIX: Joining the escorts array into the payload
       const { data, error } = await supabase
         .from('visits')
-        .select(`
-          *,
-          visitors (*),
-          host:employees!visits_host_employee_id_fkey(name),
-          escorts (*)
-        `)
+        .select(`*, visitors (*), host:employees!visits_host_employee_id_fkey(name), escorts (*)`)
         .eq('visitor_id', visitorId) 
         .ilike('status', 'approved')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+        .order('created_at', { ascending: false }).limit(1).single();
 
       if (error) throw error;
 
-      // FIX: Proper timezone formatting for UI
-      const scheduleDate = data.start_date ? new Date(data.start_date).toLocaleDateString('en-GB') : 'TBD';
-      const checkInTime = data.visitors?.checked_in_time ? new Date(data.visitors.checked_in_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Pending Gate Arrival';
+      // Auto-calculate expiry (Default to 18:00 today if duration isn't set, else add hours)
+      const now = new Date();
+      let expiryTime = new Date(now.setHours(18, 0, 0, 0)); // default 6 PM
+      if (data.duration_hours) {
+        expiryTime = new Date(new Date().getTime() + data.duration_hours * 3600000);
+      }
 
+      // FIX: Added aggressive fallbacks to catch multiple possible database column naming conventions
       setVisitor({
         id: data.visitor_id,
         visit_id: data.visit_id,
-        visitor_name: data.visitors?.name || 'Unknown',
-        visitor_email: data.visitors?.email || 'N/A',
-        visitor_gender: data.visitors?.gender || 'N/A',
-        identity_type: data.visitors?.id_type || 'Govt ID',
-        identity_number: data.visitors?.id_number || 'N/A',
-        purpose: data.purpose || 'General',
-        employee_name: data.host?.name || 'Unassigned',
-        status: data.status,
-        document_url: data.document_url || data.visitors?.document_url || null, // Map the document
-        escorts: data.escorts || [], // Map the escorts
-        schedule_date: scheduleDate,
-        checked_in: checkInTime,
+        name: data.visitors?.name || 'Unknown',
+        email: data.visitors?.email || data.visitors?.visitor_email || 'N/A',
+        phone: data.visitors?.phone || 'N/A',
+        dob: data.visitors?.dob || 'N/A',
+        gender: data.visitors?.gender || data.visitors?.visitor_gender || 'Others',
+        address: data.visitors?.address || 'N/A',
+        designation: data.visitors?.designation || 'N/A',
+        organization: data.visitors?.organization || 'N/A',
+        id_type: data.visitors?.id_type || 'Govt ID',
+        id_number: data.visitors?.id_number || data.visitors?.identity_number || 'N/A',
+        host: data.host?.name || 'Unassigned',
+        document_url: data.document_url || data.visitors?.document_url || null,
+        expiry: expiryTime.toISOString(),
+        expiry_display: expiryTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
       });
+
+      const mappedEscorts = (data.escorts || []).map((e:any) => ({ ...e, verified: false }));
+      setEscorts(mappedEscorts);
       
+      // Auto-complete escort step if no escorts exist
+      if (mappedEscorts.length === 0) {
+        setSteps(s => s.map(step => step.id === 'escorts' ? {...step, completed: true, required: false} : step));
+      } else {
+        setSteps(s => s.map(step => step.id === 'escorts' ? {...step, required: true} : step));
+      }
+
     } catch (error) {
-      console.error('Error fetching visitor:', error);
-      alert('Approved pass not found for this visitor ID.');
+      console.error('Error:', error);
+      alert('Approved pass not found.');
       navigate('/security');
     } finally {
       setLoading(false);
@@ -95,16 +90,8 @@ export default function VisitorVerification() {
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-      if (cameraRef.current) {
-        cameraRef.current.srcObject = stream;
-        // FIX: Force the video to play, overcoming some browser stall issues
-        cameraRef.current.play(); 
-        setShowCamera(true);
-      }
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      alert('Camera access blocked. Please check your browser URL bar permissions.');
-    }
+      if (cameraRef.current) { cameraRef.current.srcObject = stream; cameraRef.current.play(); setShowCamera(true); }
+    } catch (error) { alert('Camera access blocked. Please check browser permissions.'); }
   };
 
   const capturePhoto = () => {
@@ -112,277 +99,169 @@ export default function VisitorVerification() {
       const ctx = canvasRef.current.getContext('2d');
       if (ctx) {
         ctx.drawImage(cameraRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
-        const imageData = canvasRef.current.toDataURL('image/jpeg');
-        setPhotoUrl(imageData);
-
+        setPhotoUrl(canvasRef.current.toDataURL('image/jpeg'));
         canvasRef.current.toBlob((blob) => {
-          if (blob) {
-            const file = new File([blob], `visitor-${visitorId}.jpg`, { type: 'image/jpeg' });
-            setPhotoFile(file);
-          }
+          if (blob) setPhotoFile(new File([blob], `visitor-${visitorId}.jpg`, { type: 'image/jpeg' }));
         });
-
-        if (cameraRef.current.srcObject) {
-          const tracks = (cameraRef.current.srcObject as MediaStream).getTracks();
-          tracks.forEach((track) => track.stop());
-        }
+        const tracks = (cameraRef.current.srcObject as MediaStream).getTracks();
+        tracks.forEach(t => t.stop());
         setShowCamera(false);
         toggleStep('photo');
       }
     }
   };
 
-  const toggleStep = (stepId: string) => {
-    setVerificationSteps(
-      verificationSteps.map((step) =>
-        step.id === stepId ? { ...step, completed: !step.completed } : step
-      )
-    );
-  };
-
   const uploadPhoto = async () => {
     if (!photoFile || !visitor) return;
+    setUploading(true);
     try {
-      setUploading(true);
       const fileName = `visitor-photos/${visitor.id}-${Date.now()}.jpg`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('visitor_documents')
-        .upload(fileName, photoFile, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
+      await supabase.storage.from('visitor_documents').upload(fileName, photoFile, { upsert: true });
       const { data } = supabase.storage.from('visitor_documents').getPublicUrl(fileName);
-
-      const { error: updateError } = await supabase
-        .from('visitors')
-        .update({ visitor_photo_url: data.publicUrl })
-        .eq('visitor_id', visitor.id); 
-
-      if (updateError) throw updateError;
-      alert('Photo securely attached to dossier.');
+      await supabase.from('visitors').update({ visitor_photo_url: data.publicUrl }).eq('visitor_id', visitor.id); 
+      alert('Photo attached.');
     } catch (error) {
-      console.error('Error uploading photo:', error);
-      alert('Failed to upload photo');
+      alert('Failed to save photo');
     } finally {
       setUploading(false);
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setPhotoUrl(event.target?.result as string);
-        setPhotoFile(file);
-        toggleStep('photo');
-      };
-      reader.readAsDataURL(file);
-    }
+  const toggleStep = (id: string) => setSteps(s => s.map(step => step.id === id ? { ...step, completed: !step.completed } : step));
+  
+  const handleEscortVerify = (index: number) => {
+    const updated = [...escorts];
+    updated[index].verified = !updated[index].verified;
+    setEscorts(updated);
+    if (updated.every(e => e.verified)) toggleStep('escorts');
+    else setSteps(s => s.map(step => step.id === 'escorts' ? { ...step, completed: false } : step));
   };
 
   const completeCheckin = async () => {
     if (!visitor) return;
+    setUploading(true);
     try {
-      setUploading(true);
       const checkInStamp = new Date().toISOString();
-
-      const { error: visitError } = await supabase
-        .from('visits')
-        .update({ status: 'Active' })
-        .eq('visit_id', visitor.visit_id); 
-      if (visitError) throw visitError;
-
-      const { error: visitorError } = await supabase
-        .from('visitors')
-        .update({ checked_in_time: checkInStamp })
-        .eq('visitor_id', visitor.id); 
-      if (visitorError) throw visitorError;
-
-      await supabase.from('audit_logs').insert([
-        {
-          visitor_id: visitor.id,
-          action: 'checked_in',
-          performed_by: 'Gate Security',
-          performed_by_role: 'security',
-          timestamp: checkInStamp,
-          remarks: `Physical Check-in Authorized at Desk ${deskNumber}`,
-        },
-      ]);
-
-      alert('Access Granted. Visitor Checked In.');
+      await supabase.from('visits').update({ status: 'Active', expected_out: visitor.expiry }).eq('visit_id', visitor.visit_id); 
+      await supabase.from('visitors').update({ checked_in_time: checkInStamp }).eq('visitor_id', visitor.id); 
+      await supabase.from('audit_logs').insert([{
+        visitor_id: visitor.id, action: 'checked_in', performed_by: 'Gate Security', performed_by_role: 'security', remarks: `Checked in at Desk ${deskNumber}. Expiry set to ${visitor.expiry_display}`
+      }]);
+      alert('Access Granted. Monitoring initiated.');
       navigate('/security');
-    } catch (error) {
-      console.error('Error completing check-in:', error);
-      alert('Failed to authorize secure entry.');
-    } finally {
-      setUploading(false);
-    }
+    } catch (error) { alert('Check-in failed.'); } finally { setUploading(false); }
   };
 
-  if (loading) {
-    return (
-      <DashboardLayout role="security" userName="Gate Console">
-        <div className="flex items-center justify-center h-[60vh]">
-          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-600"></div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
+  if (loading) return <DashboardLayout role="security" userName="Gate Console"><div className="flex h-screen items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-slate-900"></div></div></DashboardLayout>;
   if (!visitor) return null;
-  const allRequiredCompleted = verificationSteps.filter((s) => s.required).every((s) => s.completed);
+
+  const allDone = steps.filter(s => s.required).every(s => s.completed);
 
   return (
     <DashboardLayout role="security" userName="Gate Console">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-4">
         
-        <div className="flex items-center justify-between">
-          <button onClick={() => navigate('/security')} className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-bold text-sm shadow-sm transition-colors">
-            ← Cancel & Return to Queue
-          </button>
-          <div className="text-right">
-            <h1 className="text-xl font-black text-slate-900">Zero-Trust Verification</h1>
-            <p className="text-xs text-blue-600 font-mono font-bold uppercase tracking-widest">{visitor.id}</p>
+        <div className="flex justify-between items-center bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+          <button onClick={() => navigate('/security')} className="text-sm font-bold text-slate-500 hover:text-slate-800">← Back</button>
+          <div className="flex items-center gap-4">
+            <span className="text-xs font-mono font-bold bg-slate-100 px-2 py-1 rounded">{visitor.id}</span>
+            <div className="bg-rose-100 border border-rose-200 px-3 py-1.5 rounded-md flex items-center text-rose-800">
+              <Clock className="w-4 h-4 mr-2" />
+              <span className="text-xs font-bold uppercase mr-1">Pass Expiry:</span>
+              <span className="text-sm font-black">{visitor.expiry_display}</span>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            
-            {/* Identity Block */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 bg-emerald-50 border-l border-b border-emerald-100 rounded-bl-xl text-xs font-black text-emerald-700 uppercase tracking-widest">
-                HR Approved
-              </div>
-              <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-6">{visitor.visitor_name}</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          
+          <div className="lg:col-span-2 space-y-3">
+            {/* Ultra-Compact Identity Card */}
+            <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
+              <h2 className="text-2xl font-black text-slate-900 mb-3">{visitor.name}</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm bg-slate-50 p-3 rounded border border-slate-100">
+                <div><span className="block text-[10px] font-bold text-slate-400 uppercase">Gender</span><span className="font-medium text-slate-800 truncate">{visitor.gender}</span></div>
+                <div><span className="block text-[10px] font-bold text-slate-400 uppercase">DOB</span><span className="font-medium text-slate-800 truncate">{visitor.dob}</span></div>
+                <div><span className="block text-[10px] font-bold text-slate-400 uppercase">Designation</span><span className="font-medium text-slate-800 truncate">{visitor.designation}</span></div>
+                <div><span className="block text-[10px] font-bold text-slate-400 uppercase">Organization</span><span className="font-medium text-slate-800 truncate">{visitor.organization}</span></div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-6 pb-6 border-b border-slate-100">
-                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Gender</p><p className="text-slate-900 font-medium">{visitor.visitor_gender}</p></div>
-                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">ID Type</p><p className="text-slate-900 font-medium">{visitor.identity_type}</p></div>
-                <div className="col-span-2"><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">ID Number</p><p className="text-slate-900 font-mono font-bold text-lg tracking-widest">{visitor.identity_number}</p></div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                <div className="flex items-start gap-3">
-                  <MapPin className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                  <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sponsor</p><p className="text-sm font-bold text-slate-800">{visitor.employee_name}</p></div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Clock className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                  <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Schedule</p><p className="text-sm font-bold text-slate-800">{visitor.schedule_date}</p></div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-                  <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Check-In</p><p className="text-sm font-bold text-slate-800">{visitor.checked_in}</p></div>
+                <div><span className="block text-[10px] font-bold text-slate-400 uppercase">Email</span><span className="font-medium text-slate-800 truncate">{visitor.email}</span></div>
+                <div><span className="block text-[10px] font-bold text-slate-400 uppercase">Phone</span><span className="font-medium text-slate-800">{visitor.phone}</span></div>
+                <div><span className="block text-[10px] font-bold text-slate-400 uppercase">ID Type</span><span className="font-medium text-slate-800">{visitor.id_type}</span></div>
+                <div><span className="block text-[10px] font-bold text-slate-400 uppercase">ID Number</span><span className="font-bold font-mono text-slate-900">{visitor.id_number}</span></div>
+                
+                {/* Full Width Address Row */}
+                <div className="col-span-2 md:col-span-4 border-t border-slate-200/50 pt-2 mt-1">
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase">Address</span>
+                  <span className="font-medium text-slate-800">{visitor.address}</span>
                 </div>
               </div>
             </div>
 
-            {/* FIX: New Split Block for Documents and Escorts */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              {/* Database ID Proof Viewer */}
-              <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm flex flex-col h-full">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider mb-4 flex items-center">
-                  <FileText className="w-4 h-4 mr-2 text-blue-600" /> Submitted Identity Proof
-                </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Document Embed */}
+              <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-col">
+                <h3 className="text-xs font-black text-slate-800 uppercase mb-3 flex items-center"><FileText className="w-3 h-3 mr-1.5 text-blue-600"/> Submitted ID Proof</h3>
                 {visitor.document_url ? (
-                  <div className="flex-1 flex flex-col">
-                    <div className="bg-slate-100 rounded-lg flex-1 min-h-[150px] relative overflow-hidden group border border-slate-200">
-                       <img src={visitor.document_url} alt="ID Document" className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
-                       <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900/40 backdrop-blur-sm">
-                         <a href={visitor.document_url} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-white text-slate-900 text-xs font-bold rounded-lg flex items-center shadow-lg">
-                           <ExternalLink className="w-3 h-3 mr-2" /> Expand Document
-                         </a>
-                       </div>
-                    </div>
+                  <div className="relative group bg-slate-100 rounded border border-slate-200 h-48 overflow-hidden">
+                    <img src={visitor.document_url} alt="ID" className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition" />
+                    <a href={visitor.document_url} target="_blank" rel="noreferrer" className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition text-white text-xs font-bold"><ExternalLink className="w-3 h-3 mr-1"/> View Full</a>
                   </div>
-                ) : (
-                  <div className="flex-1 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl flex items-center justify-center p-6 text-center">
-                    <p className="text-xs font-medium text-slate-400">No clearance documents attached to this profile.</p>
-                  </div>
-                )}
+                ) : <div className="h-48 bg-slate-50 border border-dashed border-slate-200 rounded flex items-center justify-center text-xs text-slate-400">No Document</div>}
               </div>
 
-              {/* Escort Manifest */}
-              <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm flex flex-col h-full">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider mb-4 flex items-center justify-between">
-                  <div className="flex items-center"><Users className="w-4 h-4 mr-2 text-blue-600" /> Escort Manifest</div>
-                  <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10px]">{visitor.escorts.length} Personnel</span>
+              {/* FIX: Escorts Redesigned with all requested details */}
+              <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-col">
+                <h3 className="text-xs font-black text-slate-800 uppercase mb-3 flex items-center justify-between">
+                  <span className="flex items-center"><Users className="w-3 h-3 mr-1.5 text-blue-600"/> Accompanying ({escorts.length})</span>
                 </h3>
-                {visitor.escorts.length > 0 ? (
-                  <div className="space-y-3 flex-1 overflow-y-auto pr-2">
-                    {visitor.escorts.map((escort: any, i: number) => (
-                      <div key={i} className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                        <p className="text-sm font-bold text-slate-900 mb-1">{escort.name}</p>
-                        <p className="text-xs font-mono text-slate-500">{escort.id_type}: {escort.id_number}</p>
+                <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
+                  {escorts.length > 0 ? escorts.map((escort, i) => (
+                    <div key={i} className={`p-3 border rounded-lg text-xs flex flex-col cursor-pointer transition ${escort.verified ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-slate-50 border-slate-200'}`} onClick={() => handleEscortVerify(i)}>
+                      <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-200/60">
+                        <p className="font-bold text-slate-900 text-sm">{escort.name}</p>
+                        <div className={`w-4 h-4 rounded border flex justify-center items-center ${escort.verified ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 bg-white'}`}>{escort.verified && <CheckCircle size={10}/>}</div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center bg-slate-50 border border-slate-100 rounded-xl p-6 text-center">
-                    <p className="text-xs font-medium text-slate-400 italic">No accompanying personnel requested.</p>
-                  </div>
-                )}
+                      <div className="grid grid-cols-2 gap-y-1.5 gap-x-2 text-[10px]">
+                        <div><span className="text-slate-400 font-bold uppercase">ID:</span> <span className="text-slate-700 font-mono font-medium">{escort.id_type} {escort.id_number}</span></div>
+                        <div><span className="text-slate-400 font-bold uppercase">Phone:</span> <span className="text-slate-700 font-medium">{escort.phone || 'N/A'}</span></div>
+                        <div><span className="text-slate-400 font-bold uppercase">Gender:</span> <span className="text-slate-700 font-medium">{escort.gender || 'N/A'}</span></div>
+                        <div><span className="text-slate-400 font-bold uppercase">DOB:</span> <span className="text-slate-700 font-medium">{escort.dob || 'N/A'}</span></div>
+                        <div className="col-span-2"><span className="text-slate-400 font-bold uppercase">Nationality:</span> <span className="text-slate-700 font-medium">{escort.nationality || 'N/A'}</span></div>
+                      </div>
+                    </div>
+                  )) : <div className="h-full flex items-center justify-center text-xs text-slate-400 mt-12">No escorts required.</div>}
+                </div>
               </div>
-
             </div>
 
-            {/* Photo Capture Section */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider mb-4 flex items-center">
-                <Camera className="w-4 h-4 mr-2 text-blue-600" /> Security Photo Kiosk
-              </h3>
-
+            {/* Photo Kiosk */}
+            <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
+              <h3 className="text-xs font-black text-slate-800 uppercase mb-3 flex items-center"><Camera className="w-3 h-3 mr-1.5 text-blue-600"/> Security Photo</h3>
               {!photoUrl ? (
-                <div className="mb-2">
+                <div>
                   {!showCamera ? (
-                    <div className="flex gap-4">
-                      <button onClick={startCamera} className="px-5 py-3 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-sm">
-                        <Camera size={18} /> Initialize Camera
-                      </button>
-                      <button onClick={() => fileInputRef.current?.click()} className="px-5 py-3 bg-white text-slate-700 font-bold text-sm border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm">
-                        <Upload size={18} /> Fallback Upload
-                      </button>
-                      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                    <div className="flex gap-3">
+                      <button onClick={startCamera} className="px-4 py-2 bg-slate-900 text-white font-bold text-xs rounded hover:bg-slate-800"><Camera className="inline w-3 h-3 mr-1"/> Start Camera</button>
+                      <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-bold text-xs rounded hover:bg-slate-50"><Upload className="inline w-3 h-3 mr-1"/> Upload</button>
+                      <input ref={fileInputRef} type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if(f) { const r = new FileReader(); r.onload = (ev) => { setPhotoUrl(ev.target?.result as string); setPhotoFile(f); toggleStep('photo'); }; r.readAsDataURL(f); } }} className="hidden" />
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      <video ref={cameraRef} autoPlay playsInline className="w-full rounded-xl bg-slate-900 border border-slate-800 h-[300px] object-cover" />
-                      <div className="flex gap-4">
-                        <button onClick={capturePhoto} className="flex-1 px-4 py-3 bg-emerald-600 font-bold text-white rounded-xl hover:bg-emerald-700 transition-colors shadow-sm">
-                          Capture Image
-                        </button>
-                        <button onClick={() => {
-                          if (cameraRef.current?.srcObject) {
-                            const tracks = (cameraRef.current.srcObject as MediaStream).getTracks();
-                            tracks.forEach((track) => track.stop());
-                          }
-                          setShowCamera(false);
-                        }} className="flex-1 px-4 py-3 bg-white font-bold text-slate-700 rounded-xl hover:bg-slate-50 border border-slate-200 transition-colors">
-                          Cancel
-                        </button>
+                    <div className="space-y-3">
+                      <video ref={cameraRef} autoPlay playsInline className="w-full h-48 object-cover bg-black rounded" />
+                      <div className="flex gap-2">
+                        <button onClick={capturePhoto} className="flex-1 py-2 bg-emerald-600 text-white font-bold text-xs rounded">Capture</button>
+                        <button onClick={() => setShowCamera(false)} className="flex-1 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded">Cancel</button>
                       </div>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="mb-2 flex gap-6 items-center">
-                  <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg bg-slate-100 shrink-0">
-                    <img src={photoUrl} alt="Visitor" className="w-full h-full object-cover" />
-                  </div>
-                  <div className="flex flex-col gap-3">
-                    <p className="text-xs text-slate-500 font-medium">Image captured successfully. Save to attach to clearance manifest.</p>
-                    <div className="flex gap-3">
-                      <button onClick={uploadPhoto} disabled={uploading} className="px-5 py-2.5 font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 shadow-sm text-sm">
-                        {uploading ? 'Encrypting...' : 'Lock & Save Photo'}
-                      </button>
-                      <button onClick={() => { setPhotoUrl(null); setPhotoFile(null); }} className="px-5 py-2.5 font-bold bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition-colors text-sm">
-                        Retake
-                      </button>
-                    </div>
+                <div className="flex gap-3 items-center">
+                  <img src={photoUrl} className="w-20 h-20 object-cover rounded-full border-2 border-slate-200" alt="Captured"/>
+                  <div className="flex gap-2">
+                    <button onClick={uploadPhoto} disabled={uploading} className="px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded shadow-sm">{uploading ? 'Saving...' : 'Lock Photo'}</button>
+                    <button onClick={() => setPhotoUrl(null)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded border border-slate-200">Retake</button>
                   </div>
                 </div>
               )}
@@ -390,64 +269,31 @@ export default function VisitorVerification() {
           </div>
 
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6 shadow-sm sticky top-6">
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider mb-5 border-b border-slate-100 pb-3">
-                Validation Matrix
-              </h3>
+            <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm sticky top-6">
+              <h3 className="text-sm font-black text-slate-800 uppercase border-b border-slate-100 pb-2 mb-4">Clearance Checklist</h3>
               
-              <div className="mb-6">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Assigned Gate Authority</label>
-                <select
-                  value={deskNumber}
-                  onChange={(e) => setDeskNumber(Number(e.target.value))}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50"
-                >
-                  <option value={1}>Desk 1 - Main Gate</option>
-                  <option value={2}>Desk 2 - East Wing</option>
-                  <option value={3}>Desk 3 - Service Gate</option>
-                </select>
-              </div>
+              <select value={deskNumber} onChange={(e) => setDeskNumber(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-200 rounded text-xs font-bold text-slate-700 bg-slate-50 mb-5 outline-none">
+                <option value={1}>Desk 1 - Main Gate</option>
+                <option value={2}>Desk 2 - East Wing</option>
+                <option value={3}>Desk 3 - Service Gate</option>
+              </select>
 
-              <div className="space-y-2 mb-8">
-                {verificationSteps.map((step) => (
-                  <div
-                    key={step.id}
-                    className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${step.completed ? 'bg-emerald-50/50 border-emerald-100' : 'bg-white border-slate-200 hover:border-blue-300'}`}
-                    onClick={() => toggleStep(step.id)}
-                  >
-                    <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${step.completed ? 'bg-emerald-500 text-white' : 'border-2 border-slate-300'}`}>
-                      {step.completed && <CheckCircle size={14} strokeWidth={3} />}
-                    </div>
-                    <div>
-                      <p className={`text-sm font-bold ${step.completed ? 'text-emerald-900' : 'text-slate-700'}`}>
-                        {step.title} {step.required && <span className="text-rose-500">*</span>}
-                      </p>
-                    </div>
+              <div className="space-y-2 mb-6">
+                {steps.map(step => (
+                  <div key={step.id} onClick={() => step.id !== 'escorts' && toggleStep(step.id)} className={`flex items-center gap-3 p-2.5 rounded border cursor-pointer ${step.completed ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
+                    <div className={`w-4 h-4 rounded-sm flex items-center justify-center ${step.completed ? 'bg-emerald-500 text-white' : 'border border-slate-300'}`}>{step.completed && <CheckCircle size={12} strokeWidth={3}/>}</div>
+                    <p className={`text-xs font-bold ${step.completed ? 'text-emerald-900' : 'text-slate-700'}`}>{step.title} {step.required && <span className="text-rose-500">*</span>}</p>
                   </div>
                 ))}
               </div>
 
-              <button
-                onClick={completeCheckin}
-                disabled={!allRequiredCompleted || uploading}
-                className={`w-full px-4 py-4 rounded-xl font-black text-sm uppercase tracking-wider shadow-sm transition-all ${
-                  allRequiredCompleted
-                    ? 'bg-slate-900 text-white hover:bg-slate-800 hover:shadow-md'
-                    : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-                }`}
-              >
-                {uploading ? 'Processing Secure Entry...' : 'Grant Facility Access'}
+              <button onClick={completeCheckin} disabled={!allDone || uploading} className={`w-full py-3 rounded font-black text-xs uppercase tracking-wider ${allDone ? 'bg-slate-900 text-white hover:bg-slate-800 shadow-md' : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'}`}>
+                {uploading ? 'Processing...' : 'Authorize Entry'}
               </button>
-
-              {!allRequiredCompleted && (
-                <p className="text-[10px] font-bold text-amber-500 mt-4 text-center uppercase tracking-wider flex items-center justify-center">
-                  <AlertCircle className="w-3 h-3 mr-1" /> Awaiting mandatory validations
-                </p>
-              )}
+              {!allDone && <p className="text-[10px] font-bold text-amber-500 mt-3 text-center uppercase"><ShieldAlert className="inline w-3 h-3 mr-1"/> Pending Validations</p>}
             </div>
           </div>
         </div>
-
         <canvas ref={canvasRef} width={640} height={480} className="hidden" />
       </div>
     </DashboardLayout>

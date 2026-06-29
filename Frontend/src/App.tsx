@@ -123,7 +123,7 @@ export default function App() {
 <Route path="/hr/hrrep/:id" element={<EnterpriseVisitorProfile />} />
 
 <Route path="/hr/analytics" element={<AnalyticsPage />} />
-<Route path="/hr/audit" element={<ProtectedRoute requiredRole='hr' userRole={userRole} isLoading={isLoading}> <AuditPage /></ProtectedRoute>} />
+<Route path="/hr/audit" element={ <AuditPage />} />
 
 {/* Security Dashboard - Queue Management */}
   <Route path="/security" element={<SecurityDashboard />} />

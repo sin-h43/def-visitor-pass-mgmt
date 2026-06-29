@@ -61,7 +61,7 @@ export default function HRRepeatedVisitorLogPage() {
       const { data, error } = await supabase
         .from('visits')
         .select(`
-          visit_id, start_date, purpose, status, department, created_by_employee_id,
+          visit_id, start_date, purpose, status, department, host_employee_id,
           visitors (visitor_id, name, phone, email, nationality, organization, designation, dob, document_url, address, id_type, id_number),
           host:employees!visits_host_employee_id_fkey (name)
         `)

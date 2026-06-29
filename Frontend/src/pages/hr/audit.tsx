@@ -58,7 +58,7 @@ export default function AuditPage() {
     }
   ];
 
-  // Supabase Fetch Logic
+
   useEffect(() => {
     async function fetchAuditLogs() {
       try {
@@ -98,7 +98,7 @@ export default function AuditPage() {
     fetchAuditLogs();
   }, []);
 
-  const handleFilterToggle = (groupKey: string, value: string) => {
+const handleFilterToggle = (groupKey: string, value: string) => {
     setSelectedFilters(prev => {
       const current = prev[groupKey] || [];
       const updated = current.includes(value) ? current.filter(i => i !== value) : [...current, value];

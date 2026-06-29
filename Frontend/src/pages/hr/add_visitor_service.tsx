@@ -238,7 +238,7 @@ export default function AddVisitorServicePage() {
         visitor_id: activeVisitorId, // CHANGE: Mapped identifier for existing or new profiles
         host_employee_id: hostId || 'EMP001',
         created_by_employee_id: 'EMP001',
-        visit_type: 'SERVICE',
+        visit_type: 'service',
         pass_type: 'One_Day',
         purpose: finalPurpose,
         start_date: startDate,

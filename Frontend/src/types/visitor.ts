@@ -1,35 +1,79 @@
+// src/types/visitor.ts
+import React from 'react';
+
+// ==========================================
+// 1. CORE VISITOR & PERSONNEL IDENTITY TYPES
+// ==========================================
+
+export interface EscortRecord {
+  name: string;
+  phone: string;
+  id_number: string;
+  id_type: string;
+  email: string;
+  gender: string;
+}
+
 export interface VisitorRecord {
   id: string;
+  id_type: string;
+  id_number: string;
   visitorName: string;
-  gender: string;
   phone: string;
   email: string;
-  category: string;
+  dob: string;
+  address: string;
+  gender?: string;
+  pipeline: string;
+  department: string;
   purpose: string;
   hostName: string;
   hostDept: string;
-  hostId: string;
-  requestedAt: string;
-  visitDate: string;
+  escorts: EscortRecord[];
+  requestDate: string;
   status: string;
-  passType: string;
-  pipeline: string;
-  nationality: string;
   organization: string;
   documentUrl: string | null;
-  escorts: any[];
-  dob: string;
-  id_type: string;
-  id_number: string;
-  address: string;
-  department: string;
-  designation: string;
-  hr_remarks: string; // Added remark field
+  hr_remarks?: string;
+  created_at?: string;
+  nationality?: string;
+  designation?: string;
+  category?: string;
+  hostId?: string;
 }
 
-// Defines how the reusable table should render columns
+// ==========================================
+// 2. UI & TABLE RENDER TYPES
+// ==========================================
+
 export interface TableColumn<T> {
-  key: keyof T | string;
+  key: string | keyof T;
   label: string;
   render?: (row: T) => React.ReactNode;
+}
+
+// ==========================================
+// 3. SECURITY & FORENSIC AUDIT TYPES
+// ==========================================
+
+// Strict type unions prevent invalid security strings from being compiled
+export type SecurityRole = 'hr' | 'employee' | 'security' | 'HR Admin' | 'Security Officer' | 'Employee' | 'System Automated';
+export type AuditAction = 'created' | 'updated' | 'approved' | 'rejected' | 'checked_in' | 'checked_out' | 'revoked';
+export type AlertSeverity = 'Low' | 'Medium' | 'High' | 'Critical';
+
+export interface AuditLog {
+  // Base fields required by the new Audit Page
+  id?: string;
+  timestamp: string;
+  action: AuditAction | string;
+  performed_by: string;
+  performed_by_role: SecurityRole | string;
+  visitor_id?: string;
+  remarks?: string;
+
+  // Extended Forensic Requirements for Zero-Trust Auditing
+  targetPassId?: string;
+  ipAddress?: string;
+  deviceId?: string;
+  severity?: AlertSeverity;
 }

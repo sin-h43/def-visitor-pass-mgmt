@@ -1,182 +1,163 @@
-// pages/hr/audit.tsx
-import { useState, useEffect } from 'react';
-import { ShieldCheck, Eye, FileSpreadsheet } from 'lucide-react';
-import DashboardLayout from '../../components/layout/DashboardLayout';
-import DataTable from '../../components/common/DataTable';
-import SearchFilterBar from '../../components/common/SearchFilterBar';
-import DetailDrawer from '../../components/common/DetailDrawer';
-import type { TableColumn } from '../../types/visitor';
+// File: Frontend/src/pages/hr/audit.tsx
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import DashboardLayout from '../../components/layout/DashboardLayout';
+import SearchFilterBar from '../../components/common/SearchFilterBar';
+import type { AuditLog } from '../../types/visitor';
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  User,
+  Calendar,
+  MessageSquare,
+  Filter,
+  Download,
+} from 'lucide-react';
 
-interface AuditLogRecord {
-  id: string;
-  actorName: string;
-  actorRole: 'HR Admin' | 'Security Officer' | 'Employee' | 'System Automated';
-  dob: string;
-  phone: string;
-  email: string;
-  actionPerformed: string;
-  targetPassId: string;
-  timestamp: string;
-  severity: 'Low' | 'Medium' | 'High' | 'Critical';
+interface AuditLogWithVisitor extends AuditLog {
+  visitor_name?: string;
+  employee_name?: string;
 }
 
 export default function AuditPage() {
-  const [auditLogs, setAuditLogs] = useState<AuditLogRecord[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogWithVisitor[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('All Trails');
-  
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [activeDrawerData, setActiveDrawerData] = useState<any | null>(null);
-
-  const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
-    actorRole: ['HR Admin', 'Security Officer', 'Employee', 'System Automated'],
-    severity: ['Low', 'Medium', 'High', 'Critical']
-  });
-
-  const auditFilterGroups = [
-    {
-      key: 'actorRole',
-      title: 'Actor Assignment Role',
-      options: [
-        { label: 'HR Administrators', value: 'HR Admin' },
-        { label: 'Security Officers', value: 'Security Officer' },
-        { label: 'Standard Employees', value: 'Employee' },
-        { label: 'System Cron Tasks', value: 'System Automated' }
-      ]
-    },
-    {
-      key: 'severity',
-      title: 'Security Alert Severity',
-      options: [
-        { label: 'Low Audits', value: 'Low' },
-        { label: 'Medium Footprints', value: 'Medium' },
-        { label: 'High Overrides', value: 'High' },
-        { label: 'Critical Breaches', value: 'Critical' }
-      ]
-    }
-  ];
-
+  const [filterAction, setFilterAction] = useState<string>('');
+  const [filterRole, setFilterRole] = useState<string>('');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
   useEffect(() => {
-    async function fetchAuditLogs() {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('system_audit_logs')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        if (data) {
-          const transformedLogs: AuditLogRecord[] = data.map((row) => ({
-            id: row.log_id,
-            actorName: row.actor_name,
-            actorRole: row.actor_role as AuditLogRecord['actorRole'],
-            dob: 'Classified Record', // Hiding DOB in live system for security compliance
-            phone: row.actor_phone || 'N/A',
-            email: row.actor_email || 'N/A',
-            actionPerformed: row.action_performed,
-            targetPassId: row.target_pass_id || 'N/A',
-            timestamp: new Date(row.created_at).toLocaleString('en-IN', {
-              day: '2-digit', month: '2-digit', year: 'numeric',
-              hour: '2-digit', minute: '2-digit', hour12: true
-            }),
-            severity: row.severity as AuditLogRecord['severity']
-          }));
-          setAuditLogs(transformedLogs);
-        }
-      } catch (error) {
-        console.error('Error fetching audit ledger:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
     fetchAuditLogs();
   }, []);
 
-const handleFilterToggle = (groupKey: string, value: string) => {
-    setSelectedFilters(prev => {
-      const current = prev[groupKey] || [];
-      const updated = current.includes(value) ? current.filter(i => i !== value) : [...current, value];
-      return { ...prev, [groupKey]: updated };
-    });
-  };
+  const fetchAuditLogs = async () => {
+    try {
+      setLoading(true);
 
-  const handleOpenDrawer = (log: AuditLogRecord) => {
-    setActiveDrawerData(log);
-    setIsDrawerOpen(true);
-  };
+      // Fetch audit logs with visitor details
+      let query = supabase
+        .from('audit_logs')
+        .select(`
+          *,
+          visitors:visitor_id (name,email, host_empolyee_id)
+        `)
+        .order('timestamp', { ascending: false });
 
-  const filteredAuditLogs = auditLogs.filter(row => {
-    const matchesSearch = 
-      row.actorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      row.targetPassId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      row.id.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesRole = (selectedFilters.actorRole || []).includes(row.actorRole);
-    const matchesSeverity = (selectedFilters.severity || []).includes(row.severity);
-
-    let matchesTab = true;
-    if (activeTab === 'Elevated Alerts') matchesTab = row.severity === 'High' || row.severity === 'Critical';
-
-    return matchesSearch && matchesRole && matchesSeverity && matchesTab;
-  });
-
-  const columns: TableColumn<AuditLogRecord>[] = [
-    { key: 'id', label: 'LOG ID', render: (row) => <span className="font-mono font-bold text-slate-500 text-xs">{row.id}</span> },
-    {
-      key: 'actorName',
-      label: 'OPERATIONAL ACTOR',
-      render: (row) => (
-        <div>
-          <div className="font-semibold text-slate-800 text-sm">{row.actorName}</div>
-          <div className="text-[11px] text-slate-400 font-medium">{row.actorRole}</div>
-        </div>
-      )
-    },
-    { key: 'actionPerformed', label: 'EVENT DESCRIPTION', render: (row) => <span className="text-xs font-medium text-slate-700">{row.actionPerformed}</span> },
-    { key: 'targetPassId', label: 'TARGET REF', render: (row) => <span className="text-blue-600 font-mono font-bold text-xs">{row.targetPassId}</span> },
-    { key: 'timestamp', label: 'SYSTEM TIMESTAMP', render: (row) => <span className="text-xs text-slate-500 font-medium">{row.timestamp}</span> },
-    {
-      key: 'severity',
-      label: 'SEVERITY',
-      render: (row) => {
-        const bg: Record<string, string> = {
-          Low: 'bg-slate-100 text-slate-800 border-slate-200',
-          Medium: 'bg-blue-100 text-blue-800 border-blue-200',
-          High: 'bg-orange-100 text-orange-800 border-orange-200',
-          Critical: 'bg-rose-100 text-rose-800 border-rose-200'
-        };
-        return <span className={`px-2 py-0.5 text-[11px] font-bold rounded border ${bg[row.severity]}`}>{row.severity}</span>;
+      // Apply filters
+      if (filterAction && filterAction !== 'all') {
+        query = query.eq('action', filterAction);
       }
-    },
-    {
-      key: 'id',
-      label: 'ACTIONS',
-      render: (row) => (
-        <button 
-          onClick={() => handleOpenDrawer(row)}
-          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold"
-        >
-          <Eye className="w-4 h-4" />
-          <span>Review</span>
-        </button>
-      )
+
+      if (filterRole && filterRole !== 'all') {
+        query = query.eq('performed_by_role', filterRole);
+      }
+
+      if (dateRange.start) {
+        query = query.gte('timestamp', dateRange.start);
+      }
+
+      if (dateRange.end) {
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        query = query.lte('timestamp', endDate.toISOString());
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      // Format the data
+      const formattedLogs = data?.map((log) => ({
+        ...log,
+        visitor_name: log.visitors?.visitor_name || 'Unknown',
+        employee_name: log.visitors?.employee_name || 'Unknown',
+      })) || [];
+
+      setAuditLogs(formattedLogs);
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+      alert('Failed to fetch audit logs');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  const getActionBadge = (action: string) => {
+    const badges: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
+      created: {
+        bg: 'bg-blue-100',
+        text: 'text-blue-800',
+        icon: <CheckCircle size={16} />,
+      },
+      updated: {
+        bg: 'bg-yellow-100',
+        text: 'text-yellow-800',
+        icon: <Clock size={16} />,
+      },
+      approved: {
+        bg: 'bg-green-100',
+        text: 'text-green-800',
+        icon: <CheckCircle size={16} />,
+      },
+      rejected: {
+        bg: 'bg-red-100',
+        text: 'text-red-800',
+        icon: <XCircle size={16} />,
+      },
+      checked_in: {
+        bg: 'bg-purple-100',
+        text: 'text-purple-800',
+        icon: <CheckCircle size={16} />,
+      },
+      checked_out: {
+        bg: 'bg-gray-100',
+        text: 'text-gray-800',
+        icon: <Clock size={16} />,
+      },
+    };
+
+    const badge = badges[action] || badges.created;
+    return badge;
+  };
+
+  const filteredLogs = auditLogs.filter(
+    (log) =>
+      log.visitor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.performed_by?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.employee_name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleExportCSV = () => {
+    const csv = [
+      ['Timestamp', 'Visitor', 'Action', 'Performed By', 'Role', 'Remarks'].join(','),
+      ...filteredLogs.map((log) =>
+        [
+          new Date(log.timestamp).toLocaleString(),
+          log.visitor_name,
+          log.action,
+          log.performed_by,
+          log.performed_by_role,
+          log.remarks || '',
+        ].join(',')
+      ),
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit-log-${new Date().toISOString()}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
 
   if (loading) {
     return (
-      <DashboardLayout role="hr" userName="Sinchana K">
-        <div className="flex items-center justify-center h-[60vh]">
-          <div className="animate-pulse flex flex-col items-center">
-            <div className="h-8 w-8 bg-slate-800 rounded-full mb-4"></div>
-            <p className="text-slate-500 font-medium">Fetching secure audit trails...</p>
-          </div>
+      <DashboardLayout  role="hr" userName="Sinchana K">
+        <div className="flex items-center justify-center h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
         </div>
       </DashboardLayout>
     );
@@ -184,67 +165,230 @@ const handleFilterToggle = (groupKey: string, value: string) => {
 
   return (
     <DashboardLayout role="hr" userName="Sinchana K">
-      <div className="max-w-7xl mx-auto space-y-6 relative">
-        
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-slate-800 text-white rounded-lg shadow-sm">
-              <ShieldCheck className="w-6 h-6" />
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Audit Logs</h1>
+          <p className="text-gray-600">
+            Complete activity history of all visitor management actions
+          </p>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Search */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Search
+              </label>
+              <input
+                type="text"
+                placeholder="Visitor, employee..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Action Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Action
+              </label>
+              <select
+                value={filterAction}
+                onChange={(e) => {
+                  setFilterAction(e.target.value);
+                  fetchAuditLogs();
+                }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">All Actions</option>
+                <option value="created">Created</option>
+                <option value="updated">Updated</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="checked_in">Checked In</option>
+                <option value="checked_out">Checked Out</option>
+              </select>
+            </div>
+
+            {/* Role Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Role
+              </label>
+              <select
+                value={filterRole}
+                onChange={(e) => {
+                  setFilterRole(e.target.value);
+                  fetchAuditLogs();
+                }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">All Roles</option>
+                <option value="employee">Employee</option>
+                <option value="hr">HR</option>
+                <option value="security">Security</option>
+              </select>
+            </div>
+
+            {/* Export Button */}
+            <div className="flex items-end">
+              <button
+                onClick={handleExportCSV}
+                className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <Download size={18} />
+                Export CSV
+              </button>
+            </div>
+          </div>
+
+          {/* Date Range */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => {
+                  setDateRange({ ...dateRange, start: e.target.value });
+                  fetchAuditLogs();
+                }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-800">System Compliance Audit Logs</h1>
-              <p className="text-sm text-slate-500">Immutable forensic activity tracking and credential modifications manifest.</p>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                End Date
+              </label>
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => {
+                  setDateRange({ ...dateRange, end: e.target.value });
+                  fetchAuditLogs();
+                }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
             </div>
           </div>
-          <button 
-            onClick={() => alert('Exporting crypto trail ledger...')}
-            className="flex items-center text-xs font-bold text-slate-700 bg-white border border-slate-300 px-4 py-2 rounded-lg hover:bg-slate-50 gap-2 shadow-sm transition-all"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            Export Audit Ledger
-          </button>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-5">
-          
-          <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-            <SearchFilterBar 
-              value={searchTerm}
-              onChange={setSearchTerm}
-              selectedFilters={selectedFilters}
-              onFilterToggle={handleFilterToggle}
-              filterGroups={auditFilterGroups}
-              placeholder="Search actor name, pass tracking ID, or log reference..."
-            />
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="text-sm font-medium text-gray-600">Total Logs</div>
+            <div className="text-2xl font-bold text-gray-900 mt-1">{filteredLogs.length}</div>
           </div>
-
-          <div className="flex border-b border-slate-200 text-xs font-semibold space-x-4">
-            {['All Trails', 'Elevated Alerts'].map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`pb-2 px-1 relative ${activeTab === tab ? 'text-blue-600 font-bold border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-              >
-                {tab}
-              </button>
-            ))}
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="text-sm font-medium text-gray-600">Approvals</div>
+            <div className="text-2xl font-bold text-green-600 mt-1">
+              {filteredLogs.filter((l) => l.action === 'approved').length}
+            </div>
           </div>
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="text-sm font-medium text-gray-600">Rejections</div>
+            <div className="text-2xl font-bold text-red-600 mt-1">
+              {filteredLogs.filter((l) => l.action === 'rejected').length}
+            </div>
+          </div>
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <div className="text-sm font-medium text-gray-600">Check-ins</div>
+            <div className="text-2xl font-bold text-purple-600 mt-1">
+              {filteredLogs.filter((l) => l.action === 'checked_in').length}
+            </div>
+          </div>
+        </div>
 
+        {/* Logs Table */}
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <DataTable 
-              data={filteredAuditLogs} 
-              columns={columns}
-            />
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                    Timestamp
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                    Visitor
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                    Action
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                    Performed By
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                    Role
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
+                    Remarks
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-600">
+                      No audit logs found
+                    </td>
+                  </tr>
+                ) : (
+                  filteredLogs.map((log) => {
+                    const badge = getActionBadge(log.action);
+                    return (
+                      <tr key={log.id} className="border-b border-gray-200 hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          <div className="flex items-center gap-2">
+                            <Calendar size={16} className="text-gray-400" />
+                            {new Date(log.timestamp).toLocaleString()}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                          {log.visitor_name}
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          <span
+                            className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}
+                          >
+                            {badge.icon}
+                            {log.action}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          <div className="flex items-center gap-2">
+                            <User size={16} className="text-gray-400" />
+                            {log.performed_by}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          <span className="px-2 py-1 bg-gray-100 rounded text-xs font-medium">
+                            {log.performed_by_role}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {log.remarks ? (
+                            <div className="flex items-start gap-2">
+                              <MessageSquare size={16} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                              <span className="line-clamp-2">{log.remarks}</span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-
-        <DetailDrawer 
-          isOpen={isDrawerOpen}
-          onClose={() => setIsDrawerOpen(false)}
-          title="Forensic Activity Signature Payload"
-          data={activeDrawerData}
-        />
-
       </div>
     </DashboardLayout>
   );

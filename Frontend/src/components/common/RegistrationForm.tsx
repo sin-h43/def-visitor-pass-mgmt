@@ -76,6 +76,25 @@ export default function RegistrationForm() {
     if (prefillData?.purpose) return prefillData.purpose.split(' | Accompanying:')[0];
     return '';
   });
+  // DYNAMIC USER STATE
+  const [currentUser, setCurrentUser] = useState({ empId: '', name: '', dept: '' });
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        const { data: emp } = await supabase.from('employees').select('*').eq('email', user.email).single();
+        if (emp) {
+          setCurrentUser({ 
+            empId: emp.id, 
+            name: emp.name, 
+            dept: emp.department || 'General Unit' 
+          });
+        }
+      }
+    };
+    fetchUser();
+  }, []);
   
   const [organization, setOrganization] = useState(prefillData?.organization !== 'N/A' ? (prefillData?.organization || '') : '');
   const [designation, setDesignation] = useState('');
@@ -303,8 +322,12 @@ const { error: updateError } = await supabase.from('visits').update({
           await supabase.from('visitors').update({ document_url: documentUrl }).eq('visitor_id', activeVisitorId);
         }
 const { error: visitError } = await supabase.from('visits').insert({
-  visit_id: activeVisitId, visitor_id: activeVisitorId, host_employee_id: 'EMP001', created_by_employee_id: 'EMP001',
-  visit_type: dbVisitType, pass_type: 'One_day', purpose: finalPurpose, start_date: startDate, end_date: startDate,
+  visit_id: activeVisitId,
+  visitor_id: activeVisitorId,
+  host_employee_id: currentUser.empId,       // <-- NOW DYNAMIC
+  created_by_employee_id: currentUser.empId,  visit_type: dbVisitType, pass_type: 'One_day',
+  purpose: finalPurpose, start_date: startDate,
+  end_date: startDate,
   status: 'Pending' 
 });
         if (visitError) throw visitError;

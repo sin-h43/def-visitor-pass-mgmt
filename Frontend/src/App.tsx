@@ -1,4 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { supabase } from './lib/supabase';
 
 // --- Employee Pages ---
 import EmployeeDashboard from './pages/emp/index';
@@ -20,11 +22,72 @@ import AddVisitorHRPage from './pages/hr/add_visitor_hr';
 import AddVisitorServicePage from './pages/hr/add_visitor_service';
 import EnterpriseVisitorProfile from './pages/hr/EnterpriseVisitorProfile';
 
+//--- Security Pages
+import SecurityDashboard from './pages/security';
+import VisitorVerification from './pages/security/visitor_verification';
+
+
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  requiredRole: string;
+  userRole: string | null;
+  isLoading: boolean;
+}
+ 
+function ProtectedRoute({
+  children,
+  requiredRole,
+  userRole,
+  isLoading,
+}: ProtectedRouteProps) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+ 
+  if (!userRole) {
+    return <Navigate to="/login" replace />;
+  }
+ 
+  if (userRole !== requiredRole && requiredRole !== 'all') {
+    return <Navigate to="/unauthorized" replace />;
+  }
+ 
+  return <>{children}</>;
+}
+
 export default function App() {
+   const [userRole, setUserRole] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+ 
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Get user role from metadata or a roles table
+        const role = user.user_metadata?.role || 'employee'; // Default to employee
+        setUserRole(role);
+      } else {
+        setUserRole(null);
+      }
+      setIsLoading(false);
+    };
+ 
+    checkAuth();
+  }, []);
   return (
     <>
     
     <Router>
+
+        {/* AUTHENTICATION ROUTES */}
+        {/* <Route path="/login" element={<LoginPage />} /> */}
+        {/* <Route path="/unauthorized" element={<UnauthorizedPage />} /> */}
+
       <Routes>
         {/* Default Route - Redirects to Employee Portal for now */}
         <Route path="/" element={<Navigate to="/emp" replace />} />
@@ -60,7 +123,13 @@ export default function App() {
 <Route path="/hr/hrrep/:id" element={<EnterpriseVisitorProfile />} />
 
 <Route path="/hr/analytics" element={<AnalyticsPage />} />
-<Route path="/hr/audit" element={<AuditPage />} />
+<Route path="/hr/audit" element={ <AuditPage />} />
+
+{/* Security Dashboard - Queue Management */}
+  <Route path="/security" element={<SecurityDashboard />} />
+        <Route path="/security/verify/:visitorId" element={<VisitorVerification />} />
+
+
         {/* Catch-all for 404 Pages */}
         <Route path="*" element={
           <div className="h-screen w-full flex items-center justify-center bg-slate-50 text-slate-500">

@@ -1,46 +1,27 @@
-// pages/hr/visitormgmt.tsx
+// File: src/pages/hr/visitormgmt.tsx
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, User, Landmark, Globe, ShieldAlert, Wrench, Eye, CheckCircle, XCircle, X, Shield, Building, FileText } from 'lucide-react';
+import { Users, User, Landmark, Globe, ShieldAlert, Wrench, Eye, CheckCircle, XCircle, X, Shield, Building, FileText, Clock, ShieldCheck } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
-import type { VisitorRecord,TableColumn } from '../../types/visitor';
+import type { VisitorRecord, TableColumn } from '../../types/visitor';
 import { supabase } from '../../lib/supabase';
 
-// interface VisitorRecord {
-//   id: string;
-//   visitorName: string;
-//   gender: string;
-//   phone: string;
-//   email: string;
-//   category: string;
-//   purpose: string;
-//   hostName: string;
-//   hostDept: string;
-//   hostId: string;
-//   requestedAt: string;
-//   visitDate: string;
-//   status: string;
-//   passType: string;
-//   pipeline: string;
-//   nationality: string;
-//   organization: string;
-//   documentUrl: string | null;
-//   escorts: any[];
-//   dob: string;
-//   id_type: string;
-//   id_number: string;
-//   address: string;
-//   department: string;
-//   designation: string;
-//   hr_remarks: string; // Added remark field
-// }
+export interface ExtendedVisitorRecord extends VisitorRecord {
+  requestedAt: string;
+  visitDate: string;
+  passType: string;
+  checkoutTime?: string;
+  approvedAt?: string;
+}
 
 export default function VisitorMgmtPage() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('All Visitors');
+  
+  // FIX: Updated to requested tab categories
+  const [activeTab, setActiveTab] = useState('All Passes');
 
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
     category: [],
@@ -48,14 +29,12 @@ export default function VisitorMgmtPage() {
     status: []
   });
 
-  const [visitorLogs, setVisitorLogs] = useState<VisitorRecord[]>([]);
+  const [visitorLogs, setVisitorLogs] = useState<ExtendedVisitorRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Drawer States
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
+  const [selectedVisitor, setSelectedVisitor] = useState<ExtendedVisitorRecord | null>(null);
 
-  // NEW: Commentary Box States
   const [panelRemark, setPanelRemark] = useState('');
   const [remarkModal, setRemarkModal] = useState<{
     isOpen: boolean;
@@ -69,7 +48,6 @@ export default function VisitorMgmtPage() {
     text: '',
   });
 
-  // Sync drawer remark when a visitor is selected
   useEffect(() => {
     if (selectedVisitor) {
       setPanelRemark(selectedVisitor.hr_remarks || '');
@@ -79,30 +57,22 @@ export default function VisitorMgmtPage() {
   const fetchVisitorLogs = async () => {
     try {
       setLoading(true);
+      
+      // FIX: Used '*' to prevent 400 Bad Request crashes if specific columns are missing
       const { data, error } = await supabase
         .from('visits')
         .select(`
-          visit_id,
-          visit_type,
-          pass_type,
-          purpose,
-          status,
-          hr_remarks, 
-          start_date,
-          created_at,
-          department,
-          visitors (
-            visitor_id, name, phone, email, nationality, organization, designation, dob, document_url, gender, address, id_type, id_number
-          ),
-          escorts(name, phone, id_number, id_type),
-          host:employees!visits_host_employee_id_fkey (employee_id,name, role)
+          *,
+          visitors (*),
+          escorts (*),
+          host:employees!visits_host_employee_id_fkey (*)
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       
       if (data) {
-        const transformed: VisitorRecord[] = data.map((row: any) => {
+        const transformed: ExtendedVisitorRecord[] = data.map((row: any) => {
           let uiPipeline = 'Walk in';
           const dbType = row.visit_type?.toLowerCase();
           if (dbType === 'prescheduled' || dbType === 'scheduled') uiPipeline = 'Pre-Scheduled';
@@ -122,9 +92,11 @@ export default function VisitorMgmtPage() {
             hostName: row.host?.name || 'Unassigned',
             hostDept: row.host?.role === 'hr' ? 'HR Officer' : 'Staff Member',
             hostId: row.host?.employee_id || 'N/A',
-            requestedAt: new Date(row.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
+            requestedAt: row.created_at ? new Date(row.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
             visitDate: row.start_date ? new Date(row.start_date).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
-            status: row.status,
+            checkoutTime: row.actual_out ? new Date(row.actual_out).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
+            approvedAt: row.updated_at ? new Date(row.updated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
+            status: row.status || 'Pending',
             passType: row.pass_type || 'ONE_DAY',
             pipeline: uiPipeline,
             nationality: row.visitors?.nationality || 'Indian',
@@ -137,7 +109,8 @@ export default function VisitorMgmtPage() {
             id_number: row.visitors?.id_number || 'N/A',
             address: row.visitors?.address || 'N/A',
             department: row.department || 'General Unit',
-            hr_remarks: row.hr_remarks || ''
+            hr_remarks: row.hr_remarks || '',
+            requestDate: row.created_at ? new Date(row.created_at).toLocaleDateString() : 'N/A'
           };
         });
 
@@ -154,51 +127,48 @@ export default function VisitorMgmtPage() {
     fetchVisitorLogs();
   }, []);
 
-  // NEW: Handle both Status & Remark updates
   const handleConfirmAction = async (visitId: string | null, newStatus: 'Approved' | 'Denied' | null, remarkText: string) => {
     if (!visitId || !newStatus) return;
     try {
       const { error } = await supabase
         .from('visits')
-        .update({ 
-          status: newStatus,
-          hr_remarks: remarkText 
-        })
+        .update({ status: newStatus, hr_remarks: remarkText })
         .eq('visit_id', visitId);
 
       if (error) throw error;
       
-      setVisitorLogs(prev => prev.map(log => log.id === visitId ? { ...log, status: newStatus, hr_remarks: remarkText } : log));
-      if (selectedVisitor?.id === visitId) {
-        setSelectedVisitor(prev => prev ? { ...prev, status: newStatus, hr_remarks: remarkText } : null);
+      const targetVisitor = visitorLogs.find(v => v.id === visitId);
+      if (targetVisitor) {
+        await supabase.from('audit_logs').insert([{
+          visitor_id: targetVisitor.id,
+          action: newStatus === 'Approved' ? 'approved' : 'rejected',
+          performed_by: 'HR Officer',
+          performed_by_role: 'hr',
+          remarks: remarkText ? `HR Decision: ${remarkText}` : `Request ${newStatus} by HR`
+        }]);
       }
       
-      // Close overlays
+      setVisitorLogs(prev => prev.map(log => log.id === visitId ? { ...log, status: newStatus, hr_remarks: remarkText, approvedAt: new Date().toLocaleString('en-GB') } : log));
+      if (selectedVisitor?.id === visitId) {
+        setSelectedVisitor(prev => prev ? { ...prev, status: newStatus, hr_remarks: remarkText, approvedAt: new Date().toLocaleString('en-GB') } : null);
+      }
+      
       setRemarkModal({ isOpen: false, visitId: null, action: null, text: '' });
       setIsDrawerOpen(false);
     } catch (err) {
-      console.error("Failed to update status", err);
       alert("Failed to process status change.");
     }
   };
 
-  // NEW: Handle ONLY updating the remark text in the drawer without changing status
   const handleUpdateRemarkOnly = async (visitId: string, remarkText: string) => {
     try {
-      const { error } = await supabase
-        .from('visits')
-        .update({ hr_remarks: remarkText })
-        .eq('visit_id', visitId);
-
+      const { error } = await supabase.from('visits').update({ hr_remarks: remarkText }).eq('visit_id', visitId);
       if (error) throw error;
       
       setVisitorLogs(prev => prev.map(log => log.id === visitId ? { ...log, hr_remarks: remarkText } : log));
-      if (selectedVisitor?.id === visitId) {
-        setSelectedVisitor(prev => prev ? { ...prev, hr_remarks: remarkText } : null);
-      }
+      if (selectedVisitor?.id === visitId) setSelectedVisitor(prev => prev ? { ...prev, hr_remarks: remarkText } : null);
       alert("Internal note updated successfully!");
     } catch (error) {
-      console.error('Error updating remark:', error);
       alert("Failed to save note.");
     }
   };
@@ -238,33 +208,29 @@ export default function VisitorMgmtPage() {
   const handleFilterToggle = (groupKey: string, value: string) => {
     setSelectedFilters(prev => {
       const current = prev[groupKey] || [];
-      const updated = current.includes(value) 
-        ? current.filter(item => item !== value) 
-        : [...current, value];
+      const updated = current.includes(value) ? current.filter(item => item !== value) : [...current, value];
       return { ...prev, [groupKey]: updated };
     });
   };
 
   const matrixFilteredRows = useMemo(() => {
     return visitorLogs.filter(row => {
-      const matchesSearch = 
-        row.visitorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        row.id.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const matchesCategory = (selectedFilters.category.length === 0) || selectedFilters.category.includes(row.category);
+      const matchesSearch = row.visitorName.toLowerCase().includes(searchTerm.toLowerCase()) || row.id.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = (selectedFilters.category.length === 0) || selectedFilters.category.includes(row.category || '');
       const matchesPipeline = (selectedFilters.pipeline.length === 0) || selectedFilters.pipeline.includes(row.pipeline);
       const matchesStatus = (selectedFilters.status.length === 0) || selectedFilters.status.includes(row.status);
 
+      // FIX: Implemented logic for new tabs
       let matchesTab = true;
-      if (activeTab === 'Pre-Scheduled') matchesTab = row.pipeline === 'Pre-Scheduled';
-      if (activeTab === 'Repeated') matchesTab = row.pipeline === 'Repeated';
-      if (activeTab === 'Expired') matchesTab = row.status === 'Expired';
+      if (activeTab === 'Pending') matchesTab = row.status === 'Pending';
+      if (activeTab === 'Active') matchesTab = row.status === 'Active';
+      if (activeTab === 'Checked Out') matchesTab = row.status === 'Completed' || row.status === 'Revoked';
+      if (activeTab === 'Expired') matchesTab = row.status === 'Expired' || row.status === 'Denied';
 
       return matchesSearch && matchesCategory && matchesPipeline && matchesStatus && matchesTab;
     });
   }, [visitorLogs, searchTerm, selectedFilters, activeTab]);
 
-  // Clean Route Strings linked securely to the individual files
   const categories = [
     { type: 'General', label: 'General Pass', desc: 'Standard public walk-ins, temporary business visits, or casual meetings.', icon: User, color: 'border-blue-100 hover:border-blue-300 hover:shadow-blue-50/50 hover:bg-blue-50 ', iconBg: 'bg-blue-50 text-blue-600', path: '/hr/add_visitor_general' },
     { type: 'HR', label: 'HR Registry', desc: 'Candidate interviews, employee onboardings, and internal hr syncs.', icon: ShieldAlert, color: 'border-purple-100 hover:border-purple-300 hover:shadow-purple-50/50 hover:bg-purple-50', iconBg: 'bg-purple-50 text-purple-600', path: '/hr/add_visitor_hr' },
@@ -273,7 +239,7 @@ export default function VisitorMgmtPage() {
     { type: 'Service', label: 'Service / Vendor', desc: 'Maintenance, infrastructure crews, and outsourced service tokens.', icon: Wrench, color: 'border-orange-100 hover:border-orange-300 hover:shadow-orange-50/50 hover:bg-orange-50/50', iconBg: 'bg-orange-50 text-orange-600', path: '/hr/add_visitor_service' },
   ];
 
-  const columns: TableColumn<VisitorRecord>[] = [
+  const columns: TableColumn<ExtendedVisitorRecord>[] = [
     {
       key: 'hostName',
       label: 'HOST DETAILS',
@@ -308,33 +274,43 @@ export default function VisitorMgmtPage() {
       )
     },
     {
+      key: 'checkout',
+      label: 'CHECKOUT / STATUS LOG',
+      render: (row) => (
+        <div>
+          <div className="text-[11px] text-slate-500 mb-0.5 font-mono"><span className="font-semibold text-emerald-600">Approved:</span> {row.approvedAt !== 'N/A' ? row.approvedAt : '--'}</div>
+          <div className="text-[11px] text-slate-500 font-mono"><span className="font-semibold text-rose-600">Checkout:</span> {row.checkoutTime !== 'N/A' ? row.checkoutTime : '--'}</div>
+        </div>
+      )
+    },
+    {
       key: 'category',
       label: 'CATEGORY',
       render: (row) => {
-        if (row.category === 'General') return <span className="font-bold text-blue-600 text-xs uppercase tracking-wide">General Pass</span>;
-        if (row.category === 'HR') return <span className="font-bold text-purple-600 text-xs uppercase tracking-wide">HR Registry</span>;
-        if (row.category === 'Govt') return <span className="font-bold text-emerald-600 text-xs uppercase tracking-wide">Govt/Defence</span>;
-        if (row.category === 'Foreign') return <span className="font-bold text-amber-600 text-xs uppercase tracking-wide">Foreign National</span>;
+        const cat = row.category || 'General';
+        if (cat === 'General') return <span className="font-bold text-blue-600 text-xs uppercase tracking-wide">General Pass</span>;
+        if (cat === 'HR') return <span className="font-bold text-purple-600 text-xs uppercase tracking-wide">HR Registry</span>;
+        if (cat === 'Govt') return <span className="font-bold text-emerald-600 text-xs uppercase tracking-wide">Govt/Defence</span>;
+        if (cat === 'Foreign') return <span className="font-bold text-amber-600 text-xs uppercase tracking-wide">Foreign National</span>;
         return <span className="font-bold text-orange-600 text-xs uppercase tracking-wide">Service</span>;
       }
     },
     {
-      key: 'department',
-      label: 'DEPARTMENT',
-      render: (row) => <span className="font-semibold text-slate-700 text-xs">{row.department}</span>
-    },
-    {
       key: 'purpose',
       label: 'PURPOSE',
-      render: (row) => <div className="text-xs text-slate-600 font-medium line-clamp-1 max-w-[180px]">{row.purpose}</div>
+      render: (row) => <div className="text-xs text-slate-600 font-medium line-clamp-1 max-w-[150px]">{row.purpose}</div>
     },
     {
       key: 'status',
       label: 'STATUS',
       render: (row) => {
+        if (row.status === 'Active') return <span className="px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 text-[10px] uppercase tracking-wider rounded font-bold">On Campus</span>;
+        if (row.status === 'Completed') return <span className="px-2 py-0.5 bg-slate-100 border border-slate-300 text-slate-700 text-[10px] uppercase tracking-wider rounded font-bold">Checked Out</span>;
         if (row.status === 'Approved') return <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] uppercase tracking-wider rounded font-bold">Approved</span>;
         if (row.status === 'Pending') return <span className="px-2 py-0.5 bg-yellow-50 border border-yellow-200 text-yellow-700 text-[10px] uppercase tracking-wider rounded font-bold animate-pulse">Action Req</span>;
         if (row.status === 'Denied') return <span className="px-2 py-0.5 bg-red-50 border border-red-200 text-red-700 text-[10px] uppercase tracking-wider rounded font-bold">Denied</span>;
+        if (row.status === 'Revoked') return <span className="px-2 py-0.5 bg-red-50 border border-red-200 text-red-700 text-[10px] uppercase tracking-wider rounded font-bold">Revoked</span>;
+        if (row.status === 'Expired') return <span className="px-2 py-0.5 bg-orange-50 border border-orange-200 text-orange-700 text-[10px] uppercase tracking-wider rounded font-bold">Expired</span>;
         return <span className="px-2 py-0.5 bg-slate-50 border border-slate-200 text-slate-600 text-[10px] uppercase tracking-wider rounded font-bold">{row.status}</span>;
       }
     },
@@ -345,28 +321,15 @@ export default function VisitorMgmtPage() {
         <div className="flex items-center space-x-1">
           {row.status === 'Pending' && (
             <>
-              {/* TRIGGER POPUP MODAL INSTEAD OF INSTANT UPDATE */}
-              <button 
-                onClick={() => setRemarkModal({ isOpen: true, visitId: row.id, action: 'Approved', text: row.hr_remarks || '' })} 
-                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" 
-                title="Approve Request"
-              >
+              <button onClick={() => setRemarkModal({ isOpen: true, visitId: row.id, action: 'Approved', text: row.hr_remarks || '' })} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Approve Request">
                 <CheckCircle className="w-4 h-4" />
               </button>
-              <button 
-                onClick={() => setRemarkModal({ isOpen: true, visitId: row.id, action: 'Denied', text: row.hr_remarks || '' })} 
-                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" 
-                title="Decline Request"
-              >
+              <button onClick={() => setRemarkModal({ isOpen: true, visitId: row.id, action: 'Denied', text: row.hr_remarks || '' })} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Decline Request">
                 <XCircle className="w-4 h-4" />
               </button>
             </>
           )}
-          <button 
-            onClick={() => { setSelectedVisitor(row); setIsDrawerOpen(true); }} 
-            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
-            title="Review Full Details"
-          >
+          <button onClick={() => { setSelectedVisitor(row); setIsDrawerOpen(true); }} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Review Full Details">
             <Eye className="w-4 h-4" />
           </button>
         </div>
@@ -401,7 +364,23 @@ export default function VisitorMgmtPage() {
           </div>
         </div>
 
-        {/* Quick Add Categories */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { title: 'Pending HR Review', value: visitorLogs.filter(d => d.status === 'Pending').length.toString(), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+            { title: 'Approved (Awaiting Gate)',  value: visitorLogs.filter(d => d.status === 'Approved').length.toString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+            { title: 'Active On-Site', value: visitorLogs.filter(d => d.status === 'Active').length.toString(), icon: ShieldCheck, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+            { title: 'Denied / Revoked', value: visitorLogs.filter(d => d.status === 'Denied' || d.status === 'Revoked').length.toString(), icon: XCircle, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100' }
+          ].map((stat, idx) => (  
+            <div key={idx} className="bg-white p-5 border border-slate-200 rounded-xl flex items-center justify-between shadow-sm">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{stat.title}</p>
+                <p className="text-2xl font-black text-slate-800 mt-1">{stat.value}</p>
+              </div>
+              <div className={`p-3 rounded-lg ${stat.bg} ${stat.color} border ${stat.border}`}><stat.icon className="w-5 h-5" /></div>
+            </div>
+          ))}
+        </div>
+
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
           <div className="mb-5">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">SELECT VISITOR CATEGORY</h3>
@@ -411,15 +390,9 @@ export default function VisitorMgmtPage() {
             {categories.map((cat) => {
               const Icon = cat.icon;
               return (
-                <div 
-                  key={cat.type} 
-                  onClick={() => navigate(cat.path)}
-                  className={`group bg-white border rounded-xl p-5 flex flex-col justify-between items-start cursor-pointer hover:shadow-lg transition-all duration-200 relative overflow-hidden ${cat.color}`}
-                >
+                <div key={cat.type} onClick={() => navigate(cat.path)} className={`group bg-white border rounded-xl p-5 flex flex-col justify-between items-start cursor-pointer hover:shadow-lg transition-all duration-200 relative overflow-hidden ${cat.color}`}>
                   <div className="w-full">
-                    <div className={`p-2.5 rounded-lg w-fit mb-4 transition-all duration-200 ${cat.iconBg}`}>
-                      <Icon className="w-5 h-5" />
-                    </div>
+                    <div className={`p-2.5 rounded-lg w-fit mb-4 transition-all duration-200 ${cat.iconBg}`}><Icon className="w-5 h-5" /></div>
                     <h4 className="text-sm font-bold text-slate-800 tracking-tight group-hover:text-slate-900">{cat.label}</h4>
                     <p className="text-[11px] leading-relaxed text-slate-400 font-medium mt-1.5 line-clamp-2">{cat.desc}</p>
                   </div>
@@ -429,7 +402,6 @@ export default function VisitorMgmtPage() {
           </div>
         </div>
 
-        {/* Master Log Table */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
           <div>
             <h2 className="text-base font-bold text-slate-800">Master Security Manifest Log</h2>
@@ -441,17 +413,18 @@ export default function VisitorMgmtPage() {
           </div>
 
           <div className="flex border-b border-slate-200 text-xs font-semibold space-x-4">
-            {['All Visitors', 'Pre-Scheduled', 'Repeated', 'Expired'].map(tab => (
+            {['All Passes', 'Pending', 'Active', 'Checked Out', 'Expired'].map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-2 px-1 relative ${activeTab === tab ? 'text-blue-600 font-bold border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
                 {tab}
               </button>
             ))}
           </div>
 
-          <DataTable data={matrixFilteredRows} columns={columns} />
+          <div className="overflow-x-auto">
+            <DataTable data={matrixFilteredRows} columns={columns} />
+          </div>
         </div>
 
-        {/* REVIEW SLIDE-OUT DRAWER */}
         {isDrawerOpen && selectedVisitor && (
           <div className="fixed inset-0 z-[80] overflow-hidden">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setIsDrawerOpen(false)} />
@@ -465,7 +438,8 @@ export default function VisitorMgmtPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className={`text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider ${
-                    selectedVisitor.status === 'Cleared' ? 'bg-slate-100 text-slate-700' :
+                    selectedVisitor.status === 'Active' ? 'bg-blue-100 text-blue-800' :
+                    selectedVisitor.status === 'Completed' ? 'bg-slate-100 text-slate-800' :
                     selectedVisitor.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
                     selectedVisitor.status === 'Pending' ? 'bg-amber-100 text-amber-700 animate-pulse' :
                     'bg-red-100 text-red-800'
@@ -488,6 +462,7 @@ export default function VisitorMgmtPage() {
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Requested By</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.hostName}</span></div>
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Request Date</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.requestedAt}</span></div>
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Scheduled Visit</span><span className="col-span-2 font-medium text-slate-900 text-blue-600">{selectedVisitor.visitDate}</span></div>
+                    <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Gate Check-Out</span><span className="col-span-2 font-medium text-slate-900 text-rose-600">{selectedVisitor.checkoutTime !== 'N/A' ? selectedVisitor.checkoutTime : 'Pending / Not Applicable'}</span></div>
                   </div>
                 </section>
 
@@ -561,22 +536,18 @@ export default function VisitorMgmtPage() {
 
               </div>
 
-              {/* NEW: ALWAYS EDITABLE COMMENTARY BOX IN DRAWER FOOTER */}
               <div className="p-6 border-t border-slate-100 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                 <div className="flex justify-between items-end mb-2">
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
                     Internal HR Remarks
                   </label>
-                  <button 
-                    onClick={() => handleUpdateRemarkOnly(selectedVisitor.id, panelRemark)}
-                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded transition-colors"
-                  >
+                  <button onClick={() => handleUpdateRemarkOnly(selectedVisitor.id, panelRemark)} className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded transition-colors">
                     Save Note
                   </button>
                 </div>
                 
                 <textarea
-                  rows={2}
+                  rows={3}
                   value={panelRemark}
                   onChange={(e) => setPanelRemark(e.target.value)}
                   placeholder="Add context, acceptance reasoning, or decline criteria..."
@@ -585,16 +556,10 @@ export default function VisitorMgmtPage() {
 
                 {selectedVisitor.status === 'Pending' && (
                   <div className="flex gap-3">
-                    <button 
-                      onClick={() => handleConfirmAction(selectedVisitor.id, 'Denied', panelRemark)}
-                      className="flex-1 py-2.5 bg-red-50 text-red-700 font-bold text-xs rounded-xl hover:bg-red-100 border border-red-100 transition-colors"
-                    >
+                    <button onClick={() => handleConfirmAction(selectedVisitor.id, 'Denied', panelRemark)} className="flex-1 py-2.5 bg-red-50 text-red-700 font-bold text-xs rounded-xl hover:bg-red-100 border border-red-100 transition-colors">
                       Decline Access
                     </button>
-                    <button 
-                      onClick={() => handleConfirmAction(selectedVisitor.id, 'Approved', panelRemark)}
-                      className="flex-1 py-2.5 bg-emerald-600 text-white font-bold text-xs rounded-xl hover:bg-emerald-700 shadow-sm transition-colors"
-                    >
+                    <button onClick={() => handleConfirmAction(selectedVisitor.id, 'Approved', panelRemark)} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold text-xs rounded-xl hover:bg-emerald-700 shadow-sm transition-colors">
                       Authorize Access
                     </button>
                   </div>
@@ -605,7 +570,6 @@ export default function VisitorMgmtPage() {
           </div>
         )}
 
-        {/* NEW: FOOD DELIVERY STYLE ACTION MODAL (From Table Buttons) */}
         {remarkModal.isOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in">
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform scale-100 transition-all">
@@ -628,18 +592,10 @@ export default function VisitorMgmtPage() {
                 />
 
                 <div className="flex gap-3 mt-5">
-                  <button 
-                    onClick={() => setRemarkModal({ isOpen: false, visitId: null, action: null, text: '' })}
-                    className="flex-1 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors"
-                  >
+                  <button onClick={() => setRemarkModal({ isOpen: false, visitId: null, action: null, text: '' })} className="flex-1 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors">
                     Cancel
                   </button>
-                  <button 
-                    onClick={() => handleConfirmAction(remarkModal.visitId, remarkModal.action, remarkModal.text)}
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm transition-all ${
-                      remarkModal.action === 'Approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
-                    }`}
-                  >
+                  <button onClick={() => handleConfirmAction(remarkModal.visitId, remarkModal.action, remarkModal.text)} className={`flex-1 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm transition-all ${remarkModal.action === 'Approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}>
                     Confirm {remarkModal.action}
                   </button>
                 </div>
@@ -649,7 +605,6 @@ export default function VisitorMgmtPage() {
         )}
 
       </div>
-
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes slide-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
         .animate-slide-in-right { animation: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }

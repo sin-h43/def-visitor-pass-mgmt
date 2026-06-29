@@ -103,3 +103,15 @@ export interface AuditLog {
   deviceId?: string;
   severity?: AlertSeverity;
 }
+
+export interface ForensicIncident {
+  id?: string;
+  visitor_id: string;
+  visit_id: string;
+  incident_type: 'time_overage' | 'emergency_revocation' | 'unauthorized_access';
+  severity: AlertSeverity;
+  excess_minutes: number;
+  reason: string;
+  status: 'open' | 'under_review' | 'resolved';
+  reported_by: string;
+}

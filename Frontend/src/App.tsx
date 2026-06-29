@@ -12,13 +12,14 @@ import VisitorMgmtPage from './pages/hr/visitormgmt';
 import HRAddVisitorPage from './pages/hr/add_visitor_general';
 import AnalyticsPage from './pages/hr/analytics';
 import AuditPage from './pages/hr/audit';
-import HRRepeatedVisitorLogPage from './pages/hr/hr_repeated_visitor.';
+import HRRepeatedVisitorLogPage from './pages/hr/hr_repeated_visitor';
 import VisitorProfilePage from './pages/hr/visitor_profile';
 import AddVisitorGeneralPage from './pages/hr/add_visitor_general';
 import AddVisitorForeignPage from './pages/hr/add_visitor_foriegn';
 import AddVisitorGovtPage from './pages/hr/add_visitor_govt';
 import AddVisitorHRPage from './pages/hr/add_visitor_hr';
 import AddVisitorServicePage from './pages/hr/add_visitor_service';
+import EnterpriseVisitorProfile from './pages/hr/EnterpriseVisitorProfile';
 
 export default function App() {
   return (
@@ -50,14 +51,14 @@ export default function App() {
 
 {/* Fallback support for both case pathways to prevent portal dropouts */}
 <Route path="/hr/add_visitor" element={<HRAddVisitorPage />} />
-<Route path="/hr/addvisitor" element={<HRAddVisitorPage />} />
+{/* <Route path="/hr/addvisitor" element={<HRAddVisitorPage />} /> */}
 <Route path="/hr/hrrep" element={<HRRepeatedVisitorLogPage />} />
 <Route path="/hr/add_visitor_general" element ={ <AddVisitorGeneralPage /> } />
 <Route path="/hr/add_visitor_govt" element ={ <AddVisitorGovtPage /> } />
 <Route path="/hr/add_visitor_hr" element ={ <AddVisitorHRPage /> } />
 <Route path="/hr/add_visitor_service" element ={ <AddVisitorServicePage /> } />
 <Route path="/hr/add_visitor_foreign" element ={ <AddVisitorForeignPage /> } />
-<Route path="/hr/visitor/:id" element={<VisitorProfilePage />} />
+<Route path="/hr/hrrep/:id" element={<EnterpriseVisitorProfile />} />
 
 <Route path="/hr/analytics" element={<AnalyticsPage />} />
 <Route path="/hr/audit" element={<AuditPage />} />

@@ -1,7 +1,7 @@
 // pages/hr/index.tsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Building, FileText , Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Bell, Eye, CheckCircle, X } from 'lucide-react';
+import { User, Building,AlertCircle, FileText , Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Bell, Eye, CheckCircle, X } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
@@ -27,6 +27,51 @@ export default function HRDashboard() {
   const [activeTab, setActiveTab] = useState('All Requests');
   const [searchTerm, setSearchTerm] = useState('');
   const [broadcastLogs, setBroadcastLogs] = useState([dynamicBroadcastPool[0], dynamicBroadcastPool[1]]);
+
+// 2. Add this state inside your HRDashboard component
+const [pendingUsers, setPendingUsers] = useState<any[]>([]);
+
+useEffect(() => {
+  fetchPendingUsers();
+}, []);
+
+const fetchPendingUsers = async () => {
+  const { data } = await supabase.from('employee_registrations').select('*').eq('status', 'pending');
+  if (data) setPendingUsers(data);
+};
+
+const handleApproveEmployee = async (user: any) => {
+  try {
+    // 1. Move them to the official employees table
+    await supabase.from('employees').insert([{
+      auth_id: user.auth_id,
+      name: user.full_name,
+      email: user.email,
+      phone: user.phone,
+      department: user.department
+    }]);
+
+    // 2. Mark as approved
+    await supabase.from('employee_registrations').update({ status: 'approved' }).eq('id', user.id);
+
+    // 3. Log it in the Audit Trail
+    await supabase.from('audit_logs').insert([{
+      action: 'approved',
+      remarks: `HR securely authorized new employee access for ${user.full_name} (${user.department})`,
+      performed_by: 'HR Admin', 
+      performed_by_role: 'hr'
+    }]);
+
+    fetchPendingUsers(); // Refresh the list
+  } catch (error) {
+    console.error("Approval failed", error);
+  }
+};
+
+const handleRejectEmployee = async (id: string) => {
+  await supabase.from('employee_registrations').update({ status: 'rejected' }).eq('id', id);
+  fetchPendingUsers();
+};  
 
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
     category: ['Govt', 'Foreign', 'Service', 'General', 'HR'],
@@ -342,6 +387,53 @@ export default function HRDashboard() {
   return (
     <DashboardLayout role="hr" userName="Sinchana K">
       <div className="max-w-7xl mx-auto space-y-6">
+
+        {/* HR ACTIONABLE NOTIFICATIONS */}
+        {pendingUsers.length > 0 && (
+          <div className="mb-8 border border-slate-200 bg-slate-50/50 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
+              <h3 className="text-sm font-bold text-slate-800 flex items-center uppercase tracking-wider">
+                <Bell className="w-4 h-4 mr-2 text-blue-600 animate-pulse" /> Pending Access Requests ({pendingUsers.length})
+              </h3>
+              <span className="text-[10px] bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full">Requires HR Authorization</span>
+            </div>
+            
+            <div className="space-y-3">
+              {pendingUsers.map(user => (
+                <div key={user.id} className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all hover:border-slate-300 shadow-sm relative overflow-hidden">
+                  <div className="absolute left-0 top-0 h-full w-1.5 bg-amber-400"></div>
+                  
+                  <div className="flex items-start gap-3 pl-2">
+                    <div className="p-2 bg-amber-50 text-amber-600 rounded-lg mt-0.5">
+                      <AlertCircle className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">{user.full_name}</h4>
+                      <p className="text-xs text-slate-500 mt-1">
+                        <span className="font-semibold text-slate-700">{user.department}</span> • {user.email} • {user.phone}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full md:w-auto shrink-0 border-t md:border-t-0 pt-3 md:pt-0 justify-end">
+                    <button 
+                      onClick={() => handleRejectEmployee(user.id)}
+                      className="px-3 py-1.5 border border-red-100 text-red-600 hover:bg-red-50 font-bold text-xs rounded-lg transition-colors flex items-center gap-1"
+                    >
+                      <XCircle className="w-3.5 h-3.5" /> Reject
+                    </button>
+                    <button 
+                      onClick={() => handleApproveEmployee(user)}
+                      className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" /> Authorize Access
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         
         {/* Dynamic Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

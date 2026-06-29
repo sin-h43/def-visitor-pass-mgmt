@@ -140,28 +140,36 @@ export default function VisitorVerification() {
     else setSteps(s => s.map(step => step.id === 'escorts' ? { ...step, completed: false } : step));
   };
 
-  const completeCheckin = async () => {
+const completeCheckin = async () => {
     if (!visitor) return;
     setUploading(true);
     try {
-      const checkInStamp = new Date().toISOString();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // FIX: Look up the actual employee ID
+      let empId = null;
+      if (user?.email) {
+        const { data: empData } = await supabase.from('employees').select('id').eq('email', user.email).single();
+        empId = empData?.id;
+      }
 
+      const checkInStamp = new Date().toISOString();
       const updates = { 
         status: 'Active', 
         expected_out: visitor.expiry,
-        security_remarks: securityNote || null // Save the note if it exists
+        security_remarks: securityNote || null 
       };
 
       await supabase.from('visits').update(updates).eq('visit_id', visitor.visit_id); 
-      await supabase.from('visitors').update({ checked_in_time: checkInStamp }).eq('visitor_id', visitor.id);
-
-      // Centralized Audit Logging for Check-in
+      await supabase.from('visitors').update({ checked_in_time: checkInStamp }).eq('visitor_id', visitor.id); 
+      
       await supabase.from('audit_logs').insert([{
-        visitor_id: visitor.id,
-        action: 'checked_in',
-        performed_by: 'Gate Security',
-        performed_by_role: 'security',
-        remarks: `Checked in at Desk ${deskNumber}. Expiry set to ${visitor.expiry_display}`
+        visitor_id: visitor.id, 
+        action: 'checked_in', 
+        performed_by_id: empId, // <--- NOW INSERTS THE CORRECT EMPLOYEE ID
+        performed_by: user?.email || 'Gate Security',
+        performed_by_role: 'security', 
+        remarks: `Checked in at Desk ${deskNumber}. ${securityNote ? `Note: ${securityNote}` : ''}`
       }]);
       
       alert('Access Granted. Monitoring initiated.');

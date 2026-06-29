@@ -153,7 +153,7 @@ export default function HRDashboard() {
               requestedAt: row.created_at ? new Date(row.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
               visitDate: row.start_date ? new Date(row.start_date).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
               status: row.status || 'Pending',
-              passType: row.pass_type || 'ONE_DAY',
+              passType: row.pass_type || 'One_day',
               pipeline: uiPipeline,
               nationality: row.visitors?.nationality || 'Indian',
               organization: row.visitors?.organization || '',

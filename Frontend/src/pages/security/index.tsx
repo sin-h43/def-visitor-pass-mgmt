@@ -91,48 +91,17 @@ export default function SecurityDashboard() {
     }
   };
 
-  const handleEmergencyCheckout = async () => {
-    if (!emergencyModal || !emergencyReason) return;
-    setIsProcessing(true);
-    
+const handleNormalCheckout = async (visitId: string, visitorId: string, expectedOut: string | undefined) => {
     try {
-      const now = new Date().toISOString();
+      const { data: { user } } = await supabase.auth.getUser();
       
-      await supabase.from('visits').update({ status: 'Revoked', actual_out: now }).eq('visit_id', emergencyModal.visitId);
-      await supabase.from('visitors').update({ checked_out_time: now }).eq('visitor_id', emergencyModal.visitorId);
-
-      await supabase.from('forensic_incidents').insert([{
-        visitor_id: emergencyModal.visitorId,
-        visit_id: emergencyModal.visitId,
-        incident_type: 'emergency_revocation',
-        severity: 'Critical',
-        reason: emergencyReason,
-        reported_by: 'Security Desk',
-        status: 'open'
-      }]);
-
-      await supabase.from('audit_logs').insert([{
-        visitor_id: emergencyModal.visitorId,
-        action: 'emergency_removal',
-        performed_by: 'Security Desk',
-        performed_by_role: 'security',
-        severity: 'Critical',
-        remarks: `EMERGENCY REMOVAL: ${emergencyReason}`
-      }]);
-
-      setEmergencyModal(null);
-      setEmergencyReason('');
-      fetchQueues();
-      alert('Emergency protocol executed. HR has been notified.');
-    } catch (error) {
-      alert('Failed to process emergency checkout.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleNormalCheckout = async (visitId: string, visitorId: string, expectedOut: string | undefined) => {
-    try {
+      // FIX: Look up the actual employee ID from the database using their auth email
+      let empId = null;
+      if (user?.email) {
+        const { data: empData } = await supabase.from('employees').select('id').eq('email', user.email).single();
+        empId = empData?.id;
+      }
+      
       const now = new Date();
       let isOverage = false;
       let excessMins = 0;
@@ -161,7 +130,7 @@ export default function SecurityDashboard() {
           severity,
           excess_minutes: excessMins,
           reason: `Auto-logged: Visitor exceeded authorized time by ${excessMins} minutes.`,
-          reported_by: 'System Automated',
+          reported_by: empId || 'System Automated',
           status: 'open'
         }]);
       }
@@ -169,7 +138,8 @@ export default function SecurityDashboard() {
       await supabase.from('audit_logs').insert([{
         visitor_id: visitorId,
         action: 'checked_out',
-        performed_by: 'Security Desk',
+        performed_by_id: empId, // <--- NOW INSERTS THE CORRECT EMPLOYEE ID
+        performed_by: user?.email || 'Security Desk',
         performed_by_role: 'security',
         remarks: isOverage ? `Checked out late (${excessMins}m overage)` : 'Normal Checkout'
       }]);
@@ -177,6 +147,56 @@ export default function SecurityDashboard() {
       fetchQueues();
     } catch (error) {
       console.error('Checkout failed:', error);
+    }
+  };
+
+  const handleEmergencyCheckout = async () => {
+    if (!emergencyModal || !emergencyReason) return;
+    setIsProcessing(true);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // FIX: Look up the actual employee ID
+      let empId = null;
+      if (user?.email) {
+        const { data: empData } = await supabase.from('employees').select('id').eq('email', user.email).single();
+        empId = empData?.id;
+      }
+
+      const now = new Date().toISOString();
+      
+      await supabase.from('visits').update({ status: 'Revoked', actual_out: now }).eq('visit_id', emergencyModal.visitId);
+      await supabase.from('visitors').update({ checked_out_time: now }).eq('visitor_id', emergencyModal.visitorId);
+
+      await supabase.from('forensic_incidents').insert([{
+        visitor_id: emergencyModal.visitorId,
+        visit_id: emergencyModal.visitId,
+        incident_type: 'emergency_revocation',
+        severity: 'Critical',
+        reason: emergencyReason,
+        reported_by: empId || 'Security Desk',
+        status: 'open'
+      }]);
+
+      await supabase.from('audit_logs').insert([{
+        visitor_id: emergencyModal.visitorId,
+        action: 'emergency_removal',
+        performed_by_id: empId, // <--- NOW INSERTS THE CORRECT EMPLOYEE ID
+        performed_by: user?.email || 'Security Desk',
+        performed_by_role: 'security',
+        severity: 'Critical',
+        remarks: `EMERGENCY REMOVAL: ${emergencyReason}`
+      }]);
+
+      setEmergencyModal(null);
+      setEmergencyReason('');
+      fetchQueues();
+      alert('Emergency protocol executed. HR has been notified.');
+    } catch (error) {
+      alert('Failed to process emergency checkout.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 

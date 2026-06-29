@@ -1,394 +1,383 @@
-// File: Frontend/src/pages/hr/audit.tsx
-import React, { useState, useEffect } from 'react';
+// File: src/pages/hr/audit_logs.tsx
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import type { AuditLog } from '../../types/visitor';
-import {
-  CheckCircle,
-  XCircle,
-  Clock,
-  User,
-  Calendar,
-  MessageSquare,
-  Filter,
-  Download,
-} from 'lucide-react';
+import DataTable from '../../components/common/DataTable';
+import SearchFilterBar from '../../components/common/SearchFilterBar';
+import type { TableColumn } from '../../types/visitor';
+import { Shield, Eye, X, User, Activity, Clock, FileText, Download, AlertOctagon, CheckCircle, XCircle } from 'lucide-react';
 
-interface AuditLogWithVisitor extends AuditLog {
-  visitor_name?: string;
-  employee_name?: string;
+interface ExtendedAuditLog {
+  id: string;
+  timestamp: string;
+  raw_date: Date;
+  action: string;
+  readable_action: string;
+  remarks: string;
+  severity: string;
+  performed_by_role: string;
+  performer_name: string;
+  performer_id: string;
+  performer_email: string;
+  performer_phone: string;
+  visitor_name: string;
+  visitor_id: string;
+  visitor_phone: string;
 }
 
-export default function AuditPage() {
-  const [auditLogs, setAuditLogs] = useState<AuditLogWithVisitor[]>([]);
+export default function AuditLogsPage() {
+  const [logs, setLogs] = useState<ExtendedAuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterAction, setFilterAction] = useState<string>('');
-  const [filterRole, setFilterRole] = useState<string>('');
-  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  
+  // Filter States
+  const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
+    action: [],
+    role: [],
+    severity: []
+  });
+  
+  // Drawer States
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<ExtendedAuditLog | null>(null);
 
   useEffect(() => {
-    fetchAuditLogs();
+    fetchLogs();
   }, []);
 
-  const fetchAuditLogs = async () => {
+  const fetchLogs = async () => {
     try {
       setLoading(true);
-
-      // Fetch audit logs with visitor details
-      let query = supabase
+      const { data, error } = await supabase
         .from('audit_logs')
         .select(`
           *,
-          visitors:visitor_id (name,email, host_empolyee_id)
+          visitors (name, phone, email, id_number),
+          employees (employee_id, name, email, phone)
         `)
         .order('timestamp', { ascending: false });
 
-      // Apply filters
-      if (filterAction && filterAction !== 'all') {
-        query = query.eq('action', filterAction);
-      }
-
-      if (filterRole && filterRole !== 'all') {
-        query = query.eq('performed_by_role', filterRole);
-      }
-
-      if (dateRange.start) {
-        query = query.gte('timestamp', dateRange.start);
-      }
-
-      if (dateRange.end) {
-        const endDate = new Date(dateRange.end);
-        endDate.setHours(23, 59, 59, 999);
-        query = query.lte('timestamp', endDate.toISOString());
-      }
-
-      const { data, error } = await query;
-
       if (error) throw error;
 
-      // Format the data
-      const formattedLogs = data?.map((log) => ({
-        ...log,
-        visitor_name: log.visitors?.visitor_name || 'Unknown',
-        employee_name: log.visitors?.employee_name || 'Unknown',
-      })) || [];
+      const formattedLogs: ExtendedAuditLog[] = data.map((log: any) => {
+        let readableAction = 'performed an action on';
+        switch(log.action) {
+          case 'checked_in': readableAction = 'checked in'; break;
+          case 'checked_out': readableAction = 'checked out'; break;
+          case 'approved': readableAction = 'approved access for'; break;
+          case 'rejected': readableAction = 'denied access to'; break;
+          case 'emergency_removal': readableAction = 'executed an emergency removal on'; break;
+          case 'created': readableAction = 'requested a pass for'; break;
+        }
 
-      setAuditLogs(formattedLogs);
+        return {
+          id: log.id,
+          timestamp: new Date(log.timestamp).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          raw_date: new Date(log.timestamp),
+          action: log.action,
+          readable_action: readableAction,
+          remarks: log.remarks || 'No additional remarks.',
+          severity: log.severity || 'Low',
+          performed_by_role: log.performed_by_role?.toUpperCase() || 'SYSTEM',
+          performer_name: log.employees?.name || log.performed_by || 'System Automated',
+          performer_id: log.employees?.employee_id || 'N/A',
+          performer_email: log.employees?.email || 'N/A',
+          performer_phone: log.employees?.phone || 'N/A',
+          visitor_name: log.visitors?.name || 'Unknown Visitor',
+          visitor_id: log.visitor_id || 'N/A',
+          visitor_phone: log.visitors?.phone || 'N/A',
+        };
+      });
+
+      setLogs(formattedLogs);
     } catch (error) {
       console.error('Error fetching audit logs:', error);
-      alert('Failed to fetch audit logs');
     } finally {
       setLoading(false);
     }
   };
 
-  const getActionBadge = (action: string) => {
-    const badges: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
-      created: {
-        bg: 'bg-blue-100',
-        text: 'text-blue-800',
-        icon: <CheckCircle size={16} />,
-      },
-      updated: {
-        bg: 'bg-yellow-100',
-        text: 'text-yellow-800',
-        icon: <Clock size={16} />,
-      },
-      approved: {
-        bg: 'bg-green-100',
-        text: 'text-green-800',
-        icon: <CheckCircle size={16} />,
-      },
-      rejected: {
-        bg: 'bg-red-100',
-        text: 'text-red-800',
-        icon: <XCircle size={16} />,
-      },
-      checked_in: {
-        bg: 'bg-purple-100',
-        text: 'text-purple-800',
-        icon: <CheckCircle size={16} />,
-      },
-      checked_out: {
-        bg: 'bg-gray-100',
-        text: 'text-gray-800',
-        icon: <Clock size={16} />,
-      },
-    };
+  // Advanced Filtering Logic
+  const filteredLogs = useMemo(() => {
+    return logs.filter(log => {
+      const matchesSearch = 
+        log.visitor_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.performer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.visitor_id.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const badge = badges[action] || badges.created;
-    return badge;
+      const matchesAction = selectedFilters.action.length === 0 || selectedFilters.action.includes(log.action);
+      const matchesRole = selectedFilters.role.length === 0 || selectedFilters.role.includes(log.performed_by_role);
+      const matchesSeverity = selectedFilters.severity.length === 0 || selectedFilters.severity.includes(log.severity);
+
+      return matchesSearch && matchesAction && matchesRole && matchesSeverity;
+    });
+  }, [logs, searchTerm, selectedFilters]);
+
+  const handleFilterToggle = (groupKey: string, value: string) => {
+    setSelectedFilters(prev => {
+      const current = prev[groupKey] || [];
+      const updated = current.includes(value) ? current.filter(item => item !== value) : [...current, value];
+      return { ...prev, [groupKey]: updated };
+    });
   };
 
-  const filteredLogs = auditLogs.filter(
-    (log) =>
-      log.visitor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.performed_by?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.employee_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filterGroups = [
+    {
+      key: 'action',
+      title: 'Action Type',
+      options: [
+        { label: 'Check-in', value: 'checked_in' },
+        { label: 'Check-out', value: 'checked_out' },
+        { label: 'Approvals', value: 'approved' },
+        { label: 'Rejections / Denials', value: 'rejected' },
+        { label: 'Emergency Removals', value: 'emergency_removal' }
+      ]
+    },
+    {
+      key: 'role',
+      title: 'Performed By',
+      options: [
+        { label: 'HR Officer', value: 'HR' },
+        { label: 'Security Guard', value: 'SECURITY' },
+        { label: 'Employee', value: 'EMPLOYEE' }
+      ]
+    },
+    {
+      key: 'severity',
+      title: 'Severity Level',
+      options: [
+        { label: 'Low', value: 'Low' },
+        { label: 'Medium', value: 'Medium' },
+        { label: 'High', value: 'High' },
+        { label: 'Critical', value: 'Critical' }
+      ]
+    }
+  ];
 
-  const handleExportCSV = () => {
-    const csv = [
-      ['Timestamp', 'Visitor', 'Action', 'Performed By', 'Role', 'Remarks'].join(','),
-      ...filteredLogs.map((log) =>
-        [
-          new Date(log.timestamp).toLocaleString(),
-          log.visitor_name,
-          log.action,
-          log.performed_by,
-          log.performed_by_role,
-          log.remarks || '',
-        ].join(',')
-      ),
-    ].join('\n');
+  // CSV Export Feature
+  const exportToCSV = () => {
+    if (filteredLogs.length === 0) return alert("No data to export.");
+    
+    const headers = ['Timestamp', 'Log ID', 'Action', 'Performed By', 'Role', 'Visitor Name', 'Visitor ID', 'Severity', 'Remarks'];
+    const csvRows = filteredLogs.map(log => [
+      `"${log.timestamp}"`,
+      `"${log.id}"`,
+      `"${log.action}"`,
+      `"${log.performer_name}"`,
+      `"${log.performed_by_role}"`,
+      `"${log.visitor_name}"`,
+      `"${log.visitor_id}"`,
+      `"${log.severity}"`,
+      `"${log.remarks.replace(/"/g, '""')}"` // Escape quotes in remarks
+    ].join(','));
 
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const csvData = [headers.join(','), ...csvRows].join('\n');
+    const blob = new Blob([csvData], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `audit-log-${new Date().toISOString()}.csv`;
+    a.download = `system_audit_logs_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   };
 
-  if (loading) {
-    return (
-      <DashboardLayout  role="hr" userName="Sinchana K">
-        <div className="flex items-center justify-center h-screen">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+  // Quick Metrics Calculation
+  const today = new Date().toDateString();
+  const metrics = {
+    total: logs.length,
+    critical: logs.filter(l => l.severity.toLowerCase() === 'critical').length,
+    todayCheckins: logs.filter(l => l.action === 'checked_in' && l.raw_date.toDateString() === today).length,
+    denials: logs.filter(l => l.action === 'rejected' || l.action === 'emergency_removal').length,
+  };
+
+  const columns: TableColumn<ExtendedAuditLog>[] = [
+    {
+      key: 'timestamp',
+      label: 'TIMESTAMP',
+      render: (row) => <span className="text-xs font-mono text-slate-600">{row.timestamp}</span>
+    },
+    {
+      key: 'actor',
+      label: 'PERFORMED BY',
+      render: (row) => (
+        <div>
+          <div className="font-bold text-slate-800 text-sm">{row.performer_name}</div>
+          <div className="text-[10px] font-mono text-slate-500 uppercase">{row.performed_by_role}</div>
         </div>
-      </DashboardLayout>
-    );
-  }
+      )
+    },
+    {
+      key: 'activity',
+      label: 'ACTIVITY LOG',
+      render: (row) => (
+        <div className="text-sm text-slate-700">
+          <span className="font-medium text-slate-500">{row.readable_action}</span> <span className="font-bold text-slate-900">{row.visitor_name}</span>
+        </div>
+      )
+    },
+    {
+      key: 'severity',
+      label: 'SEVERITY',
+      render: (row) => {
+        const isCritical = row.severity?.toLowerCase() === 'critical';
+        const isHigh = row.severity?.toLowerCase() === 'high';
+        return (
+          <span className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded ${isCritical ? 'bg-red-100 text-red-700 border border-red-200' : isHigh ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
+            {row.severity}
+          </span>
+        );
+      }
+    },
+    {
+      key: 'actions',
+      label: 'DETAILS',
+      render: (row) => (
+        <button 
+          onClick={() => { setSelectedLog(row); setIsDrawerOpen(true); }}
+          className="px-3 py-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold"
+        >
+          <Eye className="w-4 h-4" /> View
+        </button>
+      )
+    }
+  ];
 
   return (
-    <DashboardLayout role="hr" userName="Sinchana K">
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Audit Logs</h1>
-          <p className="text-gray-600">
-            Complete activity history of all visitor management actions
-          </p>
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Search */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search
-              </label>
-              <input
-                type="text"
-                placeholder="Visitor, employee..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Action Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Action
-              </label>
-              <select
-                value={filterAction}
-                onChange={(e) => {
-                  setFilterAction(e.target.value);
-                  fetchAuditLogs();
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">All Actions</option>
-                <option value="created">Created</option>
-                <option value="updated">Updated</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-                <option value="checked_in">Checked In</option>
-                <option value="checked_out">Checked Out</option>
-              </select>
-            </div>
-
-            {/* Role Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Role
-              </label>
-              <select
-                value={filterRole}
-                onChange={(e) => {
-                  setFilterRole(e.target.value);
-                  fetchAuditLogs();
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">All Roles</option>
-                <option value="employee">Employee</option>
-                <option value="hr">HR</option>
-                <option value="security">Security</option>
-              </select>
-            </div>
-
-            {/* Export Button */}
-            <div className="flex items-end">
-              <button
-                onClick={handleExportCSV}
-                className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-              >
-                <Download size={18} />
-                Export CSV
-              </button>
-            </div>
+    <DashboardLayout role="hr" userName="System Admin">
+      <div className="max-w-7xl mx-auto space-y-6">
+        
+        <div className="flex items-center space-x-3">
+          <div className="p-2 bg-slate-900 text-white rounded-lg shadow-sm">
+            <Shield className="w-6 h-6" />
           </div>
-
-          {/* Date Range */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Start Date
-              </label>
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) => {
-                  setDateRange({ ...dateRange, start: e.target.value });
-                  fetchAuditLogs();
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                End Date
-              </label>
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) => {
-                  setDateRange({ ...dateRange, end: e.target.value });
-                  fetchAuditLogs();
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">System Audit Trail</h1>
+            <p className="text-sm text-slate-500">Immutable ledger of all access grants, denials, and facility movements.</p>
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="text-sm font-medium text-gray-600">Total Logs</div>
-            <div className="text-2xl font-bold text-gray-900 mt-1">{filteredLogs.length}</div>
+        {/* Dynamic Metric Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
+            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Ledger Entries</p><p className="text-2xl font-black text-slate-800 mt-1">{metrics.total}</p></div>
+            <div className="p-3 rounded-lg bg-blue-50 text-blue-600 border border-blue-100"><FileText className="w-5 h-5" /></div>
           </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="text-sm font-medium text-gray-600">Approvals</div>
-            <div className="text-2xl font-bold text-green-600 mt-1">
-              {filteredLogs.filter((l) => l.action === 'approved').length}
-            </div>
+          <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
+            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Today's Check-ins</p><p className="text-2xl font-black text-emerald-600 mt-1">{metrics.todayCheckins}</p></div>
+            <div className="p-3 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100"><CheckCircle className="w-5 h-5" /></div>
           </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="text-sm font-medium text-gray-600">Rejections</div>
-            <div className="text-2xl font-bold text-red-600 mt-1">
-              {filteredLogs.filter((l) => l.action === 'rejected').length}
-            </div>
+          <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
+            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Denials & Removals</p><p className="text-2xl font-black text-orange-600 mt-1">{metrics.denials}</p></div>
+            <div className="p-3 rounded-lg bg-orange-50 text-orange-600 border border-orange-100"><XCircle className="w-5 h-5" /></div>
           </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="text-sm font-medium text-gray-600">Check-ins</div>
-            <div className="text-2xl font-bold text-purple-600 mt-1">
-              {filteredLogs.filter((l) => l.action === 'checked_in').length}
-            </div>
+          <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
+            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Critical Alerts</p><p className="text-2xl font-black text-red-600 mt-1">{metrics.critical}</p></div>
+            <div className="p-3 rounded-lg bg-red-50 text-red-600 border border-red-100"><AlertOctagon className="w-5 h-5" /></div>
           </div>
         </div>
 
-        {/* Logs Table */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                    Timestamp
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                    Visitor
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                    Action
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                    Performed By
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                    Role
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                    Remarks
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredLogs.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-600">
-                      No audit logs found
-                    </td>
-                  </tr>
-                ) : (
-                  filteredLogs.map((log) => {
-                    const badge = getActionBadge(log.action);
-                    return (
-                      <tr key={log.id} className="border-b border-gray-200 hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          <div className="flex items-center gap-2">
-                            <Calendar size={16} className="text-gray-400" />
-                            {new Date(log.timestamp).toLocaleString()}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                          {log.visitor_name}
-                        </td>
-                        <td className="px-6 py-4 text-sm">
-                          <span
-                            className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}
-                          >
-                            {badge.icon}
-                            {log.action}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          <div className="flex items-center gap-2">
-                            <User size={16} className="text-gray-400" />
-                            {log.performed_by}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          <span className="px-2 py-1 bg-gray-100 rounded text-xs font-medium">
-                            {log.performed_by_role}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          {log.remarks ? (
-                            <div className="flex items-start gap-2">
-                              <MessageSquare size={16} className="text-gray-400 mt-0.5 flex-shrink-0" />
-                              <span className="line-clamp-2">{log.remarks}</span>
-                            </div>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4 justify-between bg-slate-50 p-3 rounded-xl border border-slate-100">
+            <div className="flex-1">
+              <SearchFilterBar 
+                value={searchTerm} 
+                onChange={setSearchTerm} 
+                selectedFilters={selectedFilters} 
+                onFilterToggle={handleFilterToggle} 
+                filterGroups={filterGroups} 
+                placeholder="Search by Employee, Visitor, or Pass ID..." 
+              />
+            </div>
+            <button 
+              onClick={exportToCSV}
+              className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 shadow-sm shrink-0"
+            >
+              <Download className="w-4 h-4" /> Export CSV
+            </button>
           </div>
+
+          {loading ? (
+            <div className="py-12 text-center text-slate-400">Syncing secure logs...</div>
+          ) : (
+            <DataTable data={filteredLogs} columns={columns} />
+          )}
         </div>
       </div>
+
+      {/* RIGHT SLIDE-OUT DRAWER */}
+      {isDrawerOpen && selectedLog && (
+        <div className="fixed inset-0 z-[100] overflow-hidden">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setIsDrawerOpen(false)} />
+          
+          <div className="absolute inset-y-0 right-0 max-w-md w-full bg-white shadow-2xl flex flex-col animate-slide-in-right border-l border-slate-200">
+            
+            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-900 text-white">
+              <div>
+                <h2 className="text-lg font-black flex items-center"><Activity className="w-5 h-5 mr-2" /> Activity Record</h2>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">LOG ID: {selectedLog.id.split('-')[0].toUpperCase()}</p>
+              </div>
+              <button onClick={() => setIsDrawerOpen(false)} className="p-2 text-slate-400 hover:text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
+              
+              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Timestamp</p>
+                  <p className="text-sm font-bold text-slate-800 flex items-center"><Clock className="w-4 h-4 mr-1.5 text-blue-600" /> {selectedLog.timestamp}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Severity</p>
+                  <span className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded ${selectedLog.severity.toLowerCase() === 'critical' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
+                    {selectedLog.severity}
+                  </span>
+                </div>
+              </div>
+
+              <section>
+                <h3 className="text-sm font-black text-slate-800 border-b border-slate-200 pb-2 mb-3 flex items-center">
+                  <Shield className="w-4 h-4 mr-2 text-blue-600" /> Performed By (Actor)
+                </h3>
+                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-2 text-sm">
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500 font-medium">Name</span><span className="col-span-2 font-bold text-slate-900">{selectedLog.performer_name}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500 font-medium">Role Type</span><span className="col-span-2 font-bold text-slate-900 uppercase text-xs">{selectedLog.performed_by_role}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500 font-medium">Emp ID</span><span className="col-span-2 font-mono text-slate-700">{selectedLog.performer_id}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500 font-medium">Email</span><span className="col-span-2 text-slate-700">{selectedLog.performer_email}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500 font-medium">Phone</span><span className="col-span-2 font-mono text-slate-700">{selectedLog.performer_phone}</span></div>
+                </div>
+              </section>
+
+              <section>
+                <h3 className="text-sm font-black text-slate-800 border-b border-slate-200 pb-2 mb-3 flex items-center">
+                  <User className="w-4 h-4 mr-2 text-blue-600" /> Target Subject (Visitor)
+                </h3>
+                <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-2 text-sm">
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500 font-medium">Name</span><span className="col-span-2 font-bold text-slate-900">{selectedLog.visitor_name}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500 font-medium">Pass ID</span><span className="col-span-2 font-mono font-bold text-blue-600">{selectedLog.visitor_id}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500 font-medium">Phone</span><span className="col-span-2 font-mono text-slate-700">{selectedLog.visitor_phone}</span></div>
+                </div>
+              </section>
+
+              <section>
+                <h3 className="text-sm font-black text-slate-800 border-b border-slate-200 pb-2 mb-3 flex items-center">
+                  <FileText className="w-4 h-4 mr-2 text-blue-600" /> Action & System Remarks
+                </h3>
+                <div className={`p-4 border rounded-xl shadow-sm text-sm font-medium ${selectedLog.action.includes('reject') || selectedLog.action.includes('emergency') ? 'bg-red-50 border-red-200 text-red-800' : 'bg-slate-50 border-slate-200 text-slate-800'}`}>
+                  {selectedLog.remarks}
+                </div>
+              </section>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes slide-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .animate-slide-in-right { animation: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      `}} />
     </DashboardLayout>
   );
 }

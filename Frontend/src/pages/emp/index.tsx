@@ -21,7 +21,6 @@ export default function EmployeeDashboard() {
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
 
 const [currentUser, setCurrentUser] = useState({ empId: '', name: '', dept: '' });
-  const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -37,7 +36,6 @@ const [currentUser, setCurrentUser] = useState({ empId: '', name: '', dept: '' }
           });
         }
       }
-      setAuthLoading(false);
     };
     fetchUser();
   }, []);

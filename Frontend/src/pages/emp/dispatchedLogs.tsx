@@ -22,13 +22,27 @@ export default function DispatchedLogsPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
 
-  const currentUser = {
-    empId: 'EMP001',
-    name: 'Sinchana K',
-    dept: 'Cyber Security Unit'
-  };
+const [currentUser, setCurrentUser] = useState({ empId: '', name: '', dept: '' });
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        const { data: emp } = await supabase.from('employees').select('*').eq('email', user.email).single();
+        if (emp) {
+          setCurrentUser({ 
+            empId: emp.id, 
+            name: emp.name, 
+            dept: emp.department || 'General Unit' 
+          });
+        }
+      }
+    };
+    fetchUser();
+  }, []);
 
 useEffect(() => {
+  if(!currentUser.empId) return;
     async function fetchDispatchedLogs() {
       try {
         setLoading(true);

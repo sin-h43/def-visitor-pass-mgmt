@@ -1,6 +1,7 @@
 // components/common/eVisitorTable.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Eye, MoreVertical, Pencil, RefreshCw, X, Shield, User, Building, FileText } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 export interface EscortRecord {
   name: string;
@@ -46,6 +47,7 @@ interface VisitorTableProps {
   onView?: (visitor: VisitorRecord) => void;
 }
 
+
 export default function VisitorTable({ 
   data, 
   loading, 
@@ -56,6 +58,27 @@ export default function VisitorTable({
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  // const [currentUser, setCurrentUser] = useState({ empId: '', name: '', dept: '' });
+  // const [authLoading, setAuthLoading] = useState(true);
+
+  // useEffect(() => {
+  //   const fetchUser = async () => {
+  //     const { data: { user } } = await supabase.auth.getUser();
+  //     if (user?.email) {
+  //       const { data: emp } = await supabase.from('employees').select('*').eq('email', user.email).single();
+  //       if (emp) {
+  //         setCurrentUser({ 
+  //           empId: emp.id, 
+  //           name: emp.name, 
+  //           dept: emp.department || 'General Unit' 
+  //         });
+  //       }
+  //     }
+  //     setAuthLoading(false);
+  //   };
+  //   fetchUser();
+  // }, []);
 
   const handleOpenDrawer = (visitor: VisitorRecord) => {
     setSelectedVisitor(visitor);

@@ -20,11 +20,25 @@ export default function EmployeeDashboard() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
 
-  const currentUser = {
-    empId: 'EMP001',
-    name: 'Sinchana K',
-    dept: 'Cyber Security Unit'
-  };
+const [currentUser, setCurrentUser] = useState({ empId: '', name: '', dept: '' });
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        // Fetch their actual employee record from your table
+        const { data: emp } = await supabase.from('employees').select('*').eq('email', user.email).single();
+        if (emp) {
+          setCurrentUser({ 
+            empId: emp.id, 
+            name: emp.name, 
+            dept: emp.department || 'General Unit' 
+          });
+        }
+      }
+    };
+    fetchUser();
+  }, []);
 
   const [currentTab, setCurrentTab] = useState<'All Visitors' | 'Pre-Scheduled' | 'Repeated' | 'Expired'>('All Visitors');
   const [searchTerm, setSearchTerm] = useState('');

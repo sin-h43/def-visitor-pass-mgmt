@@ -7,13 +7,6 @@ import DataTable from '../../components/common/DataTable';
 import type { TableColumn } from '../../types/visitor';
 import { supabase } from '../../lib/supabase';
 
-// Static Auth Context Session Anchor
-const currentUser = {
-  empId: 'EMP001',
-  name: 'Sinchana K',
-  dept: 'Cyber Security Unit'
-};
-
 interface VisitHistory {
   visitId: string;
   date: string;
@@ -48,6 +41,26 @@ export default function EmployeeRepeatedVisitorLogPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('All Visitors');
+
+  // Static Auth Context Session Anchor
+const [currentUser, setCurrentUser] = useState({ empId: '', name: '', dept: '' });
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        const { data: emp } = await supabase.from('employees').select('*').eq('email', user.email).single();
+        if (emp) {
+          setCurrentUser({ 
+            empId: emp.id, 
+            name: emp.name, 
+            dept: emp.department || 'General Unit' 
+          });
+        }
+      }
+    };
+    fetchUser();
+  }, []);
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<VisitorProfile | null>(null);

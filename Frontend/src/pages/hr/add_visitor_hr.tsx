@@ -158,7 +158,7 @@ export default function AddVisitorHRPage() {
         host_employee_id: hostId || 'EMP001',
         created_by_employee_id: 'EMP001',
         visit_type: 'HR', // Connected operational pipeline type identifier safely
-        pass_type: 'ONE_DAY',
+        pass_type: 'One_day',
         purpose: finalPurpose,
         start_date: startDate,
         end_date: startDate,

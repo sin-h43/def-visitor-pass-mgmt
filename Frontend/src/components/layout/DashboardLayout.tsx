@@ -5,7 +5,7 @@ import { Calendar, Bell, LayoutDashboard, UserPlus, FileText, Settings, Shield, 
 
 interface LayoutProps {
   children: React.ReactNode;
-  role: 'emp' | 'hr';
+  role: 'emp' | 'hr' | 'security';
   userName: string;
 }
 
@@ -15,18 +15,33 @@ export default function DashboardLayout({ children, role, userName }: LayoutProp
   // Managed state for expanding/collapsing navigation bar text
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
 
-  const menuItems = role === 'emp' ? [
-    { label: 'Dashboard', icon: LayoutDashboard, path: '/emp' },
-    { label: 'Add Visitor', icon: UserPlus, path: '/emp/add_visitor' },
-    { label: 'Repeated Visitor', icon: Users, path: '/emp/repeated_visitor' },
-    { label: 'Settings', icon: Settings, path: '/emp/settings' },
-  ] : [
-    { label: 'Dashboard', icon: LayoutDashboard, path: '/hr' },
-    { label: 'Visitor Management', icon: Users, path: '/hr/visitormgmt' },
-    { label: 'Repeated Visitor Logs', icon: Repeat, path: '/hr/hrrep' },
-    { label: 'Analytics', icon: BarChart3, path: '/hr/analytics' },
-    { label: 'Audit Logs', icon: FileText, path: '/hr/audit' },
-  ];
+  // Dynamic menu routing based on user role
+  let menuItems: { label: string; icon: any; path: string }[] = [];
+  
+  if (role === 'emp') {
+    menuItems = [
+      { label: 'Dashboard', icon: LayoutDashboard, path: '/emp' },
+      { label: 'Add Visitor', icon: UserPlus, path: '/emp/add_visitor' },
+      { label: 'Repeated Visitor', icon: Users, path: '/emp/repeated_visitor' },
+      { label: 'Settings', icon: Settings, path: '/emp/settings' },
+    ];
+  } else if (role === 'hr') {
+    menuItems = [
+      { label: 'Dashboard', icon: LayoutDashboard, path: '/hr' },
+      { label: 'Visitor Management', icon: Users, path: '/hr/visitormgmt' },
+      { label: 'Repeated Visitor Logs', icon: Repeat, path: '/hr/hrrep' },
+      { label: 'Analytics', icon: BarChart3, path: '/hr/analytics' },
+      { label: 'Audit Logs', icon: FileText, path: '/hr/audit' },
+    ];
+  } else if (role === 'security') {
+    menuItems = [
+      { label: 'Security Terminal', icon: LayoutDashboard, path: '/security' },
+      { label: 'Settings', icon: Settings, path: '/security/settings' },
+    ];
+  }
+
+  // Dynamic role title for the top right profile block
+  const roleLabel = role === 'hr' ? 'HR Officer' : role === 'security' ? 'Security Operations' : 'Core Entry Console';
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans overflow-hidden relative">
@@ -116,7 +131,7 @@ export default function DashboardLayout({ children, role, userName }: LayoutProp
               </div>
               <div className="text-sm">
                 <p className="font-semibold text-slate-800 leading-none">{userName}</p>
-                <p className="text-xs text-slate-500 mt-1">{role === 'hr' ? 'HR Officer' : 'Core Entry Console'}</p>
+                <p className="text-xs text-slate-500 mt-1">{roleLabel}</p>
               </div>
             </div>
 

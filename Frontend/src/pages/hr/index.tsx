@@ -8,13 +8,21 @@ import SearchFilterBar from '../../components/common/SearchFilterBar';
 import type { TableColumn, VisitorRecord } from '../../types/visitor';
 import { supabase } from '../../lib/supabase';
 
+// --- UI SPECIFIC EXTENSION ---
+// Extends the core record to include properties specifically needed for the HR drawer
+export interface ExtendedVisitorRecord extends VisitorRecord {
+  requestedAt: string;
+  visitDate: string;
+  passType: string;
+}
+
 const dynamicBroadcastPool = [
   { id: 1, type: 'FOREIGN REGISTRY', text: 'Passport clearance requested for Sarah Jenkins.', color: 'bg-orange-50 border-orange-100 text-orange-800' },
   { id: 2, type: 'GATE AUTO-SYNC', text: 'Gate 2 badge scanner synchronization completed.', color: 'bg-emerald-50 border-emerald-100 text-emerald-800' },
 ];
 
 export default function HRDashboard() {
-  const [dataList, setDataList] = useState<VisitorRecord[]>([]);
+  const [dataList, setDataList] = useState<ExtendedVisitorRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('All Requests');
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,8 +34,6 @@ export default function HRDashboard() {
     status: ['Pending', 'Approved', 'Denied', 'Cleared', 'Active']
   });
 
-  // CHANGE: Added new states to manage the always-editable text box (panelRemark) 
-  // and the table popup modal (remarkModal).
   const [panelRemark, setPanelRemark] = useState('');
   const [remarkModal, setRemarkModal] = useState<{
     isOpen: boolean;
@@ -41,12 +47,9 @@ export default function HRDashboard() {
     text: '',
   });
 
-  // Drawer States
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
+  const [selectedVisitor, setSelectedVisitor] = useState<ExtendedVisitorRecord | null>(null);
 
-  // CHANGE: Added a hook to auto-fill the drawer's text box with the existing comment 
-  // from the database whenever an HR officer clicks on a visitor row.
   useEffect(() => {
     if (selectedVisitor) {
       setPanelRemark(selectedVisitor.hr_remarks || '');
@@ -127,7 +130,7 @@ export default function HRDashboard() {
         if (error) throw error;
 
         if (data) {
-          const transformed: VisitorRecord[] = data.map((row: any) => {
+          const transformed: ExtendedVisitorRecord[] = data.map((row: any) => {
             let uiPipeline: 'immediate' | 'scheduled' | 'repeated' = 'immediate';
             const dbType = row.visit_type?.toLowerCase();
             if (dbType === 'prescheduled' || dbType === 'scheduled') uiPipeline = 'scheduled';
@@ -137,7 +140,7 @@ export default function HRDashboard() {
             const escortsArray = Array.isArray(row.escorts) ? row.escorts : (row.escorts ? [row.escorts] : []);
 
             return {
-              id: row.visit_id,
+              id: row.visit_id || '',
               visitorName: row.visitors?.name || 'Unknown',
               gender: row.visitors?.gender || 'Others',
               phone: row.visitors?.phone || '',
@@ -146,7 +149,7 @@ export default function HRDashboard() {
               purpose: row.purpose || '',
               hostName: row.host?.name || 'Unassigned',
               hostDept: row.host?.role === 'hr' ? 'HR Officer' : 'Staff Member',
-              hostId: row.host?.id || '',
+              hostId: row.host?.employee_id || '',
               requestedAt: row.created_at ? new Date(row.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
               visitDate: row.start_date ? new Date(row.start_date).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
               status: row.status || 'Pending',
@@ -162,7 +165,8 @@ export default function HRDashboard() {
               id_number: row.visitors?.id_number || 'N/A',
               address: row.visitors?.address || 'N/A',
               department: row.department || 'General Unit',
-              hr_remarks: row.hr_remarks || ''
+              hr_remarks: row.hr_remarks || '',
+              requestDate: row.created_at ? new Date(row.created_at).toLocaleDateString() : 'N/A', // Guaranteed string
             };
           });
           setDataList(transformed);
@@ -186,8 +190,6 @@ export default function HRDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // CHANGE: Master function that updates BOTH the visitor's status (Approved/Denied) 
-  // AND pushes the newly typed HR remark to the Supabase database.
   const handleUpdateStatus = async (visitId: string | null, newStatus: 'Approved' | 'Denied' | null, remarkText: string) => {
     if (!visitId || !newStatus) return;
     try {
@@ -206,7 +208,6 @@ export default function HRDashboard() {
         setSelectedVisitor(prev => prev ? { ...prev, status: newStatus, hr_remarks: remarkText } : null);
       }
       
-      // Close overlays
       setRemarkModal({ isOpen: false, visitId: null, action: null, text: '' });
       setIsDrawerOpen(false);
     } catch (err) {
@@ -215,8 +216,6 @@ export default function HRDashboard() {
     }
   };
 
-  // CHANGE: Secondary function just for the "Save Note" button. This allows HR to 
-  // edit and save comments without accidentally changing the approval status.
   const handleUpdateRemarkOnly = async (visitId: string, remarkText: string) => {
     try {
       const { error } = await supabase
@@ -247,7 +246,7 @@ export default function HRDashboard() {
     });
   };
 
-  const handleOpenDrawer = (visitor: VisitorRecord) => {
+  const handleOpenDrawer = (visitor: ExtendedVisitorRecord) => {
     setSelectedVisitor(visitor);
     setIsDrawerOpen(true);
   };
@@ -257,7 +256,8 @@ export default function HRDashboard() {
       row.visitorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       row.id.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesCategory = (selectedFilters.category || []).includes(row.category);
+    // FIX: Fallback applied to row.category to satisfy TypeScript
+    const matchesCategory = (selectedFilters.category || []).includes(row.category || '');
     const matchesPipeline = (selectedFilters.pipeline || []).includes(row.pipeline);
     const matchesStatus = (selectedFilters.status || []).includes(row.status);
 
@@ -268,7 +268,7 @@ export default function HRDashboard() {
     return matchesSearch && matchesCategory && matchesPipeline && matchesStatus && matchesTab;
   });
 
-  const columns: TableColumn<VisitorRecord>[] = [
+  const columns: TableColumn<ExtendedVisitorRecord>[] = [
     { key: 'id', label: 'PASS ID', render: (row) => <span className="text-blue-600 font-mono font-bold text-xs">{row.id}</span> },
     {
       key: 'visitorName',
@@ -291,7 +291,9 @@ export default function HRDashboard() {
           Service: 'bg-orange-50 text-orange-500 border-orange-100',
           General: 'bg-blue-50 text-blue-500 border-blue-100'
         };
-        return <span className={`px-2 py-0.5 text-xs font-bold rounded border ${colors[row.category] || 'bg-slate-100'}`}>{row.category}</span>;
+        // FIX: Safe access to the category fallback
+        const safeCategory = row.category || 'General';
+        return <span className={`px-2 py-0.5 text-xs font-bold rounded border ${colors[safeCategory] || 'bg-slate-100'}`}>{safeCategory}</span>;
       }
     },
     { key: 'pipeline', label: 'PIPELINE TYPE', render: (row) => <span className="text-xs uppercase font-semibold text-slate-500 font-mono tracking-wider">{row.pipeline}</span> },
@@ -314,7 +316,6 @@ export default function HRDashboard() {
         <div className="flex items-center space-x-1">
           {row.status === 'Pending' && (
             <>
-              {/* CHANGE: Trigger remark modal instead of instant update */}
               <button onClick={() => setRemarkModal({ isOpen: true, visitId: row.id, action: 'Approved', text: row.hr_remarks || '' })} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded" title="Approve"><CheckCircle className="w-4 h-4" /></button>
               <button onClick={() => setRemarkModal({ isOpen: true, visitId: row.id, action: 'Denied', text: row.hr_remarks || '' })} className="p-1 text-rose-600 hover:bg-rose-50 rounded" title="Deny"><X className="w-4 h-4" /></button>
             </>
@@ -551,7 +552,6 @@ export default function HRDashboard() {
               </section>
             </div>
 
-            {/* CHANGE: ALWAYS EDITABLE COMMENTARY BOX IN DRAWER FOOTER */}
             <div className="p-6 border-t border-slate-100 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
               <div className="flex justify-between items-end mb-2">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -595,9 +595,6 @@ export default function HRDashboard() {
         </div>
       )}
 
-      {/* CHANGE: FOOD DELIVERY STYLE ACTION MODAL 
-          This is the new popup that appears when clicking Accept/Decline directly from the table.
-          It binds to the remarkModal state and conditionally styles itself based on the action. */}
       {remarkModal.isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform scale-100 transition-all">

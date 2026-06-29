@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import SearchFilterBar from '../../components/common/SearchFilterBar';
 import type { AuditLog } from '../../types/visitor';
 import {
   CheckCircle,

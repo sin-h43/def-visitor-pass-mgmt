@@ -13,7 +13,6 @@ import HRAddVisitorPage from './pages/hr/add_visitor_general';
 import AnalyticsPage from './pages/hr/analytics';
 import AuditPage from './pages/hr/audit';
 import HRRepeatedVisitorLogPage from './pages/hr/hr_repeated_visitor';
-import VisitorProfilePage from './pages/hr/visitor_profile';
 import AddVisitorGeneralPage from './pages/hr/add_visitor_general';
 import AddVisitorForeignPage from './pages/hr/add_visitor_foriegn';
 import AddVisitorGovtPage from './pages/hr/add_visitor_govt';

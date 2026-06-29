@@ -4,16 +4,16 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
-import { Clock, CheckCircle, AlertCircle, Users, TrendingUp, ChevronRight, AlertOctagon, ShieldAlert, X } from 'lucide-react';
+import { CheckCircle, AlertCircle, Users, TrendingUp, ChevronRight, AlertOctagon, ShieldAlert, X, User } from 'lucide-react';
 
 interface QueueItemWithDetails {
   visitor_id: string;
-  visit_id: string; // Guaranteed to exist now
+  visit_id: string; 
   visitor_name: string;
   arrival_time: string;
   expected_arrival: string;
   priority: 'high' | 'medium' | 'low';
-  status: 'pending' | 'processing' | 'completed' | 'Active'; // Safely includes Active
+  status: 'pending' | 'processing' | 'completed' | 'Active'; 
   visitor_details?: any;
   checked_in_time?: string;
   expected_out?: string;
@@ -39,7 +39,7 @@ export default function SecurityDashboard() {
   useEffect(() => {
     fetchQueues();
     const interval = setInterval(fetchQueues, 30000); 
-    const clockInterval = setInterval(() => setCurrentTime(new Date()), 60000); // Update clock every min for overage calculation
+    const clockInterval = setInterval(() => setCurrentTime(new Date()), 60000); 
     return () => { clearInterval(interval); clearInterval(clockInterval); };
   }, []);
 
@@ -98,13 +98,9 @@ export default function SecurityDashboard() {
     try {
       const now = new Date().toISOString();
       
-      // 1. Update Visit Status
       await supabase.from('visits').update({ status: 'Revoked', actual_out: now }).eq('visit_id', emergencyModal.visitId);
-      
-      // 2. Update Visitor Check-out
       await supabase.from('visitors').update({ checked_out_time: now }).eq('visitor_id', emergencyModal.visitorId);
 
-      // 3. Log to Forensic Incidents
       await supabase.from('forensic_incidents').insert([{
         visitor_id: emergencyModal.visitorId,
         visit_id: emergencyModal.visitId,
@@ -115,7 +111,6 @@ export default function SecurityDashboard() {
         status: 'open'
       }]);
 
-      // 4. Update Audit Log
       await supabase.from('audit_logs').insert([{
         visitor_id: emergencyModal.visitorId,
         action: 'emergency_removal',
@@ -130,7 +125,6 @@ export default function SecurityDashboard() {
       fetchQueues();
       alert('Emergency protocol executed. HR has been notified.');
     } catch (error) {
-      console.error('Emergency checkout failed:', error);
       alert('Failed to process emergency checkout.');
     } finally {
       setIsProcessing(false);
@@ -198,6 +192,15 @@ export default function SecurityDashboard() {
   const filteredQueue = queue.filter(item => item.visitor_name?.toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredActive = activeCampus.filter(item => item.visitor_name?.toLowerCase().includes(searchTerm.toLowerCase()));
 
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'bg-rose-50 text-rose-700 border-rose-200';
+      case 'medium': return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'low': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      default: return 'bg-slate-50 text-slate-700 border-slate-200';
+    }
+  };
+
   if (loading) {
     return (
       <DashboardLayout role="security" userName="Gate Console">
@@ -208,134 +211,163 @@ export default function SecurityDashboard() {
 
   return (
     <DashboardLayout role="security" userName="Gate Console">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-4">
         
-        <div className="flex justify-between items-end">
+        <div className="flex items-center space-x-3">
+          <div className="p-2 bg-slate-900 text-white rounded-lg shadow-sm">
+            <ShieldAlert className="w-6 h-6" />
+          </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Security Terminal</h1>
-            <p className="text-sm text-slate-500 mt-1">Real-time visitor queue and active clearance pipeline</p>
+            <h1 className="text-2xl font-bold text-slate-800">Security Terminal</h1>
+            <p className="text-sm text-slate-500">Real-time visitor queue and active clearance pipeline</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex items-center justify-between">
-            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pending Clearance</p><p className="text-2xl font-black text-slate-800 mt-1">{queue.length}</p></div>
-            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600"><Users size={20} /></div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm flex items-center justify-between">
+            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pending Gate Clearance</p><p className="text-2xl font-bold font-black text-slate-800 mt-1">{queue.length}</p></div>
+            <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600"><Users size={20} /></div>
           </div>
-          <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex items-center justify-between">
-            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active on Campus</p><p className="text-2xl font-black text-emerald-600 mt-1">{activeCampus.length}</p></div>
-            <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600"><ShieldAlert size={20} /></div>
+          <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm flex items-center justify-between">
+            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active on Campus</p><p className="text-2xl font-black font-bold text-emerald-600 mt-1">{activeCampus.length}</p></div>
+            <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600"><ShieldAlert size={20} /></div>
           </div>
-          <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex items-center justify-between">
+          {/* <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex items-center justify-between">
             <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Forensic Alerts</p><p className="text-2xl font-black text-rose-600 mt-1">Auto</p></div>
-            <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center text-rose-600"><AlertOctagon size={20} /></div>
-          </div>
-          <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex items-center justify-between">
-            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Desks</p><p className="text-2xl font-black text-purple-600 mt-1">{activeDesks.length}/4</p></div>
-            <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600"><TrendingUp size={20} /></div>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-center">
-          <div className="flex space-x-2 bg-slate-100 p-1 rounded-lg w-full sm:w-auto">
-            <button onClick={() => setActiveTab('pending')} className={`flex-1 sm:px-6 py-2 text-sm font-bold rounded-md transition-colors ${activeTab === 'pending' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}>
-              Pending Queue ({queue.length})
-            </button>
-            <button onClick={() => setActiveTab('active')} className={`flex-1 sm:px-6 py-2 text-sm font-bold rounded-md transition-colors ${activeTab === 'active' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`}>
-              Active on Campus ({activeCampus.length})
-            </button>
-          </div>
-          <div className="w-full sm:w-96">
-            <SearchFilterBar value={searchTerm} onChange={setSearchTerm} selectedFilters={{}} onFilterToggle={() => {}} filterGroups={[]} placeholder="Search Name or ID..." />
+            <div className="w-10 h-10 rounded-lg bg-rose-50 flex items-center justify-center text-rose-600"><AlertOctagon size={20} /></div>
+          </div> */}
+          <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm flex items-center justify-between">
+            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Desks</p><p className="text-2xl font-black font-bold text-purple-600 mt-1">{activeDesks.length}/4</p></div>
+            <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600"><TrendingUp size={20} /></div>
           </div>
         </div>
 
-        <div className="space-y-3">
-          {activeTab === 'pending' ? (
-            filteredQueue.length === 0 ? (
-              <div className="bg-white rounded-lg border border-slate-200 p-12 text-center shadow-sm"><Clock className="mx-auto h-12 w-12 text-slate-300 mb-4" /><p className="text-slate-500 font-medium">No pending approvals at the gate.</p></div>
-            ) : (
-              filteredQueue.map((item) => (
-                <div key={item.visitor_id} className="bg-white rounded-lg border border-slate-200 p-4 flex items-center justify-between shadow-sm hover:border-blue-300 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-700 border border-slate-200">{item.visitor_details?.visitor_type === 'foreign' ? 'F' : 'G'}</div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-slate-900">{item.visitor_name}</h3>
-                        <span className="text-[10px] font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">{item.visitor_id}</span>
-                        {item.priority === 'high' && <span className="text-[10px] font-bold bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded uppercase">High Priority</span>}
-                      </div>
-                      <p className="text-xs text-slate-500 mt-1">Host: <span className="font-medium text-slate-700">{item.visitor_details?.employee_name}</span> | Date: {item.expected_arrival}</p>
-                    </div>
-                  </div>
-                  <button onClick={() => navigate(`/security/verify/${item.visitor_id}`)} className="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-slate-800 flex items-center gap-2 shadow-sm">
-                    Verify <ChevronRight size={16} />
-                  </button>
+        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm space-y-2">
+          
+          <SearchFilterBar value={searchTerm} onChange={setSearchTerm} selectedFilters={{}} onFilterToggle={() => {}} filterGroups={[]} placeholder="Search Name or Pass ID..." />
+
+          {/* HR-Style Minimalist Tabs */}
+          <div className="flex border-b border-slate-200 text-sm font-semibold space-x-4 mt-2">
+            <button onClick={() => setActiveTab('pending')} className={`pb-3 px-1 relative ${activeTab === 'pending' ? 'text-blue-600  border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
+              Pending Queue <span className="ml-1 bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-xs">{queue.length}</span>
+            </button>
+            <button onClick={() => setActiveTab('active')} className={`pb-3 px-1 relative ${activeTab === 'active' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}>
+              Active Passes <span className="ml-1 bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-xs">{activeCampus.length}</span>
+            </button>
+          </div>
+
+          <div className="space-y-3 pt-1">
+            {activeTab === 'pending' ? (
+              filteredQueue.length === 0 ? (
+                <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-12 text-center">
+                  <CheckCircle className="mx-auto h-8 w-8 text-slate-300 mb-3" />
+                  <p className="text-slate-500 font-medium text-sm">No pending approvals at the gate.</p>
                 </div>
-              ))
-            )
-          ) : (
-            filteredActive.length === 0 ? (
-              <div className="bg-white rounded-lg border border-slate-200 p-12 text-center shadow-sm"><CheckCircle className="mx-auto h-12 w-12 text-emerald-300 mb-4" /><p className="text-slate-500 font-medium">Campus is currently clear.</p></div>
-            ) : (
-              filteredActive.map((item) => {
-                const overage = calculateOverage(item.expected_out);
-                const isWarning = overage.exceeded;
-                
-                return (
-                  <div key={item.visitor_id} className={`bg-white rounded-lg border-2 p-4 flex items-center justify-between shadow-sm transition-all ${isWarning ? 'border-rose-500 shadow-rose-100/50 pulse-border' : 'border-emerald-500'}`}>
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-inner ${isWarning ? 'bg-rose-500' : 'bg-emerald-500'}`}>
-                        {isWarning ? <AlertOctagon size={18} /> : <ShieldAlert size={18} />}
+              ) : (
+                filteredQueue.map((item) => (
+                  <div key={item.visitor_id} className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col md:flex-row md:items-center justify-between shadow-sm hover:shadow-md transition-all gap-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center border border-slate-200 shrink-0">
+                        <User className="text-slate-400 w-6 h-6" />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-slate-900">{item.visitor_name}</h3>
-                          <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{item.visitor_id}</span>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-bold text-slate-900 text-base">{item.visitor_name}</h3>
+                          <span className="text-[10px] font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold border border-blue-100">{item.visitor_id}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border ${getPriorityColor(item.priority)}`}>{item.priority} Priority</span>
                         </div>
-                        <div className="flex items-center gap-3 text-xs mt-1">
-                          <span className="text-slate-500">In: <span className="font-bold text-slate-700">{item.checked_in_time ? new Date(item.checked_in_time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--'}</span></span>
-                          <span className="text-slate-500">Out: <span className="font-bold text-slate-700">{item.expected_out ? new Date(item.expected_out).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '18:00'}</span></span>
-                          {isWarning && <span className="font-bold text-rose-600 flex items-center"><AlertCircle size={12} className="mr-1"/> Exceeded by {overage.minutes}m</span>}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-1 text-xs">
+                          <div><span className="text-slate-400 font-medium">Clearance:</span> <span className="text-slate-700 font-medium uppercase">{item.visitor_details?.visitor_type || 'General'}</span></div>
+                          <div><span className="text-slate-400 font-medium">Sponsor:</span> <span className="text-slate-700 font-medium">{item.visitor_details?.employee_name}</span></div>
+                          <div><span className="text-slate-400 font-medium">Date:</span> <span className="text-slate-700 font-medium">{item.expected_arrival}</span></div>
                         </div>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => handleNormalCheckout(item.visit_id!, item.visitor_id, item.expected_out)} className="px-4 py-2 bg-slate-100 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-200 border border-slate-200">
-                        Checkout
-                      </button>
-                      <button onClick={() => setEmergencyModal({isOpen: true, visitId: item.visit_id!, visitorId: item.visitor_id, name: item.visitor_name})} className="px-4 py-2 bg-rose-600 text-white text-sm font-bold rounded-lg hover:bg-rose-700 shadow-sm flex items-center gap-2">
-                        Emergency Remove
-                      </button>
-                    </div>
+                    <button onClick={() => navigate(`/security/verify/${item.visitor_id}`)} className="w-full md:w-auto px-6 py-2.5 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-sm shrink-0">
+                      Verify & Grant Access <ChevronRight size={16} />
+                    </button>
                   </div>
-                );
-              })
-            )
-          )}
+                ))
+              )
+            ) : (
+              filteredActive.length === 0 ? (
+                <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-12 text-center">
+                  <ShieldAlert className="mx-auto h-8 w-8 text-slate-300 mb-3" />
+                  <p className="text-slate-500 font-medium text-sm">Campus is currently clear of visitors.</p>
+                </div>
+              ) : (
+                filteredActive.map((item) => {
+                  const overage = calculateOverage(item.expected_out);
+                  const isWarning = overage.exceeded;
+                  
+                  return (
+                    <div key={item.visitor_id} className={`bg-white rounded-xl border p-5 shadow-sm transition-all flex flex-col gap-4 ${isWarning ? 'border-red-300 bg-red-50/10' : 'border-slate-200 hover:border-emerald-300'}`}>
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        
+                        <div className="flex items-start gap-4">
+                          <div className={`w-12 h-12 rounded-lg flex items-center justify-center border shrink-0 ${isWarning ? 'bg-red-50 border-red-200 text-red-600' : 'bg-emerald-50 border-emerald-200 text-emerald-600'}`}>
+                            {isWarning ? <AlertOctagon className="w-6 h-6" /> : <ShieldAlert className="w-6 h-6" />}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-bold text-slate-900 text-base">{item.visitor_name}</h3>
+                              <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold border border-slate-200">{item.visitor_id}</span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs">
+                              <div><span className="text-slate-400 font-medium">In:</span> <span className="font-bold text-slate-700">{item.checked_in_time ? new Date(item.checked_in_time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--'}</span></div>
+                              <div><span className="text-slate-400 font-medium">Target Out:</span> <span className="font-bold text-slate-700">{item.expected_out ? new Date(item.expected_out).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '18:00'}</span></div>
+                              <div><span className="text-slate-400 font-medium">Host:</span> <span className="font-medium text-slate-700">{item.visitor_details?.employee_name}</span></div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 w-full md:w-auto shrink-0">
+                          <button onClick={() => setEmergencyModal({isOpen: true, visitId: item.visit_id!, visitorId: item.visitor_id, name: item.visitor_name})} className="flex-1 md:flex-none px-4 py-2.5 bg-red-50 text-red-700 border border-red-200 text-xs font-bold rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-1.5">
+                            <AlertOctagon size={14}/> Remove
+                          </button>
+                          <button onClick={() => handleNormalCheckout(item.visit_id!, item.visitor_id, item.expected_out)} className="flex-1 md:flex-none px-6 py-2.5 bg-slate-100 text-slate-700 border border-slate-200 text-sm font-bold rounded-lg hover:bg-slate-200 transition-colors">
+                            Checkout
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Clean Overage Alert Banner inside the card instead of full-border pulsing */}
+                      {isWarning && (
+                        <div className="bg-red-50 border border-red-100 rounded-lg p-3 flex items-center gap-2 text-red-700 text-xs font-bold">
+                          <AlertCircle size={14} className="shrink-0" />
+                          <span>Forensic Alert: Visitor has exceeded authorized time by {overage.minutes} minutes. Auto-logged to registry.</span>
+                        </div>
+                      )}
+
+                    </div>
+                  );
+                })
+              )
+            )}
+          </div>
         </div>
       </div>
 
       {/* Emergency Checkout Modal */}
       {emergencyModal?.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border border-rose-100">
-            <div className="p-5 bg-rose-50 border-b border-rose-100 flex justify-between items-center">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border border-red-100">
+            <div className="p-5 bg-red-50 border-b border-red-100 flex justify-between items-center">
               <div>
-                <h3 className="font-black text-rose-800 flex items-center"><AlertOctagon className="w-5 h-5 mr-2"/> CRITICAL: Emergency Removal</h3>
-                <p className="text-xs text-rose-600 mt-0.5">{emergencyModal.name} ({emergencyModal.visitorId})</p>
+                <h3 className="font-black text-red-800 flex items-center"><AlertOctagon className="w-5 h-5 mr-2"/> CRITICAL: Emergency Removal</h3>
+                <p className="text-xs text-red-600 mt-0.5">{emergencyModal.name} ({emergencyModal.visitorId})</p>
               </div>
-              <button onClick={() => setEmergencyModal(null)} className="text-rose-400 hover:text-rose-700"><X size={20}/></button>
+              <button onClick={() => setEmergencyModal(null)} className="text-red-400 hover:text-red-700"><X size={20}/></button>
             </div>
             <div className="p-5 space-y-4">
               <p className="text-sm font-medium text-slate-600">This action immediately revokes access, creates a CRITICAL forensic log, and alerts HR. This cannot be undone.</p>
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Reason for Removal (Required)</label>
-                <textarea autoFocus value={emergencyReason} onChange={e => setEmergencyReason(e.target.value)} rows={3} placeholder="Describe aggressive behavior, security breach, etc..." className="w-full border-2 border-rose-200 rounded-lg p-3 text-sm focus:outline-none focus:border-rose-500 bg-rose-50/30 resize-none"/>
+                <textarea autoFocus value={emergencyReason} onChange={e => setEmergencyReason(e.target.value)} rows={3} placeholder="Describe aggressive behavior, security breach, etc..." className="w-full border border-red-200 rounded-lg p-3 text-sm focus:outline-none focus:border-red-400 bg-red-50/50 resize-none"/>
               </div>
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setEmergencyModal(null)} className="flex-1 py-2.5 font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200">Cancel</button>
-                <button onClick={handleEmergencyCheckout} disabled={!emergencyReason || isProcessing} className="flex-1 py-2.5 font-bold text-white bg-rose-600 rounded-lg hover:bg-rose-700 shadow-md disabled:opacity-50">
+                <button onClick={() => setEmergencyModal(null)} className="flex-1 py-2.5 font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 border border-slate-200">Cancel</button>
+                <button onClick={handleEmergencyCheckout} disabled={!emergencyReason || isProcessing} className="flex-1 py-2.5 font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 shadow-sm disabled:opacity-50">
                   {isProcessing ? 'Revoking...' : 'Confirm Removal'}
                 </button>
               </div>
@@ -343,10 +375,6 @@ export default function SecurityDashboard() {
           </div>
         </div>
       )}
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes pulse-border { 0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(244, 63, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); } }
-        .pulse-border { animation: pulse-border 2s infinite; }
-      `}}/>
     </DashboardLayout>
   );
 }

@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import { Camera, Upload, CheckCircle, Clock, FileText, Users, ExternalLink, ShieldAlert } from 'lucide-react';
+import { Camera, Upload, CheckCircle, Clock, FileText, Users, ExternalLink, ShieldAlert, AlertOctagon, X } from 'lucide-react';
 
 export default function VisitorVerification() {
   const { visitorId } = useParams<{ visitorId: string }>();
@@ -20,9 +20,13 @@ export default function VisitorVerification() {
   const [deskNumber, setDeskNumber] = useState(1);
   const [escorts, setEscorts] = useState<any[]>([]);
 
+  // Security Deny Modal State
+  const [denyModal, setDenyModal] = useState(false);
+  const [denyReason, setDenyReason] = useState('');
+
   const [steps, setSteps] = useState([
     { id: 'identity', title: 'Verify Identity Proof', completed: false, required: true },
-    { id: 'photo', title: 'Capture Photo', completed: false, required: true },
+    { id: 'photo', title: 'Capture Kiosk Photo', completed: false, required: true },
     { id: 'escorts', title: 'Verify Accompanying Persons', completed: false, required: false },
     { id: 'badge', title: 'Issue Access Badge', completed: false, required: true },
   ]);
@@ -41,14 +45,12 @@ export default function VisitorVerification() {
 
       if (error) throw error;
 
-      // Auto-calculate expiry (Default to 18:00 today if duration isn't set, else add hours)
       const now = new Date();
-      let expiryTime = new Date(now.setHours(18, 0, 0, 0)); // default 6 PM
+      let expiryTime = new Date(now.setHours(18, 0, 0, 0)); 
       if (data.duration_hours) {
         expiryTime = new Date(new Date().getTime() + data.duration_hours * 3600000);
       }
 
-      // FIX: Added aggressive fallbacks to catch multiple possible database column naming conventions
       setVisitor({
         id: data.visitor_id,
         visit_id: data.visit_id,
@@ -64,6 +66,7 @@ export default function VisitorVerification() {
         id_number: data.visitors?.id_number || data.visitors?.identity_number || 'N/A',
         host: data.host?.name || 'Unassigned',
         document_url: data.document_url || data.visitors?.document_url || null,
+        hr_remarks: data.hr_remarks || '',
         expiry: expiryTime.toISOString(),
         expiry_display: expiryTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
       });
@@ -71,7 +74,6 @@ export default function VisitorVerification() {
       const mappedEscorts = (data.escorts || []).map((e:any) => ({ ...e, verified: false }));
       setEscorts(mappedEscorts);
       
-      // Auto-complete escort step if no escorts exist
       if (mappedEscorts.length === 0) {
         setSteps(s => s.map(step => step.id === 'escorts' ? {...step, completed: true, required: false} : step));
       } else {
@@ -144,12 +146,33 @@ export default function VisitorVerification() {
       const checkInStamp = new Date().toISOString();
       await supabase.from('visits').update({ status: 'Active', expected_out: visitor.expiry }).eq('visit_id', visitor.visit_id); 
       await supabase.from('visitors').update({ checked_in_time: checkInStamp }).eq('visitor_id', visitor.id); 
+      
+      // Centralized Audit Logging for Check-in
       await supabase.from('audit_logs').insert([{
         visitor_id: visitor.id, action: 'checked_in', performed_by: 'Gate Security', performed_by_role: 'security', remarks: `Checked in at Desk ${deskNumber}. Expiry set to ${visitor.expiry_display}`
       }]);
+      
       alert('Access Granted. Monitoring initiated.');
       navigate('/security');
     } catch (error) { alert('Check-in failed.'); } finally { setUploading(false); }
+  };
+
+  const handleDenyEntry = async () => {
+    if (!visitor || !denyReason) return;
+    setUploading(true);
+    try {
+      const currentRemarks = visitor.hr_remarks ? visitor.hr_remarks + '\n\n' : '';
+      const appendedRemarks = currentRemarks + `[SECURITY DENIAL - ${new Date().toLocaleString('en-GB')}]: ${denyReason}`;
+
+      await supabase.from('visits').update({ status: 'Denied', hr_remarks: appendedRemarks }).eq('visit_id', visitor.visit_id); 
+      
+      await supabase.from('audit_logs').insert([{
+        visitor_id: visitor.id, action: 'rejected', performed_by: 'Gate Security', performed_by_role: 'security', remarks: `Entry denied at gate: ${denyReason}`
+      }]);
+      
+      alert('Visitor denied. HR has been notified.');
+      navigate('/security');
+    } catch (error) { alert('Failed to process denial.'); } finally { setUploading(false); }
   };
 
   if (loading) return <DashboardLayout role="security" userName="Gate Console"><div className="flex h-screen items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-slate-900"></div></div></DashboardLayout>;
@@ -161,11 +184,11 @@ export default function VisitorVerification() {
     <DashboardLayout role="security" userName="Gate Console">
       <div className="max-w-7xl mx-auto space-y-4">
         
-        <div className="flex justify-between items-center bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-          <button onClick={() => navigate('/security')} className="text-sm font-bold text-slate-500 hover:text-slate-800">← Back</button>
+        <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <button onClick={() => navigate('/security')} className="text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors">← Back to Queue</button>
           <div className="flex items-center gap-4">
-            <span className="text-xs font-mono font-bold bg-slate-100 px-2 py-1 rounded">{visitor.id}</span>
-            <div className="bg-rose-100 border border-rose-200 px-3 py-1.5 rounded-md flex items-center text-rose-800">
+            <span className="text-xs font-mono font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded">{visitor.id}</span>
+            <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg flex items-center text-slate-700 shadow-sm">
               <Clock className="w-4 h-4 mr-2" />
               <span className="text-xs font-bold uppercase mr-1">Pass Expiry:</span>
               <span className="text-sm font-black">{visitor.expiry_display}</span>
@@ -175,93 +198,90 @@ export default function VisitorVerification() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           
-          <div className="lg:col-span-2 space-y-3">
-            {/* Ultra-Compact Identity Card */}
-            <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
+          <div className="lg:col-span-2 space-y-4">
+            {/* Compact Identity Card */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
               <h2 className="text-2xl font-black text-slate-900 mb-3">{visitor.name}</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm bg-slate-50 p-3 rounded border border-slate-100">
-                <div><span className="block text-[10px] font-bold text-slate-400 uppercase">Gender</span><span className="font-medium text-slate-800 truncate">{visitor.gender}</span></div>
-                <div><span className="block text-[10px] font-bold text-slate-400 uppercase">DOB</span><span className="font-medium text-slate-800 truncate">{visitor.dob}</span></div>
-                <div><span className="block text-[10px] font-bold text-slate-400 uppercase">Designation</span><span className="font-medium text-slate-800 truncate">{visitor.designation}</span></div>
-                <div><span className="block text-[10px] font-bold text-slate-400 uppercase">Organization</span><span className="font-medium text-slate-800 truncate">{visitor.organization}</span></div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm bg-slate-50 p-4 rounded-lg border border-slate-100">
+                <div><span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Gender</span><span className="font-medium text-slate-800 truncate">{visitor.gender}</span></div>
+                <div><span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">DOB</span><span className="font-medium text-slate-800 truncate">{visitor.dob}</span></div>
+                <div><span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Designation</span><span className="font-medium text-slate-800 truncate">{visitor.designation}</span></div>
+                <div><span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Organization</span><span className="font-medium text-slate-800 truncate">{visitor.organization}</span></div>
 
-                <div><span className="block text-[10px] font-bold text-slate-400 uppercase">Email</span><span className="font-medium text-slate-800 truncate">{visitor.email}</span></div>
-                <div><span className="block text-[10px] font-bold text-slate-400 uppercase">Phone</span><span className="font-medium text-slate-800">{visitor.phone}</span></div>
-                <div><span className="block text-[10px] font-bold text-slate-400 uppercase">ID Type</span><span className="font-medium text-slate-800">{visitor.id_type}</span></div>
-                <div><span className="block text-[10px] font-bold text-slate-400 uppercase">ID Number</span><span className="font-bold font-mono text-slate-900">{visitor.id_number}</span></div>
+                <div><span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Email</span><span className="font-medium text-slate-800 truncate">{visitor.email}</span></div>
+                <div><span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Phone</span><span className="font-medium text-slate-800 font-mono">{visitor.phone}</span></div>
+                <div><span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">ID Type</span><span className="font-medium text-slate-800">{visitor.id_type}</span></div>
+                <div><span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">ID Number</span><span className="font-bold font-mono text-slate-900 tracking-wider">{visitor.id_number}</span></div>
                 
-                {/* Full Width Address Row */}
-                <div className="col-span-2 md:col-span-4 border-t border-slate-200/50 pt-2 mt-1">
-                  <span className="block text-[10px] font-bold text-slate-400 uppercase">Address</span>
+                <div className="col-span-2 md:col-span-4 border-t border-slate-200/60 pt-3 mt-1">
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Address</span>
                   <span className="font-medium text-slate-800">{visitor.address}</span>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* Document Embed */}
-              <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-col">
-                <h3 className="text-xs font-black text-slate-800 uppercase mb-3 flex items-center"><FileText className="w-3 h-3 mr-1.5 text-blue-600"/> Submitted ID Proof</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center"><FileText className="w-3 h-3 mr-2 text-blue-600"/> Submitted ID Proof</h3>
                 {visitor.document_url ? (
-                  <div className="relative group bg-slate-100 rounded border border-slate-200 h-48 overflow-hidden">
-                    <img src={visitor.document_url} alt="ID" className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition" />
-                    <a href={visitor.document_url} target="_blank" rel="noreferrer" className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition text-white text-xs font-bold"><ExternalLink className="w-3 h-3 mr-1"/> View Full</a>
+                  <div className="relative group bg-slate-100 rounded-lg border border-slate-200 h-48 overflow-hidden">
+                    <img src={visitor.document_url} alt="ID" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                    <a href={visitor.document_url} target="_blank" rel="noreferrer" className="absolute inset-0 flex items-center justify-center bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold backdrop-blur-[2px]"><ExternalLink className="w-3 h-3 mr-1.5"/> View Document Fullscreen</a>
                   </div>
-                ) : <div className="h-48 bg-slate-50 border border-dashed border-slate-200 rounded flex items-center justify-center text-xs text-slate-400">No Document</div>}
+                ) : <div className="h-48 bg-slate-50 border border-dashed border-slate-200 rounded-lg flex items-center justify-center text-xs text-slate-400 font-medium">No Identity Document Attached</div>}
               </div>
 
-              {/* FIX: Escorts Redesigned with all requested details */}
-              <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-col">
-                <h3 className="text-xs font-black text-slate-800 uppercase mb-3 flex items-center justify-between">
-                  <span className="flex items-center"><Users className="w-3 h-3 mr-1.5 text-blue-600"/> Accompanying ({escorts.length})</span>
+              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center justify-between">
+                  <span className="flex items-center"><Users className="w-3 h-3 mr-2 text-blue-600"/> Escort Manifest</span>
+                  <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold text-[10px]">{escorts.length} Persons</span>
                 </h3>
                 <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
                   {escorts.length > 0 ? escorts.map((escort, i) => (
-                    <div key={i} className={`p-3 border rounded-lg text-xs flex flex-col cursor-pointer transition ${escort.verified ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-slate-50 border-slate-200'}`} onClick={() => handleEscortVerify(i)}>
+                    <div key={i} className={`p-3 border rounded-lg text-xs flex flex-col cursor-pointer transition-colors ${escort.verified ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-slate-50 border-slate-200 hover:border-blue-300'}`} onClick={() => handleEscortVerify(i)}>
                       <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-200/60">
                         <p className="font-bold text-slate-900 text-sm">{escort.name}</p>
-                        <div className={`w-4 h-4 rounded border flex justify-center items-center ${escort.verified ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 bg-white'}`}>{escort.verified && <CheckCircle size={10}/>}</div>
+                        <div className={`w-4 h-4 rounded border flex justify-center items-center transition-colors ${escort.verified ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 bg-white'}`}>{escort.verified && <CheckCircle size={10} strokeWidth={3}/>}</div>
                       </div>
                       <div className="grid grid-cols-2 gap-y-1.5 gap-x-2 text-[10px]">
-                        <div><span className="text-slate-400 font-bold uppercase">ID:</span> <span className="text-slate-700 font-mono font-medium">{escort.id_type} {escort.id_number}</span></div>
-                        <div><span className="text-slate-400 font-bold uppercase">Phone:</span> <span className="text-slate-700 font-medium">{escort.phone || 'N/A'}</span></div>
-                        <div><span className="text-slate-400 font-bold uppercase">Gender:</span> <span className="text-slate-700 font-medium">{escort.gender || 'N/A'}</span></div>
-                        <div><span className="text-slate-400 font-bold uppercase">DOB:</span> <span className="text-slate-700 font-medium">{escort.dob || 'N/A'}</span></div>
-                        <div className="col-span-2"><span className="text-slate-400 font-bold uppercase">Nationality:</span> <span className="text-slate-700 font-medium">{escort.nationality || 'N/A'}</span></div>
+                        <div><span className="text-slate-400 font-bold uppercase tracking-wider">ID:</span> <span className="text-slate-700 font-mono font-medium">{escort.id_type} {escort.id_number}</span></div>
+                        <div><span className="text-slate-400 font-bold uppercase tracking-wider">Phone:</span> <span className="text-slate-700 font-mono font-medium">{escort.phone || 'N/A'}</span></div>
+                        <div><span className="text-slate-400 font-bold uppercase tracking-wider">Gender:</span> <span className="text-slate-700 font-medium">{escort.gender || 'N/A'}</span></div>
+                        <div><span className="text-slate-400 font-bold uppercase tracking-wider">DOB:</span> <span className="text-slate-700 font-medium">{escort.dob || 'N/A'}</span></div>
+                        <div className="col-span-2 pt-0.5"><span className="text-slate-400 font-bold uppercase tracking-wider">Nationality:</span> <span className="text-slate-700 font-medium">{escort.nationality || 'N/A'}</span></div>
                       </div>
                     </div>
-                  )) : <div className="h-full flex items-center justify-center text-xs text-slate-400 mt-12">No escorts required.</div>}
+                  )) : <div className="h-full flex items-center justify-center text-xs text-slate-400 font-medium mt-12 bg-slate-50 rounded-lg border border-dashed border-slate-200">No accompanying personnel.</div>}
                 </div>
               </div>
             </div>
 
-            {/* Photo Kiosk */}
-            <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
-              <h3 className="text-xs font-black text-slate-800 uppercase mb-3 flex items-center"><Camera className="w-3 h-3 mr-1.5 text-blue-600"/> Security Photo</h3>
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center"><Camera className="w-3 h-3 mr-2 text-blue-600"/> Security Photo Kiosk</h3>
               {!photoUrl ? (
                 <div>
                   {!showCamera ? (
                     <div className="flex gap-3">
-                      <button onClick={startCamera} className="px-4 py-2 bg-slate-900 text-white font-bold text-xs rounded hover:bg-slate-800"><Camera className="inline w-3 h-3 mr-1"/> Start Camera</button>
-                      <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-bold text-xs rounded hover:bg-slate-50"><Upload className="inline w-3 h-3 mr-1"/> Upload</button>
+                      <button onClick={startCamera} className="px-5 py-2.5 bg-slate-900 text-white font-bold text-xs rounded-lg hover:bg-slate-800 transition-colors flex items-center shadow-sm"><Camera className="w-3 h-3 mr-1.5"/> Start Camera</button>
+                      <button onClick={() => fileInputRef.current?.click()} className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold text-xs rounded-lg hover:bg-slate-50 transition-colors flex items-center"><Upload className="w-3 h-3 mr-1.5"/> Fallback Upload</button>
                       <input ref={fileInputRef} type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if(f) { const r = new FileReader(); r.onload = (ev) => { setPhotoUrl(ev.target?.result as string); setPhotoFile(f); toggleStep('photo'); }; r.readAsDataURL(f); } }} className="hidden" />
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <video ref={cameraRef} autoPlay playsInline className="w-full h-48 object-cover bg-black rounded" />
-                      <div className="flex gap-2">
-                        <button onClick={capturePhoto} className="flex-1 py-2 bg-emerald-600 text-white font-bold text-xs rounded">Capture</button>
-                        <button onClick={() => setShowCamera(false)} className="flex-1 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded">Cancel</button>
+                      <video ref={cameraRef} autoPlay playsInline className="w-full h-48 object-cover bg-slate-900 rounded-lg shadow-inner" />
+                      <div className="flex gap-3">
+                        <button onClick={capturePhoto} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold text-xs rounded-lg hover:bg-emerald-700 shadow-sm transition-colors">Capture Image</button>
+                        <button onClick={() => setShowCamera(false)} className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-bold text-xs rounded-lg hover:bg-slate-200 transition-colors">Cancel</button>
                       </div>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="flex gap-3 items-center">
-                  <img src={photoUrl} className="w-20 h-20 object-cover rounded-full border-2 border-slate-200" alt="Captured"/>
-                  <div className="flex gap-2">
-                    <button onClick={uploadPhoto} disabled={uploading} className="px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded shadow-sm">{uploading ? 'Saving...' : 'Lock Photo'}</button>
-                    <button onClick={() => setPhotoUrl(null)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold text-xs rounded border border-slate-200">Retake</button>
+                <div className="flex gap-5 items-center bg-slate-50 p-4 rounded-lg border border-slate-100">
+                  <img src={photoUrl} className="w-20 h-20 object-cover rounded-full border-4 border-white shadow-md" alt="Captured"/>
+                  <div className="flex gap-3">
+                    <button onClick={uploadPhoto} disabled={uploading} className="px-5 py-2.5 bg-blue-600 text-white font-bold text-xs rounded-lg shadow-sm hover:bg-blue-700 transition-colors">{uploading ? 'Encrypting...' : 'Lock & Save Photo'}</button>
+                    <button onClick={() => setPhotoUrl(null)} className="px-5 py-2.5 bg-white text-slate-700 font-bold text-xs rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">Retake</button>
                   </div>
                 </div>
               )}
@@ -269,33 +289,71 @@ export default function VisitorVerification() {
           </div>
 
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm sticky top-6">
-              <h3 className="text-sm font-black text-slate-800 uppercase border-b border-slate-100 pb-2 mb-4">Clearance Checklist</h3>
+            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm sticky top-6">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-3 mb-5">Validation Matrix</h3>
               
-              <select value={deskNumber} onChange={(e) => setDeskNumber(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-200 rounded text-xs font-bold text-slate-700 bg-slate-50 mb-5 outline-none">
-                <option value={1}>Desk 1 - Main Gate</option>
-                <option value={2}>Desk 2 - East Wing</option>
-                <option value={3}>Desk 3 - Service Gate</option>
-              </select>
+              <div className="mb-6">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Gate Authority Assignment</label>
+                <select value={deskNumber} onChange={(e) => setDeskNumber(Number(e.target.value))} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 bg-slate-50 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-shadow">
+                  <option value={1}>Desk 1 - Main Gate</option>
+                  <option value={2}>Desk 2 - East Wing</option>
+                  <option value={3}>Desk 3 - Service Gate</option>
+                </select>
+              </div>
 
-              <div className="space-y-2 mb-6">
+              <div className="space-y-2 mb-8">
                 {steps.map(step => (
-                  <div key={step.id} onClick={() => step.id !== 'escorts' && toggleStep(step.id)} className={`flex items-center gap-3 p-2.5 rounded border cursor-pointer ${step.completed ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
-                    <div className={`w-4 h-4 rounded-sm flex items-center justify-center ${step.completed ? 'bg-emerald-500 text-white' : 'border border-slate-300'}`}>{step.completed && <CheckCircle size={12} strokeWidth={3}/>}</div>
-                    <p className={`text-xs font-bold ${step.completed ? 'text-emerald-900' : 'text-slate-700'}`}>{step.title} {step.required && <span className="text-rose-500">*</span>}</p>
+                  <div key={step.id} onClick={() => step.id !== 'escorts' && toggleStep(step.id)} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${step.completed ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-200 hover:border-blue-300'}`}>
+                    <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 transition-colors ${step.completed ? 'bg-emerald-500 text-white border-emerald-500' : 'border-2 border-slate-300 bg-white'}`}>{step.completed && <CheckCircle size={14} strokeWidth={3}/>}</div>
+                    <p className={`text-sm font-bold ${step.completed ? 'text-emerald-900' : 'text-slate-700'}`}>{step.title} {step.required && <span className="text-red-500 ml-0.5">*</span>}</p>
                   </div>
                 ))}
               </div>
 
-              <button onClick={completeCheckin} disabled={!allDone || uploading} className={`w-full py-3 rounded font-black text-xs uppercase tracking-wider ${allDone ? 'bg-slate-900 text-white hover:bg-slate-800 shadow-md' : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'}`}>
-                {uploading ? 'Processing...' : 'Authorize Entry'}
-              </button>
-              {!allDone && <p className="text-[10px] font-bold text-amber-500 mt-3 text-center uppercase"><ShieldAlert className="inline w-3 h-3 mr-1"/> Pending Validations</p>}
+              <div className="flex flex-col gap-3">
+                <button onClick={completeCheckin} disabled={!allDone || uploading} className={`w-full py-3.5 rounded-lg font-black text-xs tracking-widest shadow-sm transition-all ${allDone ? 'bg-slate-900 text-white hover:bg-slate-800 hover:shadow-md' : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'}`}>
+                  {uploading ? 'Processing Secure Entry...' : 'Authorize Facility Access'}
+                </button>
+                <button onClick={() => setDenyModal(true)} disabled={uploading} className="w-full py-3.5 rounded-lg font-black text-xs tracking-widest bg-red-40 text-red-600 border border-red-200 hover:bg-red-100 transition-colors">
+                  Deny Entry
+                </button>
+              </div>
+              {!allDone && <p className="text-[10px] font-bold text-amber-600 mt-4 text-center uppercase tracking-wider flex items-center justify-center"><ShieldAlert className="w-3 h-3 mr-1.5"/> Awaiting Mandatory Validations</p>}
             </div>
           </div>
         </div>
+        
+        {/* Security Deny Modal */}
+        {denyModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-red-100 transform scale-100 transition-all">
+              <div className="p-5 bg-red-50 border-b border-red-100 flex justify-between items-center">
+                <h3 className="font-black text-red-800 flex items-center"><AlertOctagon className="w-5 h-5 mr-2"/> Deny Access</h3>
+                <button onClick={() => setDenyModal(false)} className="text-red-400 hover:text-red-700 transition-colors"><X size={20}/></button>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm font-medium text-slate-600">This will reject the visitor at the gate. The reason will be immediately sent to HR for review.</p>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Reason for Denial (Required)</label>
+                  <textarea autoFocus value={denyReason} onChange={e => setDenyReason(e.target.value)} rows={3} placeholder="e.g. Identity mismatch, aggressive behavior, unverified escort..." className="w-full border-2 border-red-100 rounded-xl p-3 text-sm focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400 bg-red-50/30 resize-none transition-shadow"/>
+                </div>
+                <div className="flex gap-3 pt-3">
+                  <button onClick={() => setDenyModal(false)} className="flex-1 py-3 font-bold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors text-sm">Cancel</button>
+                  <button onClick={handleDenyEntry} disabled={!denyReason || uploading} className="flex-1 py-3 font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 shadow-sm disabled:opacity-50 transition-colors text-sm">
+                    {uploading ? 'Processing...' : 'Confirm Denial'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <canvas ref={canvasRef} width={640} height={480} className="hidden" />
       </div>
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes fade-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .animate-fade-in { animation: fade-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      `}} />
     </DashboardLayout>
   );
 }

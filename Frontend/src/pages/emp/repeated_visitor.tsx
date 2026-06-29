@@ -1,4 +1,4 @@
-// pages/hr/repeated_visitors.tsx
+// pages/emp/repeated_visitor.tsx
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { History, RefreshCw, X, Shield, Calendar, UserCheck, Search, Building } from 'lucide-react';
@@ -42,7 +42,7 @@ interface VisitorProfile {
   history: VisitHistory[];
 }
 
-export default function HRRepeatedVisitorLogPage() {
+export default function EmployeeRepeatedVisitorLogPage() {
   const navigate = useNavigate();
   const [directory, setDirectory] = useState<VisitorProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,15 +56,15 @@ export default function HRRepeatedVisitorLogPage() {
     try {
       setLoading(true);
       
-      // EXPLICIT SECURITY FIX: Attached .eq() filter targeting only this employee's created sessions
+      // EMP FIX: Added .eq() filter back so employees ONLY see their own visitors
       const { data, error } = await supabase
         .from('visits')
         .select(`
-          visit_id, start_date, purpose, status, department, created_by_employee_id,
-          visitors (visitor_id, name, phone, email, nationality, organization, designation, dob, document_url, address, id_type, id_number),
-          host:employees!visits_host_employee_id_fkey (name)
+          visit_id, start_date, purpose, status, department,
+          visitors(visitor_id, name, phone, email, nationality, organization, designation, dob, document_url, address, id_type, id_number),
+          host:employees!visits_host_employee_id_fkey(name)
         `)
-        .eq('created_by_employee_id', currentUser.empId) // <-- Filters out records from all other endpoints
+        .eq('host_employee_id', currentUser.empId)
         .order('start_date', { ascending: false });
 
       if (error) throw error;
@@ -134,15 +134,8 @@ export default function HRRepeatedVisitorLogPage() {
   const handleReRegister = (profile: VisitorProfile) => {
     setIsDrawerOpen(false);
 
-    let targetPath = '/hr/add_visitor_general';
-    if (profile.nationality && profile.nationality.toLowerCase() !== 'indian') {
-      targetPath = '/hr/add_visitor_foreign';
-    } else if (profile.organization && (profile.organization.toLowerCase().includes('govt') || profile.organization.toLowerCase().includes('defence'))) {
-      targetPath = '/hr/add_visitor_govt';
-    }
-
     const cleanAutofill = {
-      id: profile.id, 
+      visitorId: profile.id, // properly mapped to prevent duplicates
       visitorName: profile.name,
       phone: profile.phone,
       email: profile.email,
@@ -159,7 +152,7 @@ export default function HRRepeatedVisitorLogPage() {
       escorts: []
     };
 
-    navigate(targetPath, { state: { autofill: cleanAutofill } });
+    navigate('/emp/add_visitor', { state: { autofill: cleanAutofill } });
   };
 
   const processedFilteredQueue = useMemo(() => {
@@ -231,10 +224,10 @@ export default function HRRepeatedVisitorLogPage() {
             <RefreshCw className="w-3 h-3 mr-1.5" /> Re-Register
           </button>
           <button 
-            onClick={() => navigate(`/hr/visitor/${row.id}`, { state: { profile: row } })} 
+            onClick={() => { setSelectedProfile(row); setIsDrawerOpen(true); }}
             className="px-3 py-1.5 bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-indigo-100 transition-all border border-indigo-200"
           >
-            Full Profile
+            View Profile
           </button>
         </div>
       )
@@ -243,11 +236,11 @@ export default function HRRepeatedVisitorLogPage() {
 
   if (loading) {
     return (
-      <DashboardLayout role="hr" userName={currentUser.name}>
+      <DashboardLayout role="emp" userName={currentUser.name}>
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-pulse flex flex-col items-center">
             <div className="h-8 w-8 bg-indigo-600 rounded-full mb-4"></div>
-            <p className="text-slate-500 text-xs font-bold tracking-wide uppercase">Compiling My Registered Contacts Directory...</p>
+            <p className="text-slate-500 text-xs font-bold tracking-wide uppercase">Compiling My Registered Contacts...</p>
           </div>
         </div>
       </DashboardLayout>
@@ -255,13 +248,13 @@ export default function HRRepeatedVisitorLogPage() {
   }
 
   return (
-    <DashboardLayout role="hr" userName={currentUser.name}>
+    <DashboardLayout role="emp" userName={currentUser.name}>
       <div className="max-w-7xl mx-auto space-y-6 pb-12">
         
         <div className="flex items-center space-x-3">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Personal Visitor Directory</h1>
-            <p className="text-sm text-slate-500">History ledger tracking identities logged .</p>
+            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">My Visitor Directory</h1>
+            <p className="text-sm text-slate-500">History ledger tracking identities you have previously hosted.</p>
           </div>
         </div>
 

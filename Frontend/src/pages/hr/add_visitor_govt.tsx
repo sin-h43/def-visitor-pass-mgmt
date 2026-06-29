@@ -253,7 +253,7 @@ export default function AddVisitorGovtPage() {
         host_employee_id: hostId || 'EMP001',
         created_by_employee_id: 'EMP001',
         visit_type: 'Govt',
-        pass_type: 'ONE_DAY',
+        pass_type: 'One_day',
         purpose: finalPurpose,
         start_date: startDate,
         end_date: startDate,

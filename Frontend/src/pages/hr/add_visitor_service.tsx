@@ -239,7 +239,7 @@ export default function AddVisitorServicePage() {
         host_employee_id: hostId || 'EMP001',
         created_by_employee_id: 'EMP001',
         visit_type: 'SERVICE',
-        pass_type: 'ONE_DAY',
+        pass_type: 'One_Day',
         purpose: finalPurpose,
         start_date: startDate,
         end_date: startDate,

@@ -7,7 +7,13 @@ import DataTable from '../../components/common/DataTable';
 import type { TableColumn } from '../../types/visitor';
 import { supabase } from '../../lib/supabase';
 
-// --- DATA MODELS ---
+// Static Auth Context Session Anchor
+const currentUser = {
+  empId: 'EMP001',
+  name: 'Sinchana K',
+  dept: 'Cyber Security Unit'
+};
+
 interface VisitHistory {
   visitId: string;
   date: string;
@@ -23,7 +29,6 @@ interface VisitorProfile {
   name: string;
   phone: string;
   email: string;
-  gender:string;
   nationality: string;
   organization: string;
   idType: string;
@@ -47,15 +52,16 @@ export default function HRRepeatedVisitorLogPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<VisitorProfile | null>(null);
 
-  // --- SUPABASE FETCH & DATA GROUPING ---
   const fetchVisitorDirectory = async () => {
     try {
       setLoading(true);
-      // Fetch all visits and their associated visitor records
+      
+      // FIX APPLIED: Removed the .eq('created_by_employee_id', currentUser.empId) 
+      // constraint so HR can see the global visitor directory.
       const { data, error } = await supabase
         .from('visits')
         .select(`
-          visit_id, start_date, purpose, status, department,
+          visit_id, start_date, purpose, status, department, host_employee_id,
           visitors (visitor_id, name, phone, email, nationality, organization, designation, dob, document_url, address, id_type, id_number),
           host:employees!visits_host_employee_id_fkey (name)
         `)
@@ -64,7 +70,6 @@ export default function HRRepeatedVisitorLogPage() {
       if (error) throw error;
       
       if (data) {
-        // Group visits by visitor_id
         const profileMap = new Map<string, VisitorProfile>();
 
         data.forEach((row: any) => {
@@ -86,7 +91,6 @@ export default function HRRepeatedVisitorLogPage() {
             profile.history.push(visitRecord);
             profile.totalVisits += 1;
             
-            // Update last visit date if this record is newer
             const rowTime = new Date(row.start_date).getTime();
             if (rowTime > profile.rawLastVisit) {
               profile.lastVisitDate = visitRecord.date;
@@ -98,7 +102,6 @@ export default function HRRepeatedVisitorLogPage() {
               name: v.name || 'Unknown',
               phone: v.phone || 'N/A',
               email: v.email || 'N/A',
-              gender: v.gender || 'Others',
               nationality: v.nationality || 'Indian',
               organization: v.organization || 'N/A',
               idType: v.id_type || 'Govt ID',
@@ -114,7 +117,6 @@ export default function HRRepeatedVisitorLogPage() {
           }
         });
 
-        // Convert map to array and sort by most recent visit
         const sortedDirectory = Array.from(profileMap.values()).sort((a, b) => b.rawLastVisit - a.rawLastVisit);
         setDirectory(sortedDirectory);
       }
@@ -129,19 +131,13 @@ export default function HRRepeatedVisitorLogPage() {
     fetchVisitorDirectory();
   }, []);
 
-  // --- RE-REGISTER LOGIC (STRIPPING OLD DATA) ---
   const handleReRegister = (profile: VisitorProfile) => {
     setIsDrawerOpen(false);
 
-    // Smartly guess the category based on their nationality/org
-    let category = 'general';
-    if (profile.nationality && profile.nationality.toLowerCase() !== 'indian') category = 'foreign';
-    else if (profile.organization && (profile.organization.toLowerCase().includes('govt') || profile.organization.toLowerCase().includes('defence'))) category = 'govt';
-
     const cleanAutofill = {
-      id: profile.id, 
+      // FIX APPLIED: Changed 'id' to 'visitorId' to prevent collision with visit_id
+      visitorId: profile.id, 
       visitorName: profile.name,
-      gender:profile.gender,  
       phone: profile.phone,
       email: profile.email,
       dob: profile.dob,
@@ -151,30 +147,25 @@ export default function HRRepeatedVisitorLogPage() {
       organization: profile.organization,
       address: profile.address,
       documentUrl: profile.docUrl,
-      category: category,
       pipeline: 'Repeated',
-      
-      // EXPLICITLY STRIPPED FIELDS FOR NEW VISIT:
+      // Cleared for fresh visit entry:
       purpose: '',
       department: '',
       escorts: []
     };
 
-    navigate(`/hr/add_visitor?category=${category}`, { state: { autofill: cleanAutofill } });
+    navigate('/emp/add_visitor', { state: { autofill: cleanAutofill } });
   };
 
   const processedFilteredQueue = useMemo(() => {
     return directory.filter(row => {
       const matchesSearch = row.name.toLowerCase().includes(searchTerm.toLowerCase()) || row.phone.includes(searchTerm);
-      
       let matchesTab = true;
       if (activeTab === 'Frequent (2+ Visits)') matchesTab = row.totalVisits > 1;
-
       return matchesSearch && matchesTab;
     });
   }, [directory, searchTerm, activeTab]);
 
-  // --- STANDARD PROFESSIONAL COLUMNS ---
   const columns: TableColumn<VisitorProfile>[] = [
     {
       key: 'name',
@@ -215,7 +206,7 @@ export default function HRRepeatedVisitorLogPage() {
     {
       key: 'lastVisitDate',
       label: 'LATEST ENTRY',
-      render: (row) => <span className="text-slate-600 font-medium text-xs">{row.lastVisitDate}</span>
+      render: (row) => <span className="text-slate-600 font-medium text-xs font-mono">{row.lastVisitDate}</span>
     },
     {
       key: 'actions',
@@ -223,10 +214,7 @@ export default function HRRepeatedVisitorLogPage() {
       render: (row) => (
         <div className="flex items-center space-x-2">
           <button 
-            onClick={() => {
-              setSelectedProfile(row);
-              setIsDrawerOpen(true);
-            }}
+            onClick={() => { setSelectedProfile(row); setIsDrawerOpen(true); }}
             className="px-3 py-1.5 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-slate-800 transition-all shadow-sm flex items-center"
           >
             <History className="w-3 h-3 mr-1.5" /> History
@@ -238,11 +226,10 @@ export default function HRRepeatedVisitorLogPage() {
             <RefreshCw className="w-3 h-3 mr-1.5" /> Re-Register
           </button>
           <button 
-            // --- NEW: Navigates to the massive profile page we just built! ---
-            onClick={() => navigate(`/hr/visitor/${row.id}`, { state: { profile: row } })} 
+            onClick={() => { setSelectedProfile(row); setIsDrawerOpen(true); }}
             className="px-3 py-1.5 bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-indigo-100 transition-all border border-indigo-200"
           >
-            Full Profile
+            View Profile
           </button>
         </div>
       )
@@ -251,11 +238,11 @@ export default function HRRepeatedVisitorLogPage() {
 
   if (loading) {
     return (
-      <DashboardLayout role="hr" userName="Sinchana K">
+      <DashboardLayout role="hr" userName={currentUser.name}>
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-pulse flex flex-col items-center">
             <div className="h-8 w-8 bg-indigo-600 rounded-full mb-4"></div>
-            <p className="text-slate-500 font-medium tracking-wide">Compiling Visitor Master Directory...</p>
+            <p className="text-slate-500 text-xs font-bold tracking-wide uppercase">Compiling Directory...</p>
           </div>
         </div>
       </DashboardLayout>
@@ -263,29 +250,25 @@ export default function HRRepeatedVisitorLogPage() {
   }
 
   return (
-    <DashboardLayout role="hr" userName="Sinchana K">
+    <DashboardLayout role="hr" userName={currentUser.name}>
       <div className="max-w-7xl mx-auto space-y-6 pb-12">
         
-        {/* Professional Identity Header */}
         <div className="flex items-center space-x-3">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">Master Visitor Directory</h1>
-            <p className="text-sm text-slate-500">Searchable ledger of all identities that have accessed the facility.</p>
+            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Organization Visitor Directory</h1>
+            <p className="text-sm text-slate-500">History ledger tracking identities logged .</p>
           </div>
         </div>
 
-
-        {/* Main Dashboard Panel Workspace */}
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
-          
           <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100 flex items-center">
-            <Search className="w-5 h-5 text-slate-400 mr-3 ml-2" />
+            <Search className="w-4 h-4 text-slate-400 mr-3 ml-2" />
             <input 
               type="text"
-              placeholder="Search directory by visitor name or phone number..."
+              placeholder="Search directory records..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 bg-transparent border-none outline-none text-sm font-medium text-slate-700 placeholder-slate-400"
+              className="flex-1 bg-transparent border-none outline-none text-xs font-semibold text-slate-700 placeholder-slate-400"
             />
           </div>
 
@@ -301,124 +284,92 @@ export default function HRRepeatedVisitorLogPage() {
             ))}
           </div>
 
-          <div className="overflow-x-auto">
-            <DataTable title="" data={processedFilteredQueue} columns={columns} />
-          </div>
+          <DataTable data={processedFilteredQueue} columns={columns} />
         </div>
 
-        {/* VISITOR HISTORY SLIDE-OUT DRAWER */}
+        {/* VISITOR HISTORY DRAWER */}
         {isDrawerOpen && selectedProfile && (
           <div className="fixed inset-0 z-50 overflow-hidden">
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setIsDrawerOpen(false)} />
-            
             <div className="absolute inset-y-0 right-0 max-w-md w-full bg-white shadow-2xl flex flex-col animate-slide-in-right">
-              
               <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-800">Identity Ledger</h2>
-                  <p className="text-sm text-slate-500 font-mono mt-0.5">{selectedProfile.id}</p>
+                  <h2 className="text-base font-bold text-slate-800">Identity Clearance Ledger</h2>
+                  <p className="text-xs text-slate-400 font-mono mt-0.5">{selectedProfile.id}</p>
                 </div>
                 <button onClick={() => setIsDrawerOpen(false)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/50">
-                
-                {/* 1. Master Identity Profile */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
                 <section>
-                  <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                    <Shield className="w-4 h-4 mr-2 text-indigo-600" /> Authenticated Profile
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200 pb-1.5 mb-3 flex items-center">
+                    <Shield className="w-3.5 h-3.5 mr-1.5 text-indigo-600" /> Authorized Profile
                   </h3>
                   <div className="bg-white p-4 border border-slate-200 rounded-xl shadow-sm">
-                    <div className="flex items-center space-x-4 mb-5 border-b border-slate-100 pb-4">
-                      <div className="w-12 h-12 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black text-lg">
+                    <div className="flex items-center space-x-3 mb-4 border-b border-slate-100 pb-3">
+                      <div className="w-10 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-black text-sm">
                         {selectedProfile.name.substring(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <h3 className="font-bold text-slate-900 text-lg">{selectedProfile.name}</h3>
-                        <p className="text-xs font-semibold text-slate-500">{selectedProfile.organization}</p>
+                        <h4 className="font-bold text-slate-900 text-sm leading-tight">{selectedProfile.name}</h4>
+                        <p className="text-[11px] font-medium text-slate-400 mt-0.5">{selectedProfile.organization}</p>
                       </div>
                     </div>
-
-                    <div className="space-y-3 text-sm">
-                      <div className="grid grid-cols-3 gap-2"><span className="text-slate-400 font-medium">Phone</span><span className="col-span-2 font-semibold text-slate-800 font-mono">{selectedProfile.phone}</span></div>
-                      <div className="grid grid-cols-3 gap-2"><span className="text-slate-400 font-medium">Email</span><span className="col-span-2 font-semibold text-slate-800 break-all">{selectedProfile.email}</span></div>
-                      <div className="grid grid-cols-3 gap-2"><span className="text-slate-400 font-medium">Nationality</span><span className="col-span-2 font-semibold text-slate-800">{selectedProfile.nationality}</span></div>
-                      <div className="grid grid-cols-3 gap-2"><span className="text-slate-400 font-medium">{selectedProfile.idType}</span><span className="col-span-2 font-semibold text-slate-800 font-mono">{selectedProfile.idNumber}</span></div>
+                    <div className="space-y-2.5 text-xs">
+                      <div className="flex justify-between"><span className="text-slate-400 font-medium">Phone</span><span className="font-bold text-slate-800 font-mono">{selectedProfile.phone}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-400 font-medium">Email</span><span className="font-bold text-slate-800 font-mono break-all">{selectedProfile.email}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-400 font-medium">Nationality</span><span className="font-bold text-slate-800">{selectedProfile.nationality}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-400 font-medium">{selectedProfile.idType}</span><span className="font-bold text-slate-800 font-mono tracking-wide">{selectedProfile.idNumber}</span></div>
                     </div>
                   </div>
                 </section>
 
-                {/* 2. Historical Visits Log */}
                 <section>
-                  <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center justify-between">
-                    <span className="flex items-center"><Calendar className="w-4 h-4 mr-2 text-indigo-600" /> Timeline of Visits</span>
-                    <span className="text-[10px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-bold">{selectedProfile.totalVisits} Recorded</span>
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-200 pb-1.5 mb-3 flex items-center justify-between">
+                    <span className="flex items-center"><Calendar className="w-3.5 h-3.5 mr-1.5 text-indigo-600" /> My Logged Timeline</span>
+                    <span className="text-[9px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded font-bold uppercase tracking-wider">{selectedProfile.totalVisits} Session Passes</span>
                   </h3>
-                  
                   <div className="space-y-3">
-                    {/* Reverse array to show newest first */}
                     {[...selectedProfile.history].reverse().map((visit, idx) => (
-                      <div key={idx} className="bg-white p-4 border border-slate-200 rounded-xl shadow-sm relative overflow-hidden group">
-                        
-                        {/* Status color strip on the left */}
+                      <div key={idx} className="bg-white p-4 border border-slate-200 rounded-xl shadow-sm relative overflow-hidden">
                         <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                          visit.status === 'Approved' || visit.status === 'Cleared' ? 'bg-emerald-400' :
-                          visit.status === 'Pending' ? 'bg-amber-400' : 'bg-rose-400'
+                          visit.status === 'Approved' || visit.status === 'Cleared' ? 'bg-emerald-500' :
+                          visit.status === 'Pending' ? 'bg-amber-400' : 'bg-rose-500'
                         }`} />
-
-                        <div className="flex justify-between items-start mb-2 pl-2">
-                          <span className="text-xs font-bold text-slate-800">{visit.date}</span>
-                          <span className="text-[10px] font-mono text-slate-400">{visit.visitId}</span>
+                        <div className="flex justify-between items-center mb-2 pl-1">
+                          <span className="text-xs font-bold text-slate-800 font-mono">{visit.date}</span>
+                          <span className="text-[10px] font-mono font-bold text-slate-400">{visit.visitId}</span>
                         </div>
-                        
-                        <div className="pl-2 space-y-1">
-                          <div className="flex items-center text-xs">
-                            <Building className="w-3 h-3 mr-1.5 text-slate-400" />
-                            <span className="text-slate-600 font-medium">{visit.department}</span>
-                          </div>
-                          <div className="flex items-center text-xs">
-                            <UserCheck className="w-3 h-3 mr-1.5 text-slate-400" />
-                            <span className="text-slate-600">Hosted by <span className="font-semibold text-slate-800">{visit.hostName}</span></span>
-                          </div>
+                        <div className="pl-1 space-y-1 text-xs">
+                          <div className="flex items-center text-slate-600 font-medium"><Building className="w-3 h-3 mr-1.5 text-slate-400" />{visit.department}</div>
+                          <div className="flex items-center text-slate-600 font-medium"><UserCheck className="w-3 h-3 mr-1.5 text-slate-400" />Hosted by <span className="font-bold text-slate-800 ml-1">{visit.hostName}</span></div>
                         </div>
-
-                        <div className="mt-3 pt-3 border-t border-slate-100 pl-2">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Stated Purpose</span>
+                        <div className="mt-2.5 pt-2.5 border-t border-slate-100 pl-1">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Objective Brief</span>
                           <p className="text-xs text-slate-700 font-medium italic">"{visit.purpose}"</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 </section>
-
               </div>
 
-              {/* ACTION FOOTER */}
               <div className="px-6 py-4 border-t border-slate-100 bg-white flex justify-between items-center shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-                <span className="text-xs font-medium text-slate-500">
-                  Last active: {selectedProfile.lastVisitDate}
-                </span>
-
+                <span className="text-[11px] font-semibold font-mono text-slate-400">Latest: {selectedProfile.lastVisitDate}</span>
                 <button 
                   onClick={() => handleReRegister(selectedProfile)}
-                  className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm rounded-lg flex items-center gap-2 transition-colors shadow-[0_4px_14px_0_rgba(0,0,0,0.1)]"
+                  className="px-5 py-2 bg-slate-950 hover:bg-slate-900 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-sm"
                 >
-                  <RefreshCw className="w-4 h-4" /> Re-Register Visitor
+                  <RefreshCw className="w-3.5 h-3.5" /> Re-Register Profile
                 </button>
               </div>
-
             </div>
           </div>
         )}
 
       </div>
-
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes slide-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
-        .animate-slide-in-right { animation: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-      `}} />
     </DashboardLayout>
   );
 }

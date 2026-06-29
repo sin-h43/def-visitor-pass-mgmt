@@ -224,7 +224,9 @@ export default function AddVisitorForeignPage() {
           nationality: nationality,
           organization: organization || 'Global Delegation',
           designation: designation || 'International Delegate',
-          department: department
+          department: department,
+          visit_type: 'foreign',
+          pass_type: 'One_day',
         });
 
         if (visitorError) throw visitorError;
@@ -246,7 +248,7 @@ export default function AddVisitorForeignPage() {
         host_employee_id: hostId || 'EMP001',
         created_by_employee_id: 'EMP001',
         visit_type: 'Foreign',
-        pass_type: 'ONE_DAY',
+        pass_type: 'One_day',
         purpose: finalPurpose,
         start_date: startDate,
         end_date: startDate,

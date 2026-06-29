@@ -1,3 +1,4 @@
+// components/common/RegistrationForm.tsx
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { UploadCloud, Users, AlertCircle, CheckCircle2, Search, X } from 'lucide-react';
@@ -59,8 +60,9 @@ export default function RegistrationForm() {
   const [scheduledDate, setScheduledDate] = useState('');
   const [department, setDepartment] = useState(prefillData?.department || 'Research Wing');
 
-  // Visitor Core Identity Attributes
-  const [visitorId, setVisitorId] = useState<string | null>(null); 
+  // FIX APPLIED: Link the existing visitorId if passed from Repeated Visitor page
+  const [visitorId, setVisitorId] = useState<string | null>(prefillData?.visitorId || null); 
+  
   const [visitorName, setVisitorName] = useState(prefillData?.visitorName || '');
   const [gender, setGender] = useState(prefillData?.gender && prefillData.gender !== 'Others' ? prefillData.gender : 'Others');
   const [dob, setDob] = useState(prefillData?.dob !== 'N/A' ? (prefillData?.dob || '') : '');
@@ -105,17 +107,17 @@ export default function RegistrationForm() {
 
   // Accompanying Contingent State
   const [headCount, setHeadCount] = useState<number>(prefillData?.escorts?.length || 0);
-const [escorts, setEscorts] = useState<EscortPersonnel[]>(
-  prefillData?.escorts?.map((e: any) => ({ 
-    name: e.name || '', 
-    idType: e.idType || e.id_type || 'PAN',
-    govId: e.govId || e.id_number || e.gov_id || '',  
-    email: e.email || '', 
-    nationality: e.nationality || 'Indian', 
-    phone: e.phone || '', 
-    gender: e.gender || 'Others' 
-  })) || []
-);
+  const [escorts, setEscorts] = useState<EscortPersonnel[]>(
+    prefillData?.escorts?.map((e: any) => ({ 
+      name: e.name || '', 
+      idType: e.idType || e.id_type || 'PAN',
+      govId: e.govId || e.id_number || e.gov_id || '',  
+      email: e.email || '', 
+      nationality: e.nationality || 'Indian', 
+      phone: e.phone || '', 
+      gender: e.gender || 'Others' 
+    })) || []
+  );
 
   // File Asset Tokens
   const [file, setFile] = useState<File | null>(null);
@@ -184,29 +186,28 @@ const [escorts, setEscorts] = useState<EscortPersonnel[]>(
     setPipeline('New Visitor / Urgent Access');
   };
 
-useEffect(() => {
-  const count = Math.max(0, Math.min(headCount, 10));
-  setEscorts(prev => {
-    const newEscorts = [...prev];
-    if (count > prev.length) {
-      for (let i = prev.length; i < count; i++) {
-        // Enforce safe default initialization fields per escort block
-        newEscorts.push({ 
-          name: '', 
-          idType: 'PAN', 
-          govId: '', 
-          email: '', 
-          phone: '', 
-          nationality: 'Indian', 
-          gender: 'Others' 
-        });
+  useEffect(() => {
+    const count = Math.max(0, Math.min(headCount, 10));
+    setEscorts(prev => {
+      const newEscorts = [...prev];
+      if (count > prev.length) {
+        for (let i = prev.length; i < count; i++) {
+          newEscorts.push({ 
+            name: '', 
+            idType: 'PAN', 
+            govId: '', 
+            email: '', 
+            phone: '', 
+            nationality: 'Indian', 
+            gender: 'Others' 
+          });
+        }
+      } else {
+        newEscorts.length = count;
       }
-    } else {
-      newEscorts.length = count;
-    }
-    return newEscorts;
-  });
-}, [headCount]);
+      return newEscorts;
+    });
+  }, [headCount]);
 
   const handleEscortChange = (index: number, field: keyof EscortPersonnel, value: string) => {
     const updatedEscorts = [...escorts];
@@ -226,7 +227,7 @@ useEffect(() => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -261,22 +262,26 @@ useEffect(() => {
         const guestList = escorts.map(esc => `${esc.name} (${esc.idType}: ${esc.govId})`).join(', ');
         finalPurpose += ` | Accompanying: ${guestList}`;
       }
-      const dbVisitType = pipeline === 'Pre-Scheduled Visit' ? 'PRESCHEDULED' : (pipeline === 'Repeated Visitor' ? 'REPEATED' : 'IMMEDIATE');
-      const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
+const dbVisitType = pipeline === 'Pre-Scheduled Visit' ? 'scheduled' : (pipeline === 'Repeated Visitor' ? 'repeated' : 'immediate');      const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
 
       if (isEdit) {
         if (activeVisitorId) {
           await supabase.from('visitors').update({
             name: visitorName, email: email || null, phone: phone, gender: gender || 'Others',
             dob: dob || null, address: address || null, id_type: idType, id_number: idNumber || 'Pending',
-            nationality: nationality, organization: organization || null, designation: designation || null, department: department || null
+            nationality: nationality, organization: organization || null, designation: designation || null, department: department || null,
+            ...(documentUrl && { document_url: documentUrl }) // MOVED HERE: Saves to visitors table
           }).eq('visitor_id', activeVisitorId);
         }
 
-        const { error: updateError } = await supabase.from('visits').update({
-          visit_type: dbVisitType, purpose: finalPurpose, start_date: startDate, end_date: startDate,
-          status: 'Pending', hr_remarks: null, department: department,
-          ...(documentUrl && { document_url: documentUrl })
+const { error: updateError } = await supabase.from('visits').update({
+          visit_type: dbVisitType, 
+          purpose: finalPurpose, 
+          start_date: startDate, 
+          end_date: startDate,
+          status: 'Pending',       // <--- Resets the status
+          hr_remarks: null,        // <--- Clears the old rejection note
+          department: department
         }).eq('visit_id', activeVisitId);
 
         if (updateError) throw updateError;
@@ -289,16 +294,19 @@ useEffect(() => {
             visitor_id: standardGeneratedId, name: visitorName, email: email || null, phone: phone,
             gender: gender || 'Others', dob: dob || null, address: address || null, id_type: idType,
             id_number: idNumber || 'Pending', nationality: nationality, organization: organization || null,
-            designation: designation || null, department: department || null
+            designation: designation || null, department: department || null,
+            document_url: documentUrl // ADDED HERE: Saves to visitors table
           });
           if (visitorError) throw visitorError;
+        } else if (documentUrl) {
+          // If it's a repeated visitor but they uploaded a NEW document, update their profile
+          await supabase.from('visitors').update({ document_url: documentUrl }).eq('visitor_id', activeVisitorId);
         }
-
-        const { error: visitError } = await supabase.from('visits').insert({
-          visit_id: activeVisitId, visitor_id: activeVisitorId, host_employee_id: 'EMP001', created_by_employee_id: 'EMP001',
-          visit_type: dbVisitType, pass_type: 'ONE_DAY', purpose: finalPurpose, start_date: startDate, end_date: startDate,
-          status: 'Pending', document_url: documentUrl
-        });
+const { error: visitError } = await supabase.from('visits').insert({
+  visit_id: activeVisitId, visitor_id: activeVisitorId, host_employee_id: 'EMP001', created_by_employee_id: 'EMP001',
+  visit_type: dbVisitType, pass_type: 'One_day', purpose: finalPurpose, start_date: startDate, end_date: startDate,
+  status: 'Pending' 
+});
         if (visitError) throw visitError;
       }
 
@@ -348,7 +356,6 @@ useEffect(() => {
 
       <form className="space-y-5" onSubmit={handleSubmit}>
         
-        {/* Processing Configuration Fields */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 border border-slate-200 rounded-xl">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Pass Processing Pipeline *</label>
@@ -388,10 +395,8 @@ useEffect(() => {
 
         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pt-2 border-b border-slate-50 pb-1">Primary Base Identity</h4>
 
-        {/* Primary Identity Section Fields */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           
-          {/* Autocomplete Name Field */}
           <div className="relative">
             <label className="block text-xs font-semibold text-slate-500 mb-1">Full Name *</label>
             <div className="relative flex items-center">
@@ -504,7 +509,6 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* Accompanying Escort Section Layout */}
         <div className="border border-slate-200 rounded-xl bg-slate-50/40 overflow-hidden mt-2">
           <div className="p-4 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100">
             <div>
@@ -529,7 +533,6 @@ useEffect(() => {
                   
                   <div className="flex flex-col gap-3 w-full">
                     
-                    {/* FIRST ROW: Name, Gender, Nationality, Contact Phone */}
                     <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
                       <div className='sm:col-span-2'>
                         <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Member Full Name *</label>
@@ -583,7 +586,6 @@ useEffect(() => {
                       </div>
                     </div>
 
-                    {/* SECOND ROW: ID Type, ID Number & Email Address */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                       <div>
                         <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">ID Type *</label>
@@ -601,18 +603,18 @@ useEffect(() => {
                       </div>
 
                       <div>
-  <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">
-    {escort.idType} Serial ID *
-  </label>
-  <input 
-    required
-    type="text" 
-    value={escort.govId}
-    onChange={(e) => handleEscortChange(index, 'govId', e.target.value)}
-    placeholder={`Enter ${escort.idType} Number`} 
-    className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono uppercase tracking-wider outline-none focus:border-blue-500" 
-  />
-</div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">
+                          {escort.idType} Serial ID *
+                        </label>
+                        <input 
+                          required
+                          type="text" 
+                          value={escort.govId}
+                          onChange={(e) => handleEscortChange(index, 'govId', e.target.value)}
+                          placeholder={`Enter ${escort.idType} Number`} 
+                          className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono uppercase tracking-wider outline-none focus:border-blue-500" 
+                        />
+                      </div>
 
                       <div>
                         <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Email Address</label>
@@ -633,7 +635,6 @@ useEffect(() => {
           )}
         </div>
 
-        {/* Verification Media Upload Section */}
         <div className="pt-4 border-t border-slate-100">
           <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5">Verification Document Scans</label>
           

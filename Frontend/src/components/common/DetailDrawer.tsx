@@ -48,9 +48,6 @@ export default function DetailDrawer({ isOpen, onClose, title = "Access Registry
           
           <div className="md:col-span-2 space-y-4">
             {isAuditLog ? (
-              /* ========================================================
-                  FIXED: DEDICATED IMMUTABLE AUDIT LOG DETAILS PREVIEW
-                 ======================================================== */
               <div className="space-y-4">
                 
                 {/* Section 1: Core Operator Demographics Info */}

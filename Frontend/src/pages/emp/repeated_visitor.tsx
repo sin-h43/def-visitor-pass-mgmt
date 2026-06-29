@@ -223,12 +223,6 @@ export default function EmployeeRepeatedVisitorLogPage() {
           >
             <RefreshCw className="w-3 h-3 mr-1.5" /> Re-Register
           </button>
-          <button 
-            onClick={() => { setSelectedProfile(row); setIsDrawerOpen(true); }}
-            className="px-3 py-1.5 bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-indigo-100 transition-all border border-indigo-200"
-          >
-            View Profile
-          </button>
         </div>
       )
     }

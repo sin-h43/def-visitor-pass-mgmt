@@ -355,7 +355,7 @@ export default function VisitorMgmtPage() {
       <div className="max-w-7xl mx-auto space-y-8">
         
         <div className="flex items-center space-x-3">
-          <div className="p-2 bg-blue-600 text-white rounded-lg shadow-sm">
+          <div className="p-2 bg-slate-800 text-white rounded-lg shadow-sm">
             <Users className="w-6 h-6" />
           </div>
           <div>
@@ -374,7 +374,7 @@ export default function VisitorMgmtPage() {
             <div key={idx} className="bg-white p-5 border border-slate-200 rounded-xl flex items-center justify-between shadow-sm">
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{stat.title}</p>
-                <p className="text-2xl font-black text-slate-800 mt-1">{stat.value}</p>
+                <p className="text-2xl font-bold text-slate-800 mt-1">{stat.value}</p>
               </div>
               <div className={`p-3 rounded-lg ${stat.bg} ${stat.color} border ${stat.border}`}><stat.icon className="w-5 h-5" /></div>
             </div>

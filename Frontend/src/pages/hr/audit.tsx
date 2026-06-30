@@ -26,7 +26,7 @@ interface ExtendedAuditLog {
 }
 
 export default function AuditLogsPage() {
-  const [activeTab, setActiveTab] = useState<'Account Requests' | 'System Logs'>('Account Requests');
+  const [activeTab, setActiveTab] = useState<'Account Requests' | 'System Logs'>('System Logs');
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
 
   const [logs, setLogs] = useState<ExtendedAuditLog[]>([]);
@@ -310,6 +310,17 @@ export default function AuditLogsPage() {
 
         {/* Tab Navigation */}
         <div className="flex space-x-2 border-b border-slate-200">
+                    <button
+            onClick={() => setActiveTab('System Logs')}
+            className={`flex items-center px-4 py-3 text-sm font-bold border-b-2 transition-colors ${
+              activeTab === 'System Logs' 
+                ? 'border-blue-600 text-blue-600' 
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+            }`}
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            System Audit Trail
+          </button>
           <button
             onClick={() => setActiveTab('Account Requests')}
             className={`flex items-center px-4 py-3 text-sm font-bold border-b-2 transition-colors ${
@@ -326,21 +337,62 @@ export default function AuditLogsPage() {
               </span>
             )}
           </button>
-          <button
-            onClick={() => setActiveTab('System Logs')}
-            className={`flex items-center px-4 py-3 text-sm font-bold border-b-2 transition-colors ${
-              activeTab === 'System Logs' 
-                ? 'border-blue-600 text-blue-600' 
-                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
-            }`}
-          >
-            <FileText className="w-4 h-4 mr-2" />
-            System Audit Trail
-          </button>
-        </div>
 
+        </div>
         {/* ==================================================== */}
-        {/* TAB 1: PENDING ACCOUNT REQUESTS (No Right Drawer)    */}
+        {/* TAB 1: EXISTING SYSTEM AUDIT LOGS                    */}
+        {/* ==================================================== */}
+        {activeTab === 'System Logs' && (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
+                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Ledger Entries</p><p className="text-2xl font-bold text-slate-800 mt-1">{metrics.total}</p></div>
+                <div className="p-3 rounded-lg bg-blue-50 text-blue-600 border border-blue-100"><FileText className="w-5 h-5" /></div>
+              </div>
+              <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
+                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Today's Check-ins</p><p className="text-2xl font-bold text-emerald-600 mt-1">{metrics.todayCheckins}</p></div>
+                <div className="p-3 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100"><CheckCircle className="w-5 h-5" /></div>
+              </div>
+              <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
+                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Denials & Removals</p><p className="text-2xl font-bold text-orange-600 mt-1">{metrics.denials}</p></div>
+                <div className="p-3 rounded-lg bg-orange-50 text-orange-600 border border-orange-100"><XCircle className="w-5 h-5" /></div>
+              </div>
+              <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
+                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Critical Alerts</p><p className="text-2xl font-bold text-red-600 mt-1">{metrics.critical}</p></div>
+                <div className="p-3 rounded-lg bg-red-50 text-red-600 border border-red-100"><AlertOctagon className="w-5 h-5" /></div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row gap-4 justify-between bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <div className="flex-1">
+                  <SearchFilterBar 
+                    value={searchTerm} 
+                    onChange={setSearchTerm} 
+                    selectedFilters={selectedFilters} 
+                    onFilterToggle={handleFilterToggle} 
+                    filterGroups={filterGroups} 
+                    placeholder="Search by Employee, Visitor, or Pass ID..." 
+                  />
+                </div>
+                <button 
+                  onClick={exportToCSV}
+                  className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 shadow-sm shrink-0"
+                >
+                  <Download className="w-4 h-4" /> Export CSV
+                </button>
+              </div>
+
+              {loading ? (
+                <div className="py-12 text-center text-slate-400">Syncing secure logs...</div>
+              ) : (
+                <DataTable data={filteredLogs} columns={columns} />
+              )}
+            </div>
+          </>
+        )}
+        {/* ==================================================== */}
+        {/* TAB 2: PENDING ACCOUNT REQUESTS (No Right Drawer)    */}
         {/* ==================================================== */}
         {activeTab === 'Account Requests' && (
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
@@ -400,58 +452,7 @@ export default function AuditLogsPage() {
           </div>
         )}
 
-        {/* ==================================================== */}
-        {/* TAB 2: EXISTING SYSTEM AUDIT LOGS                    */}
-        {/* ==================================================== */}
-        {activeTab === 'System Logs' && (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
-                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Ledger Entries</p><p className="text-2xl font-bold text-slate-800 mt-1">{metrics.total}</p></div>
-                <div className="p-3 rounded-lg bg-blue-50 text-blue-600 border border-blue-100"><FileText className="w-5 h-5" /></div>
-              </div>
-              <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
-                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Today's Check-ins</p><p className="text-2xl font-bold text-emerald-600 mt-1">{metrics.todayCheckins}</p></div>
-                <div className="p-3 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100"><CheckCircle className="w-5 h-5" /></div>
-              </div>
-              <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
-                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Denials & Removals</p><p className="text-2xl font-bold text-orange-600 mt-1">{metrics.denials}</p></div>
-                <div className="p-3 rounded-lg bg-orange-50 text-orange-600 border border-orange-100"><XCircle className="w-5 h-5" /></div>
-              </div>
-              <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
-                <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Critical Alerts</p><p className="text-2xl font-bold text-red-600 mt-1">{metrics.critical}</p></div>
-                <div className="p-3 rounded-lg bg-red-50 text-red-600 border border-red-100"><AlertOctagon className="w-5 h-5" /></div>
-              </div>
-            </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
-              <div className="flex flex-col sm:flex-row gap-4 justify-between bg-slate-50 p-3 rounded-xl border border-slate-100">
-                <div className="flex-1">
-                  <SearchFilterBar 
-                    value={searchTerm} 
-                    onChange={setSearchTerm} 
-                    selectedFilters={selectedFilters} 
-                    onFilterToggle={handleFilterToggle} 
-                    filterGroups={filterGroups} 
-                    placeholder="Search by Employee, Visitor, or Pass ID..." 
-                  />
-                </div>
-                <button 
-                  onClick={exportToCSV}
-                  className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 shadow-sm shrink-0"
-                >
-                  <Download className="w-4 h-4" /> Export CSV
-                </button>
-              </div>
-
-              {loading ? (
-                <div className="py-12 text-center text-slate-400">Syncing secure logs...</div>
-              ) : (
-                <DataTable data={filteredLogs} columns={columns} />
-              )}
-            </div>
-          </>
-        )}
       </div>
 
       {/* RIGHT SLIDE-OUT DRAWER (Only triggers from System Logs tab) */}

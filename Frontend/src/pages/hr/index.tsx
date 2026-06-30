@@ -1,4 +1,4 @@
-// pages/hr/index.tsx
+// src/pages/hr/index.tsx
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Building, FileText, Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Bell, Eye, CheckCircle, X } from 'lucide-react';
@@ -8,7 +8,6 @@ import SearchFilterBar from '../../components/common/SearchFilterBar';
 import type { TableColumn, VisitorRecord } from '../../types/visitor';
 import { supabase } from '../../lib/supabase';
 
-// --- UI SPECIFIC EXTENSION ---
 export interface ExtendedVisitorRecord extends VisitorRecord {
   requestedAt: string;
   visitDate: string;
@@ -40,7 +39,6 @@ export default function HRDashboard() {
     status: ['Pending', 'Approved', 'Denied', 'Cleared', 'Active']
   });
 
-  // --- NOTIFICATION ROUTING & READ STATE ---
   const navigate = useNavigate();
   const [readLogs, setReadLogs] = useState<string[]>(JSON.parse(localStorage.getItem('readLogs') || '[]'));
 
@@ -69,10 +67,11 @@ export default function HRDashboard() {
   // ==========================================
 
   const fetchPendingUsers = async () => {
+    // Bulletproof case-insensitive fetch
     const { data, error } = await supabase
       .from('employee_registrations')
       .select('*')
-      .in('status', ['pending', 'Pending', 'PENDING']); 
+      .ilike('status', 'pending'); 
     
     if (data) setPendingUsers(data);
     if (error) console.error("Failed to fetch pending users:", error);
@@ -155,7 +154,6 @@ export default function HRDashboard() {
     }
   }
 
-  // Master Initializer & Polling Setup
   useEffect(() => {
     fetchVisits();
     fetchPendingUsers();
@@ -174,7 +172,6 @@ export default function HRDashboard() {
       setPanelRemark(selectedVisitor.hr_remarks || '');
     }
   }, [selectedVisitor]);
-
 
   // ==========================================
   // ACTION HANDLERS
@@ -287,11 +284,6 @@ export default function HRDashboard() {
 
     return matchesSearch && matchesCategory && matchesPipeline && matchesStatus && matchesTab;
   });
-
-
-  // ==========================================
-  // RENDER HELPERS
-  // ==========================================
 
   const hrFilterGroups = [
     { key: 'category', title: 'Category Tracks', options: [ { label: 'Government / Defence', value: 'Govt' }, { label: 'Foreign Nationals', value: 'Foreign' }, { label: 'Service / Vendors', value: 'Service' }, { label: 'General Walk-ins', value: 'General' } ] },

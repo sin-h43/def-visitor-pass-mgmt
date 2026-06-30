@@ -332,16 +332,17 @@ return (
       role="hr" 
       userName="HR Admin"
       headerAction={
-        /* --- THIS INJECTS THE HR NOTIFICATION BELL INTO THE TOP NAVBAR --- */
+        /* --- UNIFIED NOTIFICATION CENTER --- */
         <div className="relative">
           <button 
             onClick={() => setShowNotifications(!showNotifications)}
             className="relative p-2 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <Bell className="w-5 h-5 text-slate-700" />
-            {pendingUsers.length > 0 && (
+            {/* Show badge if there are pending actions or recent logs */}
+            {(pendingUsers.length > 0 || liveAuditLogs.length > 0) && (
               <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border-2 border-white shadow-sm animate-pulse">
-                {pendingUsers.length}
+                {pendingUsers.length > 0 ? pendingUsers.length : '!'}
               </span>
             )}
           </button>
@@ -349,55 +350,84 @@ return (
           {showNotifications && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-              <div className="absolute right-0 mt-3 w-[400px] bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden origin-top-right animate-fade-in text-left">
+              <div className="absolute right-0 mt-3 w-[420px] bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden origin-top-right animate-fade-in text-left">
+                
+                {/* Header */}
                 <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                   <h3 className="font-bold text-slate-800 text-sm flex items-center">
-                    <Shield className="w-4 h-4 mr-2 text-blue-600" /> Employee Approvals
+                    <Bell className="w-4 h-4 mr-2 text-blue-600" /> Activity & Approvals
                   </h3>
-                  <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold">
-                    {pendingUsers.length} Pending
-                  </span>
+                  {pendingUsers.length > 0 && (
+                    <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold animate-pulse">
+                      {pendingUsers.length} Action Required
+                    </span>
+                  )}
                 </div>
                 
-                <div className="max-h-[400px] overflow-y-auto custom-scrollbar bg-slate-50/50">
-                  {pendingUsers.length === 0 ? (
-                    <div className="p-8 text-center text-slate-500 flex flex-col items-center">
-                      <CheckCircle className="w-8 h-8 mb-2 text-emerald-400 opacity-50" />
-                      <p className="text-sm font-medium">You're all caught up!</p>
-                      <p className="text-xs mt-1 opacity-70">No pending access requests.</p>
-                    </div>
-                  ) : (
-                    <div className="p-2 space-y-2">
+                <div className="max-h-[450px] overflow-y-auto custom-scrollbar bg-slate-50/50 p-3 space-y-3">
+                  
+                  {/* 1. ACTIONABLE PENDING USERS (MINIMAL UI) */}
+                  {pendingUsers.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Pending Access Requests</div>
                       {pendingUsers.map(user => (
-                        <div key={user.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
+                        <div key={user.id} className="bg-white border border-amber-200 rounded-xl p-3 shadow-sm relative overflow-hidden">
                           <div className="absolute left-0 top-0 h-full w-1 bg-amber-400"></div>
                           
-                          <div className="flex items-start justify-between mb-3 pl-2">
+                          <div className="flex items-center justify-between pl-2">
                             <div>
-                              <h4 className="font-bold text-slate-900 text-sm">{user.full_name}</h4>
-                              <p className="text-xs text-slate-500 mt-0.5 font-medium">{user.department}</p>
+                              <h4 className="font-bold text-slate-900 text-sm leading-tight">{user.full_name}</h4>
+                              <p className="text-[10px] text-slate-500 font-mono mt-0.5">{user.email}</p>
                             </div>
-                            <span className="text-[9px] font-mono text-slate-400">{user.phone}</span>
-                          </div>
 
-                          <div className="flex items-center gap-2 pt-3 border-t border-slate-100 pl-2">
-                            <button 
-                              onClick={() => handleRejectEmployee(user.id, user.full_name)}
-                              className="flex-1 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-lg transition-colors border border-red-100"
-                            >
-                              Reject
-                            </button>
-                            <button 
-                              onClick={() => handleApproveEmployee(user)}
-                              className="flex-1 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors shadow-sm"
-                            >
-                              Authorize
-                            </button>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button 
+                                onClick={() => handleRejectEmployee(user.id, user.full_name)}
+                                className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-[10px] uppercase tracking-wider rounded-lg border border-red-100 transition-colors"
+                              >
+                                Decline
+                              </button>
+                              <button 
+                                onClick={() => handleApproveEmployee(user)}
+                                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] uppercase tracking-wider rounded-lg shadow-sm transition-colors"
+                              >
+                                Approve
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
                     </div>
                   )}
+
+                  {/* 2. GENERAL AUDIT LOGS */}
+                  {liveAuditLogs.length > 0 && (
+                    <div className="space-y-2 pt-1">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">System Audit Logs</div>
+                      {liveAuditLogs.map(log => (
+                        <div key={log.id} className="bg-white border border-slate-100 rounded-xl p-3 shadow-sm hover:border-blue-100 transition-colors">
+                          <div className="flex justify-between items-start mb-1">
+                            <span className="font-bold text-[10px] uppercase tracking-wider text-slate-700">
+                              {log.action.replace(/_/g, ' ')}
+                            </span>
+                            <span className="text-[9px] text-slate-400 font-mono shrink-0 ml-2">
+                              {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-600 leading-snug">{log.remarks}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {pendingUsers.length === 0 && liveAuditLogs.length === 0 && (
+                    <div className="py-8 text-center text-slate-400">
+                      <CheckCircle className="w-8 h-8 mb-2 mx-auto text-emerald-400 opacity-50" />
+                      <p className="text-sm font-medium">You're all caught up!</p>
+                      <p className="text-xs mt-1 opacity-70">No recent activity detected.</p>
+                    </div>
+                  )}
+
                 </div>
               </div>
             </>

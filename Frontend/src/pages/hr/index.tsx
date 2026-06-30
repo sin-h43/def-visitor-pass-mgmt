@@ -1,7 +1,7 @@
 // pages/hr/index.tsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Building,AlertCircle, FileText , Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Bell, Eye, CheckCircle, X } from 'lucide-react';
+import { User, Building, FileText, Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Bell, Eye, CheckCircle, X } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
@@ -9,69 +9,30 @@ import type { TableColumn, VisitorRecord } from '../../types/visitor';
 import { supabase } from '../../lib/supabase';
 
 // --- UI SPECIFIC EXTENSION ---
-// Extends the core record to include properties specifically needed for the HR drawer
 export interface ExtendedVisitorRecord extends VisitorRecord {
   requestedAt: string;
   visitDate: string;
   passType: string;
 }
 
-const dynamicBroadcastPool = [
-  { id: 1, type: 'FOREIGN REGISTRY', text: 'Passport clearance requested for Sarah Jenkins.', color: 'bg-orange-50 border-orange-100 text-orange-800' },
-  { id: 2, type: 'GATE AUTO-SYNC', text: 'Gate 2 badge scanner synchronization completed.', color: 'bg-emerald-50 border-emerald-100 text-emerald-800' },
-];
-
 export default function HRDashboard() {
   const [dataList, setDataList] = useState<ExtendedVisitorRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('All Requests');
   const [searchTerm, setSearchTerm] = useState('');
-  const [broadcastLogs, setBroadcastLogs] = useState([dynamicBroadcastPool[0], dynamicBroadcastPool[1]]);
+  
+  // Real Database States
+  const [pendingUsers, setPendingUsers] = useState<any[]>([]);
+  const [liveAuditLogs, setLiveAuditLogs] = useState<any[]>([]);
 
-// 2. Add this state inside your HRDashboard component
-const [pendingUsers, setPendingUsers] = useState<any[]>([]);
-
-useEffect(() => {
-  fetchPendingUsers();
-}, []);
-
-const fetchPendingUsers = async () => {
-  const { data } = await supabase.from('employee_registrations').select('*').eq('status', 'pending');
-  if (data) setPendingUsers(data);
-};
-
-const handleApproveEmployee = async (user: any) => {
-  try {
-    // 1. Move them to the official employees table
-    await supabase.from('employees').insert([{
-      auth_id: user.auth_id,
-      name: user.full_name,
-      email: user.email,
-      phone: user.phone,
-      department: user.department
-    }]);
-
-    // 2. Mark as approved
-    await supabase.from('employee_registrations').update({ status: 'approved' }).eq('id', user.id);
-
-    // 3. Log it in the Audit Trail
-    await supabase.from('audit_logs').insert([{
-      action: 'approved',
-      remarks: `HR securely authorized new employee access for ${user.full_name} (${user.department})`,
-      performed_by: 'HR Admin', 
-      performed_by_role: 'hr'
-    }]);
-
-    fetchPendingUsers(); // Refresh the list
-  } catch (error) {
-    console.error("Approval failed", error);
-  }
-};
-
-const handleRejectEmployee = async (id: string) => {
-  await supabase.from('employee_registrations').update({ status: 'rejected' }).eq('id', id);
-  fetchPendingUsers();
-};  
+  // Modal & Drawer States
+  const [panelRemark, setPanelRemark] = useState('');
+  const [remarkModal, setRemarkModal] = useState<{ isOpen: boolean; visitId: string | null; action: 'Approved' | 'Denied' | null; text: string; }>({
+    isOpen: false, visitId: null, action: null, text: '',
+  });
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [selectedVisitor, setSelectedVisitor] = useState<ExtendedVisitorRecord | null>(null);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
     category: ['Govt', 'Foreign', 'Service', 'General', 'HR'],
@@ -79,21 +40,106 @@ const handleRejectEmployee = async (id: string) => {
     status: ['Pending', 'Approved', 'Denied', 'Cleared', 'Active']
   });
 
-  const [panelRemark, setPanelRemark] = useState('');
-  const [remarkModal, setRemarkModal] = useState<{
-    isOpen: boolean;
-    visitId: string | null;
-    action: 'Approved' | 'Denied' | null;
-    text: string;
-  }>({
-    isOpen: false,
-    visitId: null,
-    action: null,
-    text: '',
-  });
+  // ==========================================
+  // DATA FETCHING & REAL-TIME POLLING
+  // ==========================================
+  
+  const fetchPendingUsers = async () => {
+    const { data } = await supabase.from('employee_registrations').select('*').eq('status', 'pending');
+    if (data) setPendingUsers(data);
+  };
 
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [selectedVisitor, setSelectedVisitor] = useState<ExtendedVisitorRecord | null>(null);
+  const fetchLiveAuditLogs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(15); // Get the 15 most recent actions across the whole facility
+      
+      if (error) throw error;
+      if (data) setLiveAuditLogs(data);
+    } catch (err) {
+      console.error("Error fetching live audit logs:", err);
+    }
+  };
+
+  async function fetchVisits() {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('visits')
+        .select(`
+          visit_id, visit_type, pass_type, purpose, status, start_date, created_at, hr_remarks,
+          visitors (visitor_id, name, gender, phone, email, nationality, organization, designation, document_url, dob, id_type, id_number, address),
+          host:employees!visits_host_employee_id_fkey (name, role, employee_id), department
+        `);
+
+      if (error) throw error;
+
+      if (data) {
+        const transformed: ExtendedVisitorRecord[] = data.map((row: any) => {
+          let uiPipeline: 'immediate' | 'scheduled' | 'repeated' = 'immediate';
+          const dbType = row.visit_type?.toLowerCase();
+          if (dbType === 'prescheduled' || dbType === 'scheduled') uiPipeline = 'scheduled';
+          if (dbType === 'repeated') uiPipeline = 'repeated';
+
+          const computedCategory = row.visitors?.nationality?.toLowerCase() !== 'indian' ? 'Foreign' : 'General';
+          const escortsArray = Array.isArray(row.escorts) ? row.escorts : (row.escorts ? [row.escorts] : []);
+
+          return {
+            id: row.visit_id || '',
+            visitorName: row.visitors?.name || 'Unknown',
+            gender: row.visitors?.gender || 'Others',
+            phone: row.visitors?.phone || '',
+            email: row.visitors?.email || '',
+            category: computedCategory,
+            purpose: row.purpose || '',
+            hostName: row.host?.name || 'Unassigned',
+            hostDept: row.host?.role === 'hr' ? 'HR Officer' : 'Staff Member',
+            hostId: row.host?.employee_id || '',
+            requestedAt: row.created_at ? new Date(row.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
+            visitDate: row.start_date ? new Date(row.start_date).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
+            status: row.status || 'Pending',
+            passType: row.pass_type || 'One_day',
+            pipeline: uiPipeline,
+            nationality: row.visitors?.nationality || 'Indian',
+            organization: row.visitors?.organization || '',
+            designation: row.visitors?.designation || 'N/A',
+            documentUrl: row.visitors?.document_url || row.document_url || null,
+            escorts: escortsArray,
+            dob: row.visitors?.dob || 'N/A',
+            id_type: row.visitors?.id_type || 'Govt ID',
+            id_number: row.visitors?.id_number || 'N/A',
+            address: row.visitors?.address || 'N/A',
+            department: row.department || 'General Unit',
+            hr_remarks: row.hr_remarks || '',
+            requestDate: row.created_at ? new Date(row.created_at).toLocaleDateString() : 'N/A',
+          };
+        });
+        setDataList(transformed);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Master Initializer & Polling Setup
+  useEffect(() => {
+    fetchVisits();
+    fetchPendingUsers();
+    fetchLiveAuditLogs();
+
+    // Poll for new audit logs and pending users every 10 seconds to keep the dashboard "Live"
+    const interval = setInterval(() => {
+      fetchLiveAuditLogs();
+      fetchPendingUsers();
+    }, 10000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (selectedVisitor) {
@@ -101,160 +147,74 @@ const handleRejectEmployee = async (id: string) => {
     }
   }, [selectedVisitor]);
 
-  const hrFilterGroups = [
-    {
-      key: 'category',
-      title: 'Category Tracks',
-      options: [
-        { label: 'Government / Defence', value: 'Govt' },
-        { label: 'Foreign Nationals', value: 'Foreign' },
-        { label: 'Service / Vendors', value: 'Service' },
-        { label: 'General Walk-ins', value: 'General' }
-      ]
-    },
-    {
-      key: 'pipeline',
-      title: 'Pipeline Types',
-      options: [
-        { label: 'Immediate Access', value: 'immediate' },
-        { label: 'Pre-Scheduled Entry', value: 'scheduled' },
-        { label: 'Repeated Framework', value: 'repeated' }
-      ]
-    },
-    {
-      key: 'status',
-      title: 'Pass Clearance Status',
-      options: [
-        { label: 'Pending Review', value: 'Pending' },
-        { label: 'Approved Access', value: 'Approved' },
-        { label: 'Active On-Site', value: 'Active' },
-        { label: 'Cleared Outposts', value: 'Cleared' }
-      ]
+
+  // ==========================================
+  // ACTION HANDLERS
+  // ==========================================
+
+  const handleApproveEmployee = async (user: any) => {
+    try {
+      await supabase.from('employees').insert([{
+        auth_id: user.auth_id,
+        name: user.full_name,
+        email: user.email,
+        phone: user.phone,
+        department: user.department,
+        role: 'employee' // Automatically grants employee portal access
+      }]);
+
+      await supabase.from('employee_registrations').update({ status: 'approved' }).eq('id', user.id);
+
+      await supabase.from('audit_logs').insert([{
+        action: 'approved',
+        remarks: `HR securely authorized new employee access for ${user.full_name} (${user.department})`,
+        performed_by: 'HR Admin', 
+        performed_by_role: 'hr'
+      }]);
+
+      fetchPendingUsers(); 
+      fetchLiveAuditLogs(); // Instantly show it in the live feed
+    } catch (error) {
+      console.error("Approval failed", error);
+      alert("Failed to approve user.");
     }
-  ];
+  };
 
-  // 1. Live Supabase Data Fetch
-  useEffect(() => {
-    async function fetchVisits() {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('visits')
-          .select(`
-            visit_id,
-            visit_type,
-            pass_type,
-            purpose,
-            status,
-            start_date,
-            created_at,
-            hr_remarks,
-            visitors (
-              visitor_id,
-              name,
-              gender,
-              phone,
-              email,
-              nationality,
-              organization,
-              designation,
-              document_url,
-              dob,
-              id_type,
-              id_number,
-              address
-            ),
-            host:employees!visits_host_employee_id_fkey (
-              name,
-              role,
-              employee_id
-            ),
-            department
-          `);
+  const handleRejectEmployee = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to reject registration for ${name}?`)) return;
+    await supabase.from('employee_registrations').update({ status: 'rejected' }).eq('id', id);
+    
+    await supabase.from('audit_logs').insert([{
+      action: 'rejected',
+      remarks: `HR rejected portal access request for ${name}.`,
+      performed_by: 'HR Admin', 
+      performed_by_role: 'hr'
+    }]);
 
-        if (error) throw error;
-
-        if (data) {
-          const transformed: ExtendedVisitorRecord[] = data.map((row: any) => {
-            let uiPipeline: 'immediate' | 'scheduled' | 'repeated' = 'immediate';
-            const dbType = row.visit_type?.toLowerCase();
-            if (dbType === 'prescheduled' || dbType === 'scheduled') uiPipeline = 'scheduled';
-            if (dbType === 'repeated') uiPipeline = 'repeated';
-
-            const computedCategory = row.visitors?.nationality?.toLowerCase() !== 'indian' ? 'Foreign' : 'General';
-            const escortsArray = Array.isArray(row.escorts) ? row.escorts : (row.escorts ? [row.escorts] : []);
-
-            return {
-              id: row.visit_id || '',
-              visitorName: row.visitors?.name || 'Unknown',
-              gender: row.visitors?.gender || 'Others',
-              phone: row.visitors?.phone || '',
-              email: row.visitors?.email || '',
-              category: computedCategory,
-              purpose: row.purpose || '',
-              hostName: row.host?.name || 'Unassigned',
-              hostDept: row.host?.role === 'hr' ? 'HR Officer' : 'Staff Member',
-              hostId: row.host?.employee_id || '',
-              requestedAt: row.created_at ? new Date(row.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
-              visitDate: row.start_date ? new Date(row.start_date).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
-              status: row.status || 'Pending',
-              passType: row.pass_type || 'One_day',
-              pipeline: uiPipeline,
-              nationality: row.visitors?.nationality || 'Indian',
-              organization: row.visitors?.organization || '',
-              designation: row.visitors?.designation || 'N/A',
-              documentUrl: row.visitors?.document_url || row.document_url || null,
-              escorts: escortsArray,
-              dob: row.visitors?.dob || 'N/A',
-              id_type: row.visitors?.id_type || 'Govt ID',
-              id_number: row.visitors?.id_number || 'N/A',
-              address: row.visitors?.address || 'N/A',
-              department: row.department || 'General Unit',
-              hr_remarks: row.hr_remarks || '',
-              requestDate: row.created_at ? new Date(row.created_at).toLocaleDateString() : 'N/A', // Guaranteed string
-            };
-          });
-          setDataList(transformed);
-        }
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchVisits();
-  }, []);
-
-  // Broadcast animation
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const randomLog = dynamicBroadcastPool[Math.floor(Math.random() * dynamicBroadcastPool.length)];
-      setBroadcastLogs(prev => [{ ...randomLog, id: Date.now() }, ...prev.slice(0, 3)]);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, []);
+    fetchPendingUsers();
+    fetchLiveAuditLogs();
+  };  
 
   const handleUpdateStatus = async (visitId: string | null, newStatus: 'Approved' | 'Denied' | null, remarkText: string) => {
     if (!visitId || !newStatus) return;
     try {
-      const { error } = await supabase
-        .from('visits')
-        .update({ 
-          status: newStatus,
-          hr_remarks: remarkText 
-        })
-        .eq('visit_id', visitId);
-
+      const { error } = await supabase.from('visits').update({ status: newStatus, hr_remarks: remarkText }).eq('visit_id', visitId);
       if (error) throw error;
       
+      // Log the pass approval/denial in the audit log
+      await supabase.from('audit_logs').insert([{
+        action: newStatus === 'Approved' ? 'approved' : 'rejected',
+        remarks: `HR ${newStatus} visitor pass ${visitId}. Note: ${remarkText || 'No remarks provided.'}`,
+        performed_by: 'HR Admin', 
+        performed_by_role: 'hr'
+      }]);
+
       setDataList(prev => prev.map(log => log.id === visitId ? { ...log, status: newStatus, hr_remarks: remarkText } : log));
-      if (selectedVisitor?.id === visitId) {
-        setSelectedVisitor(prev => prev ? { ...prev, status: newStatus, hr_remarks: remarkText } : null);
-      }
+      if (selectedVisitor?.id === visitId) setSelectedVisitor(prev => prev ? { ...prev, status: newStatus, hr_remarks: remarkText } : null);
       
       setRemarkModal({ isOpen: false, visitId: null, action: null, text: '' });
       setIsDrawerOpen(false);
+      fetchLiveAuditLogs();
     } catch (err) {
       console.error("Failed to update status", err);
       alert("Failed to process status change.");
@@ -263,17 +223,11 @@ const handleRejectEmployee = async (id: string) => {
 
   const handleUpdateRemarkOnly = async (visitId: string, remarkText: string) => {
     try {
-      const { error } = await supabase
-        .from('visits')
-        .update({ hr_remarks: remarkText })
-        .eq('visit_id', visitId);
-
+      const { error } = await supabase.from('visits').update({ hr_remarks: remarkText }).eq('visit_id', visitId);
       if (error) throw error;
       
       setDataList(prev => prev.map(log => log.id === visitId ? { ...log, hr_remarks: remarkText } : log));
-      if (selectedVisitor?.id === visitId) {
-        setSelectedVisitor(prev => prev ? { ...prev, hr_remarks: remarkText } : null);
-      }
+      if (selectedVisitor?.id === visitId) setSelectedVisitor(prev => prev ? { ...prev, hr_remarks: remarkText } : null);
       alert("Internal note updated successfully!");
     } catch (error) {
       console.error('Error updating remark:', error);
@@ -284,9 +238,7 @@ const handleRejectEmployee = async (id: string) => {
   const handleFilterToggle = (groupKey: string, value: string) => {
     setSelectedFilters(prev => {
       const current = prev[groupKey] || [];
-      const updated = current.includes(value) 
-        ? current.filter(item => item !== value) 
-        : [...current, value];
+      const updated = current.includes(value) ? current.filter(item => item !== value) : [...current, value];
       return { ...prev, [groupKey]: updated };
     });
   };
@@ -297,11 +249,7 @@ const handleRejectEmployee = async (id: string) => {
   };
 
   const matrixFilteredRows = dataList.filter(row => {
-    const matchesSearch = 
-      row.visitorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      row.id.toLowerCase().includes(searchTerm.toLowerCase());
-
-    // FIX: Fallback applied to row.category to satisfy TypeScript
+    const matchesSearch = row.visitorName.toLowerCase().includes(searchTerm.toLowerCase()) || row.id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = (selectedFilters.category || []).includes(row.category || '');
     const matchesPipeline = (selectedFilters.pipeline || []).includes(row.pipeline);
     const matchesStatus = (selectedFilters.status || []).includes(row.status);
@@ -313,30 +261,22 @@ const handleRejectEmployee = async (id: string) => {
     return matchesSearch && matchesCategory && matchesPipeline && matchesStatus && matchesTab;
   });
 
+
+  // ==========================================
+  // RENDER HELPERS
+  // ==========================================
+
+  const hrFilterGroups = [
+    { key: 'category', title: 'Category Tracks', options: [ { label: 'Government / Defence', value: 'Govt' }, { label: 'Foreign Nationals', value: 'Foreign' }, { label: 'Service / Vendors', value: 'Service' }, { label: 'General Walk-ins', value: 'General' } ] },
+    { key: 'pipeline', title: 'Pipeline Types', options: [ { label: 'Immediate Access', value: 'immediate' }, { label: 'Pre-Scheduled Entry', value: 'scheduled' }, { label: 'Repeated Framework', value: 'repeated' } ] },
+    { key: 'status', title: 'Pass Clearance Status', options: [ { label: 'Pending Review', value: 'Pending' }, { label: 'Approved Access', value: 'Approved' }, { label: 'Active On-Site', value: 'Active' }, { label: 'Cleared Outposts', value: 'Cleared' } ] }
+  ];
+
   const columns: TableColumn<ExtendedVisitorRecord>[] = [
     { key: 'id', label: 'PASS ID', render: (row) => <span className="text-blue-600 font-mono font-bold text-xs">{row.id}</span> },
-    {
-      key: 'visitorName',
-      label: 'VISITOR DETAILS',
-      render: (row) => (
-        <div>
-          <div className="font-semibold text-slate-800 text-sm">{row.visitorName}</div>
-          <div className="text-xs text-slate-500 font-mono">{row.phone}</div>
-        </div>
-      )
-    },
-    {
-      key: 'category',
-      label: 'CATEGORY',
-      render: (row) => {
-        const colors: Record<string, string> = {
-          HR:  'bg-purple-50 text-purple-500 border-purple-100',
-          Govt:'bg-emerald-50 text-emerald-500 border-emerald-100', 
-          Foreign: 'bg-amber-50 text-amber-500 border-amber-100',
-          Service: 'bg-orange-50 text-orange-500 border-orange-100',
-          General: 'bg-blue-50 text-blue-500 border-blue-100'
-        };
-        // FIX: Safe access to the category fallback
+    { key: 'visitorName', label: 'VISITOR DETAILS', render: (row) => ( <div><div className="font-semibold text-slate-800 text-sm">{row.visitorName}</div><div className="text-xs text-slate-500 font-mono">{row.phone}</div></div> ) },
+    { key: 'category', label: 'CATEGORY', render: (row) => {
+        const colors: Record<string, string> = { HR: 'bg-purple-50 text-purple-500 border-purple-100', Govt:'bg-emerald-50 text-emerald-500 border-emerald-100', Foreign: 'bg-amber-50 text-amber-500 border-amber-100', Service: 'bg-orange-50 text-orange-500 border-orange-100', General: 'bg-blue-50 text-blue-500 border-blue-100' };
         const safeCategory = row.category || 'General';
         return <span className={`px-2 py-0.5 text-xs font-bold rounded border ${colors[safeCategory] || 'bg-slate-100'}`}>{safeCategory}</span>;
       }
@@ -344,20 +284,14 @@ const handleRejectEmployee = async (id: string) => {
     { key: 'pipeline', label: 'PIPELINE TYPE', render: (row) => <span className="text-xs uppercase font-semibold text-slate-500 font-mono tracking-wider">{row.pipeline}</span> },
     { key: 'purpose', label: 'PURPOSE OBJECTIVE', render: (row) => <p className="text-xs text-slate-600 max-w-[140px] truncate" title={row.purpose}>{row.purpose}</p> },
     { key: 'hostName', label: 'ASSIGNED HOST', render: (row) => <span className="text-slate-700 font-medium text-xs">{row.hostName}</span> },
-    {
-      key: 'status',
-      label: 'STATUS',
-      render: (row) => {
+    { key: 'status', label: 'STATUS', render: (row) => {
         if (row.status === 'Approved' || row.status === 'Active') return <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-xs rounded font-medium border border-emerald-200">Active</span>;
         if (row.status === 'Pending') return <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded font-medium border border-amber-200">Pending</span>;
         if (row.status === 'Denied') return <span className="px-2 py-0.5 bg-rose-100 text-rose-800 text-xs rounded font-medium border border-rose-200">Denied</span>;
         return <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded border border-slate-200">{row.status}</span>;
       }
     },
-    {
-      key: 'id',
-      label: 'ACTIONS',
-      render: (row) => (
+    { key: 'id', label: 'ACTIONS', render: (row) => (
         <div className="flex items-center space-x-1">
           {row.status === 'Pending' && (
             <>
@@ -371,9 +305,18 @@ const handleRejectEmployee = async (id: string) => {
     }
   ];
 
+  // Helper function to color code real audit logs based on the action
+  const getAuditColor = (action: string) => {
+    const lowerAction = action.toLowerCase();
+    if (lowerAction.includes('approved') || lowerAction.includes('checked_in')) return 'bg-emerald-50 border-emerald-100 text-emerald-800';
+    if (lowerAction.includes('rejected') || lowerAction.includes('denied') || lowerAction.includes('emergency')) return 'bg-rose-50 border-rose-100 text-rose-800';
+    if (lowerAction.includes('checked_out')) return 'bg-blue-50 border-blue-100 text-blue-800';
+    return 'bg-amber-50 border-amber-100 text-amber-800'; // Defaults like 'created', 'pending'
+  };
+
   if (loading) {
     return (
-      <DashboardLayout role="hr" userName="Sinchana K">
+      <DashboardLayout role="hr" userName="HR Admin">
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-pulse flex flex-col items-center">
             <div className="h-8 w-8 bg-blue-600 rounded-full mb-4"></div>
@@ -384,56 +327,91 @@ const handleRejectEmployee = async (id: string) => {
     );
   }
 
-  return (
-    <DashboardLayout role="hr" userName="Sinchana K">
+return (
+    <DashboardLayout 
+      role="hr" 
+      userName="HR Admin"
+      headerAction={
+        /* --- THIS INJECTS THE HR NOTIFICATION BELL INTO THE TOP NAVBAR --- */
+        <div className="relative">
+          <button 
+            onClick={() => setShowNotifications(!showNotifications)}
+            className="relative p-2 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <Bell className="w-5 h-5 text-slate-700" />
+            {pendingUsers.length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border-2 border-white shadow-sm animate-pulse">
+                {pendingUsers.length}
+              </span>
+            )}
+          </button>
+
+          {showNotifications && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+              <div className="absolute right-0 mt-3 w-[400px] bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden origin-top-right animate-fade-in text-left">
+                <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                  <h3 className="font-bold text-slate-800 text-sm flex items-center">
+                    <Shield className="w-4 h-4 mr-2 text-blue-600" /> Employee Approvals
+                  </h3>
+                  <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-bold">
+                    {pendingUsers.length} Pending
+                  </span>
+                </div>
+                
+                <div className="max-h-[400px] overflow-y-auto custom-scrollbar bg-slate-50/50">
+                  {pendingUsers.length === 0 ? (
+                    <div className="p-8 text-center text-slate-500 flex flex-col items-center">
+                      <CheckCircle className="w-8 h-8 mb-2 text-emerald-400 opacity-50" />
+                      <p className="text-sm font-medium">You're all caught up!</p>
+                      <p className="text-xs mt-1 opacity-70">No pending access requests.</p>
+                    </div>
+                  ) : (
+                    <div className="p-2 space-y-2">
+                      {pendingUsers.map(user => (
+                        <div key={user.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
+                          <div className="absolute left-0 top-0 h-full w-1 bg-amber-400"></div>
+                          
+                          <div className="flex items-start justify-between mb-3 pl-2">
+                            <div>
+                              <h4 className="font-bold text-slate-900 text-sm">{user.full_name}</h4>
+                              <p className="text-xs text-slate-500 mt-0.5 font-medium">{user.department}</p>
+                            </div>
+                            <span className="text-[9px] font-mono text-slate-400">{user.phone}</span>
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-3 border-t border-slate-100 pl-2">
+                            <button 
+                              onClick={() => handleRejectEmployee(user.id, user.full_name)}
+                              className="flex-1 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-lg transition-colors border border-red-100"
+                            >
+                              Reject
+                            </button>
+                            <button 
+                              onClick={() => handleApproveEmployee(user)}
+                              className="flex-1 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors shadow-sm"
+                            >
+                              Authorize
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      }
+    >
       <div className="max-w-7xl mx-auto space-y-6">
 
-        {/* HR ACTIONABLE NOTIFICATIONS */}
-        {pendingUsers.length > 0 && (
-          <div className="mb-8 border border-slate-200 bg-slate-50/50 rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
-              <h3 className="text-sm font-bold text-slate-800 flex items-center uppercase tracking-wider">
-                <Bell className="w-4 h-4 mr-2 text-blue-600 animate-pulse" /> Pending Access Requests ({pendingUsers.length})
-              </h3>
-              <span className="text-[10px] bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full">Requires HR Authorization</span>
-            </div>
-            
-            <div className="space-y-3">
-              {pendingUsers.map(user => (
-                <div key={user.id} className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all hover:border-slate-300 shadow-sm relative overflow-hidden">
-                  <div className="absolute left-0 top-0 h-full w-1.5 bg-amber-400"></div>
-                  
-                  <div className="flex items-start gap-3 pl-2">
-                    <div className="p-2 bg-amber-50 text-amber-600 rounded-lg mt-0.5">
-                      <AlertCircle className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-sm">{user.full_name}</h4>
-                      <p className="text-xs text-slate-500 mt-1">
-                        <span className="font-semibold text-slate-700">{user.department}</span> • {user.email} • {user.phone}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 w-full md:w-auto shrink-0 border-t md:border-t-0 pt-3 md:pt-0 justify-end">
-                    <button 
-                      onClick={() => handleRejectEmployee(user.id)}
-                      className="px-3 py-1.5 border border-red-100 text-red-600 hover:bg-red-50 font-bold text-xs rounded-lg transition-colors flex items-center gap-1"
-                    >
-                      <XCircle className="w-3.5 h-3.5" /> Reject
-                    </button>
-                    <button 
-                      onClick={() => handleApproveEmployee(user)}
-                      className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
-                    >
-                      <CheckCircle className="w-3.5 h-3.5" /> Authorize Access
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* PAGE HEADER */}
+        <div className="mb-4">
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Command Center</h1>
+          <p className="text-sm text-slate-500 font-medium mt-1">HR Administration & Access Control</p>
+        </div>
         
         {/* Dynamic Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -486,10 +464,7 @@ const handleRejectEmployee = async (id: string) => {
             </div>
 
             <div className="overflow-x-auto">
-              <DataTable 
-                data={matrixFilteredRows} 
-                columns={columns}
-              />
+              <DataTable data={matrixFilteredRows} columns={columns} />
             </div>
           </div>
 
@@ -504,45 +479,60 @@ const handleRejectEmployee = async (id: string) => {
                   </div>
                   <span className="text-xs text-slate-400">Go →</span>
                 </Link>
-                <Link to="/hr/visitormgmt" className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-amber-500 hover:bg-slate-50/50 transition-all group">
+                <Link to="/hr/hrrep" className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-amber-500 hover:bg-slate-50/50 transition-all group">
                   <div className="flex items-center text-sm font-medium text-slate-700">
                     <History className="w-4 h-4 mr-3 text-slate-400 group-hover:text-amber-500" />
                     Review Repeated Manifests
                   </div>
                   <span className="text-xs text-slate-400">View →</span>
                 </Link>
-                <div onClick={() => alert('Synchronizing console parameters...')} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-purple-500 hover:bg-slate-50/50 transition-all cursor-pointer group">
+                <Link to="/hr/audit" className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-purple-500 hover:bg-slate-50/50 transition-all cursor-pointer group">
                   <div className="flex items-center text-sm font-medium text-slate-700">
                     <Shield className="w-4 h-4 mr-3 text-slate-400 group-hover:text-purple-500" />
-                    Gate Security Sync Console
+                    Full Security Audit Trail
                   </div>
-                  <span className="text-xs text-slate-400">Link 🟢</span>
-                </div>
+                  <span className="text-xs text-slate-400">View 🛡️</span>
+                </Link>
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col h-[320px]">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-3">
+            {/* REAL DATABASE LIVE AUDIT PANEL */}
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col h-[400px]">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-3 shrink-0">
                 <h3 className="font-bold text-slate-800 text-base flex items-center">
                   <Bell className="w-4 h-4 mr-2 text-slate-500" />
                   Live Activity Broadcast
                 </h3>
                 <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
               </div>
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
-                {broadcastLogs.map((log) => (
-                  <div key={log.id} className={`p-3 border rounded-lg transition-all duration-300 ${log.color}`}>
-                    <div className="flex justify-between font-bold text-[10px] uppercase tracking-wider mb-1">
-                      <span>{log.type}</span>
-                      <span className="font-mono text-slate-400">LIVE</span>
-                    </div>
-                    <p className="font-medium">{log.text}</p>
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs custom-scrollbar">
+                {liveAuditLogs.length > 0 ? (
+                  liveAuditLogs.map((log) => {
+                    const timeFormatted = new Date(log.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                    const colorClass = getAuditColor(log.action);
+                    return (
+                      <div key={log.id} className={`p-3 border rounded-lg transition-all duration-300 ${colorClass}`}>
+                        <div className="flex justify-between font-bold text-[10px] uppercase tracking-wider mb-1">
+                          <span>{log.action.replace(/_/g, ' ')}</span>
+                          <span className="font-mono text-slate-500">{timeFormatted}</span>
+                        </div>
+                        <p className="font-medium text-xs leading-snug">{log.remarks}</p>
+                        <div className="mt-2 pt-2 border-t border-black/5 flex justify-between text-[9px] uppercase tracking-widest text-slate-500">
+                          <span>By: {log.performed_by}</span>
+                          <span className="font-mono">{log.performed_by_role}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                    <Clock className="w-8 h-8 mb-2 opacity-50" />
+                    <p>No recent activity detected.</p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </div>
-
         </div>
       </div>
 
@@ -734,7 +724,14 @@ const handleRejectEmployee = async (id: string) => {
         .animate-slide-in-right { animation: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         @keyframes fade-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         .animate-fade-in { animation: fade-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        /* Custom scrollbar for the live activity feed */
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: #94a3b8; }
       `}} />
     </DashboardLayout>
   );
+
 }

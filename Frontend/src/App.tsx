@@ -136,7 +136,7 @@ export default function App() {
         {/*PUBLIC & AUTH ROUTES*/}
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={!userRole ? <Login /> : <Navigate to={`/${userRole === 'employee' ? 'emp' : userRole}`} replace />} />
-        <Route path="/register" element={<DummyPage title="Employee Registration" />} />
+        <Route path="/register" element={<Register/>} />
         <Route path="/pending" element={<DummyPage title="Pending HR Approval" />} />
         <Route path="/unauthorized" element={<DummyPage title="401 - Unauthorized Access" />} />
 

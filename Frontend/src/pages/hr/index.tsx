@@ -1,6 +1,6 @@
 // pages/hr/index.tsx
 import { useState, useEffect } from 'react';
-import { Link,useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { User, Building, FileText, Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Bell, Eye, CheckCircle, X } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
@@ -45,13 +45,11 @@ export default function HRDashboard() {
   const [readLogs, setReadLogs] = useState<string[]>(JSON.parse(localStorage.getItem('readLogs') || '[]'));
 
   const handleAuditClick = (logId: string) => {
-    // Mark as read
     if (!readLogs.includes(logId)) {
       const newReadLogs = [...readLogs, logId];
       setReadLogs(newReadLogs);
       localStorage.setItem('readLogs', JSON.stringify(newReadLogs));
     }
-    // Close dropdown and navigate
     setShowNotifications(false);
     navigate('/hr/audit');
   };
@@ -69,14 +67,15 @@ export default function HRDashboard() {
   // ==========================================
   // DATA FETCHING & REAL-TIME POLLING
   // ==========================================
-  
-const fetchPendingUsers = async () => {
-    const { data } = await supabase
+
+  const fetchPendingUsers = async () => {
+    const { data, error } = await supabase
       .from('employee_registrations')
       .select('*')
-      .ilike('status', 'pending'); 
+      .in('status', ['pending', 'Pending', 'PENDING']); 
     
     if (data) setPendingUsers(data);
+    if (error) console.error("Failed to fetch pending users:", error);
   };
 
   const fetchLiveAuditLogs = async () => {
@@ -85,7 +84,7 @@ const fetchPendingUsers = async () => {
         .from('audit_logs')
         .select('*')
         .order('timestamp', { ascending: false })
-        .limit(15); // Get the 15 most recent actions across the whole facility
+        .limit(15);
       
       if (error) throw error;
       if (data) setLiveAuditLogs(data);
@@ -162,10 +161,9 @@ const fetchPendingUsers = async () => {
     fetchPendingUsers();
     fetchLiveAuditLogs();
 
-    // Poll for new audit logs and pending users every 10 seconds to keep the dashboard "Live"
     const interval = setInterval(() => {
-      fetchLiveAuditLogs();
       fetchPendingUsers();
+      fetchLiveAuditLogs();
     }, 10000);
     
     return () => clearInterval(interval);
@@ -190,20 +188,20 @@ const fetchPendingUsers = async () => {
         email: user.email,
         phone: user.phone,
         department: user.department,
-        role: 'employee' // Automatically grants employee portal access
+        role: 'employee' 
       }]);
 
       await supabase.from('employee_registrations').update({ status: 'approved' }).eq('id', user.id);
 
       await supabase.from('audit_logs').insert([{
-        action: 'approved',
-        remarks: `HR securely authorized new employee access for ${user.full_name} (${user.department})`,
+        action: 'account_approved',
+        remarks: `HR authorized portal access for ${user.full_name} (${user.department})`,
         performed_by: 'HR Admin', 
         performed_by_role: 'hr'
       }]);
 
       fetchPendingUsers(); 
-      fetchLiveAuditLogs(); // Instantly show it in the live feed
+      fetchLiveAuditLogs(); 
     } catch (error) {
       console.error("Approval failed", error);
       alert("Failed to approve user.");
@@ -211,19 +209,19 @@ const fetchPendingUsers = async () => {
   };
 
   const handleRejectEmployee = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to reject registration for ${name}?`)) return;
+    if (!window.confirm(`Are you sure you want to decline access for ${name}?`)) return;
     await supabase.from('employee_registrations').update({ status: 'rejected' }).eq('id', id);
     
     await supabase.from('audit_logs').insert([{
-      action: 'rejected',
-      remarks: `HR rejected portal access request for ${name}.`,
+      action: 'account_rejected',
+      remarks: `HR declined portal access request for ${name}.`,
       performed_by: 'HR Admin', 
       performed_by_role: 'hr'
     }]);
 
     fetchPendingUsers();
     fetchLiveAuditLogs();
-  };  
+  };
 
   const handleUpdateStatus = async (visitId: string | null, newStatus: 'Approved' | 'Denied' | null, remarkText: string) => {
     if (!visitId || !newStatus) return;
@@ -231,7 +229,6 @@ const fetchPendingUsers = async () => {
       const { error } = await supabase.from('visits').update({ status: newStatus, hr_remarks: remarkText }).eq('visit_id', visitId);
       if (error) throw error;
       
-      // Log the pass approval/denial in the audit log
       await supabase.from('audit_logs').insert([{
         action: newStatus === 'Approved' ? 'approved' : 'rejected',
         remarks: `HR ${newStatus} visitor pass ${visitId}. Note: ${remarkText || 'No remarks provided.'}`,
@@ -335,13 +332,12 @@ const fetchPendingUsers = async () => {
     }
   ];
 
-  // Helper function to color code real audit logs based on the action
   const getAuditColor = (action: string) => {
     const lowerAction = action.toLowerCase();
     if (lowerAction.includes('approved') || lowerAction.includes('checked_in')) return 'bg-emerald-50 border-emerald-100 text-emerald-800';
     if (lowerAction.includes('rejected') || lowerAction.includes('denied') || lowerAction.includes('emergency')) return 'bg-rose-50 border-rose-100 text-rose-800';
     if (lowerAction.includes('checked_out')) return 'bg-blue-50 border-blue-100 text-blue-800';
-    return 'bg-amber-50 border-amber-100 text-amber-800'; // Defaults like 'created', 'pending'
+    return 'bg-amber-50 border-amber-100 text-amber-800'; 
   };
 
   if (loading) {
@@ -357,12 +353,12 @@ const fetchPendingUsers = async () => {
     );
   }
 
-return (
+  return (
     <DashboardLayout 
       role="hr" 
       userName="HR Admin"
-headerAction={
-        /* --- UNIFIED SAAS-STYLE NOTIFICATION CENTER --- */
+      headerAction={
+        /* --- COMBINED NOTIFICATION CENTER (ACTIONABLE + FEED) --- */
         <div className="relative">
           <button 
             onClick={() => setShowNotifications(!showNotifications)}
@@ -403,7 +399,7 @@ headerAction={
                 
                 <div className="overflow-y-auto custom-scrollbar bg-slate-50/50 flex-1">
                   
-                  {/* 1. CRITICAL: PENDING APPROVALS (Always Unread/Action Required) */}
+                  {/* 1. CRITICAL: PENDING APPROVALS (With Action Buttons) */}
                   {pendingUsers.length > 0 && (
                     <div className="p-3 border-b border-slate-100 bg-blue-50/30">
                       <div className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-3 px-1 flex items-center">
@@ -458,7 +454,6 @@ headerAction={
                                   : 'bg-white border-slate-200 shadow-sm hover:border-blue-300'
                               }`}
                             >
-                              {/* Unread Dot Indicator */}
                               <div className="pt-1.5 shrink-0">
                                 <div className={`w-2 h-2 rounded-full transition-colors ${isRead ? 'bg-slate-300' : 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]'}`} />
                               </div>
@@ -483,7 +478,6 @@ headerAction={
                     </div>
                   )}
 
-                  {/* Empty State */}
                   {pendingUsers.length === 0 && liveAuditLogs.length === 0 && (
                     <div className="py-12 text-center text-slate-400">
                       <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
@@ -495,7 +489,6 @@ headerAction={
                   )}
                 </div>
                 
-                {/* Footer link to full audit page */}
                 <div className="p-3 border-t border-slate-100 bg-slate-50 text-center shrink-0">
                   <button 
                     onClick={() => { setShowNotifications(false); navigate('/hr/audit'); }}
@@ -839,5 +832,4 @@ headerAction={
       `}} />
     </DashboardLayout>
   );
-
 }

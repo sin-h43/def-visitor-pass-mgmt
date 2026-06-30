@@ -70,8 +70,12 @@ export default function HRDashboard() {
   // DATA FETCHING & REAL-TIME POLLING
   // ==========================================
   
-  const fetchPendingUsers = async () => {
-    const { data } = await supabase.from('employee_registrations').select('*').eq('status', 'pending');
+const fetchPendingUsers = async () => {
+    const { data } = await supabase
+      .from('employee_registrations')
+      .select('*')
+      .ilike('status', 'pending'); 
+    
     if (data) setPendingUsers(data);
   };
 

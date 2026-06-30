@@ -247,7 +247,7 @@ export default function AuditLogsPage() {
       <div className="max-w-7xl mx-auto space-y-6">
         
         <div className="flex items-center space-x-3">
-          <div className="p-2 bg-slate-900 text-white rounded-lg shadow-sm">
+          <div className="p-2 bg-slate-800 text-white rounded-lg shadow-sm">
             <Shield className="w-6 h-6" />
           </div>
           <div>
@@ -259,19 +259,19 @@ export default function AuditLogsPage() {
         {/* Dynamic Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
-            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Ledger Entries</p><p className="text-2xl font-black text-slate-800 mt-1">{metrics.total}</p></div>
+            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Ledger Entries</p><p className="text-2xl font-bold text-slate-800 mt-1">{metrics.total}</p></div>
             <div className="p-3 rounded-lg bg-blue-50 text-blue-600 border border-blue-100"><FileText className="w-5 h-5" /></div>
           </div>
           <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
-            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Today's Check-ins</p><p className="text-2xl font-black text-emerald-600 mt-1">{metrics.todayCheckins}</p></div>
+            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Today's Check-ins</p><p className="text-2xl font-bold text-emerald-600 mt-1">{metrics.todayCheckins}</p></div>
             <div className="p-3 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100"><CheckCircle className="w-5 h-5" /></div>
           </div>
           <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
-            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Denials & Removals</p><p className="text-2xl font-black text-orange-600 mt-1">{metrics.denials}</p></div>
+            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Denials & Removals</p><p className="text-2xl font-bold text-orange-600 mt-1">{metrics.denials}</p></div>
             <div className="p-3 rounded-lg bg-orange-50 text-orange-600 border border-orange-100"><XCircle className="w-5 h-5" /></div>
           </div>
           <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
-            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Critical Alerts</p><p className="text-2xl font-black text-red-600 mt-1">{metrics.critical}</p></div>
+            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Critical Alerts</p><p className="text-2xl font-bold text-red-600 mt-1">{metrics.critical}</p></div>
             <div className="p-3 rounded-lg bg-red-50 text-red-600 border border-red-100"><AlertOctagon className="w-5 h-5" /></div>
           </div>
         </div>

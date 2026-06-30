@@ -7,9 +7,11 @@ interface LayoutProps {
   children: React.ReactNode;
   role: 'emp' | 'hr' | 'security';
   userName: string;
+  headerAction?: React.ReactNode;
 }
 
-export default function DashboardLayout({ children, role, userName }: LayoutProps) {
+// 1. ADDED headerAction TO THE DESTRUCTURING HERE
+export default function DashboardLayout({ children, role, userName, headerAction }: LayoutProps) {
   const location = useLocation();
   
   // Managed state for expanding/collapsing navigation bar text
@@ -95,19 +97,19 @@ export default function DashboardLayout({ children, role, userName }: LayoutProp
       {/* Main Content Workspace Area */}
       <div className="flex-1 flex flex-col overflow-hidden w-full">
         {/* Header Frame */}
-        <header className="h-16 bg-slate-50 border-b border-slate-400/60 flex items-center justify-between px-8 shrink-0">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
           
           {/* Left Side Header Controls: Sidebar Collapse Trigger */}
           <div className="flex items-center">
             <button 
               onClick={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
-              className="p-1.5 hover:bg-slate-200 border border-slate-400/60 rounded-lg transition-colors text-slate-700 bg-white"
+              className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-500"
               title={isLeftSidebarOpen ? "Collapse Navigation Sidebar" : "Expand Navigation Sidebar"}
             >
               {isLeftSidebarOpen ? (
-                <PanelLeftClose className="w-4 h-4" />
+                <PanelLeftClose className="w-5 h-5" />
               ) : (
-                <PanelLeftOpen className="w-4 h-4" />
+                <PanelLeftOpen className="w-5 h-5" />
               )}
             </button>
           </div>
@@ -121,11 +123,11 @@ export default function DashboardLayout({ children, role, userName }: LayoutProp
               <span>{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
             </div>
 
-            {/* Notification Bell */}
-            <Bell className="w-5 h-5 cursor-pointer hover:text-slate-800" />
+            {/* 2. REPLACED HARDCODED BELL WITH THE SLOT */}
+            {headerAction ? headerAction : <Bell className="w-5 h-5 cursor-pointer hover:text-slate-800" />}
             
             {/* Profile Avatar Context Box */}
-            <div className="flex items-center pl-4 border-l border-slate-400/60">
+            <div className="flex items-center pl-4 border-l border-slate-200">
               <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs mr-3">
                 {userName.charAt(0)}
               </div>

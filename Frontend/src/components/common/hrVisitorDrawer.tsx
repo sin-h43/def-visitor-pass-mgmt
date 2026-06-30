@@ -118,6 +118,8 @@ export default function VisitDetailDrawer({ isOpen, onClose, visit }: VisitDetai
                   <div key={idx} className="bg-white p-3 border border-slate-200 rounded-xl shadow-sm text-sm">
                     <div className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider border-b border-slate-100 pb-1">Escort {idx + 1}</div>
                     <div className="grid grid-cols-3 gap-1 mb-1"><span className="text-slate-500 font-medium">Name</span><span className="col-span-2 font-bold text-slate-800">{escort.name || 'N/A'}</span></div>
+                    <div className="grid grid-cols-3 gap-1 mb-1"><span className="text-slate-500 font-medium">Gender</span><span className="col-span-2 font-bold text-slate-800">{escort.gender || 'N/A'}</span></div>
+                    <div className="grid grid-cols-3 gap-1 mb-1"><span className="text-slate-500 font-medium">Nationality</span><span className="col-span-2 font-bold text-slate-800">{escort.nationality || 'N/A'}</span></div>
                     <div className="grid grid-cols-3 gap-1 mb-1"><span className="text-slate-500 font-medium">Phone</span><span className="col-span-2 font-medium font-mono text-slate-700">{escort.phone || 'N/A'}</span></div>
                     <div className="grid grid-cols-3 gap-1 mb-1"><span className="text-slate-500 font-medium">Email</span><span className="col-span-2 font-medium text-slate-700 break-all">{escort.email || 'N/A'}</span></div>
                     <div className="grid grid-cols-3 gap-1"><span className="text-slate-500 font-medium">{escort.id_type || 'ID'}</span><span className="col-span-2 font-bold text-slate-700 font-mono tracking-wider">{escort.id_number || 'N/A'}</span></div>

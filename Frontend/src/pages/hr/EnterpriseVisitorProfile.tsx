@@ -126,7 +126,7 @@ export default function EnterpriseVisitorProfile() {
             <button onClick={() => navigate(-1)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors mr-2">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <div className="p-2 bg-slate-900 text-white rounded-lg shadow-md">
+            <div className="p-2 bg-slate-800 text-white rounded-lg shadow-md">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
@@ -188,10 +188,10 @@ export default function EnterpriseVisitorProfile() {
               
               {/* Box 1: Verified Dossier */}
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-4 flex items-center border-b border-slate-100 pb-2">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center border-b border-slate-100 pb-2">
                   <User className="w-4 h-4 mr-2 text-slate-500" /> Verified Dossier
                 </h3>
-                <div className="space-y-3 text-sm">
+                <div className="space-y-1 text-sm">
                   <div className="flex justify-between items-center">
                     <span className="text-slate-500 font-medium">{visitor.id_type || 'Govt ID'}</span>
                     <div className="flex items-center gap-2">
@@ -206,6 +206,10 @@ export default function EnterpriseVisitorProfile() {
                     </div>
                   </div>
                   <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-medium">Nationality</span>
+                    <span className="font-medium text-slate-800 truncate max-w-[150px]" title={visitor.nationality}>{visitor.nationality || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
                     <span className="text-slate-500 font-medium">Contact</span>
                     <span className="font-mono font-bold text-slate-800">{visitor.phone}</span>
                   </div>
@@ -213,12 +217,18 @@ export default function EnterpriseVisitorProfile() {
                     <span className="text-slate-500 font-medium">Email</span>
                     <span className="font-medium text-slate-800 truncate max-w-[150px]" title={visitor.email}>{visitor.email || 'N/A'}</span>
                   </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-medium">DOB</span>
+                    <span className="font-medium text-slate-800 truncate max-w-[150px]" title={visitor.dob}>{visitor.dob || 'N/A'}</span>
+                  </div>
+
                 </div>
               </div>
 
+
               {/* Box 2: Internal Sponsor */}
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-4 flex items-center border-b border-slate-100 pb-2">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center border-b border-slate-100 pb-2">
                   <ShieldCheck className="w-4 h-4 mr-2 text-slate-500" /> Internal Sponsor
                 </h3>
                 <div className="flex items-center gap-3 mb-4">
@@ -237,7 +247,7 @@ export default function EnterpriseVisitorProfile() {
 
               {/* Box 3: Compliance Checklist */}
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm sm:col-span-2">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-4 flex items-center border-b border-slate-100 pb-2">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center border-b border-slate-100 pb-2">
                   <FileText className="w-4 h-4 mr-2 text-slate-500" /> Security Compliance Checklist
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

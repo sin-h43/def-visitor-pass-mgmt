@@ -44,13 +44,19 @@ export default function Register() {
           full_name: fullName,
           phone,
           department,
-          status: 'pending'
+          status: 'Pending'
         }
       ]);
 
       if (dbError) throw dbError;
-
-      // 3. Show success and redirect
+    // 3. NEW: Fire off an Audit Log so the HR Bell rings immediately!
+          await supabase.from('audit_logs').insert([{
+            action: 'pending',
+            remarks: `New employee portal access requested by ${fullName} (${department}).`,
+            performed_by: fullName, 
+            performed_by_role: 'system' // Or 'applicant'
+          }]);
+      // 4. Show success and redirect
       setSuccess(true);
       setTimeout(() => {
         navigate('/pending');

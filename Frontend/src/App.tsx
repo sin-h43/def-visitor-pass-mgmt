@@ -4,7 +4,7 @@ import { supabase } from './lib/supabase';
 
 // --- Auth Pages ---
 import Login from './pages/auth/login';
-// import Register from './pages/auth/register'; // We will build this next
+import Register from './pages/auth/register'; // We will build this next
 // import PendingApproval from './pages/auth/pending'; // We will build this next
 // import Unauthorized from './pages/auth/unauthorized'; // We will build this next
 
@@ -133,19 +133,15 @@ export default function App() {
     <Router>
       <Routes>
         
-        {/* =========================================
-            PUBLIC & AUTH ROUTES
-        ========================================= */}
+        {/*PUBLIC & AUTH ROUTES*/}
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={!userRole ? <Login /> : <Navigate to={`/${userRole === 'employee' ? 'emp' : userRole}`} replace />} />
-        <Route path="/register" element={<DummyPage title="Employee Registration" />} />
+        <Route path="/register" element={<Register/>} />
         <Route path="/pending" element={<DummyPage title="Pending HR Approval" />} />
         <Route path="/unauthorized" element={<DummyPage title="401 - Unauthorized Access" />} />
 
 
-        {/* =========================================
-            EMPLOYEE PORTAL ROUTES
-        ========================================= */}
+        {/*EMPLOYEE PORTAL ROUTES*/}
         <Route path="/emp" element={<ProtectedRoute requiredRole="employee" userRole={userRole} isLoading={isLoading}><EmployeeDashboard /></ProtectedRoute>} />
         <Route path="/emp/add_visitor" element={<ProtectedRoute requiredRole="employee" userRole={userRole} isLoading={isLoading}><AddVisitorPage /></ProtectedRoute>} />
         <Route path="/emp/repeated_visitor" element={<ProtectedRoute requiredRole="employee" userRole={userRole} isLoading={isLoading}><RepeatedVisitorPage /></ProtectedRoute>} />
@@ -153,9 +149,7 @@ export default function App() {
         <Route path="/emp/settings" element={<ProtectedRoute requiredRole="employee" userRole={userRole} isLoading={isLoading}><div className="p-8">Employee Settings (Coming Soon)</div></ProtectedRoute>} />
 
 
-        {/* =========================================
-            HR PORTAL ROUTES
-        ========================================= */}
+        {/*HR PORTAL ROUTES */}
         <Route path="/hr" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><HRDashboard /></ProtectedRoute>} />
         <Route path="/hr/visitormgmt" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><VisitorMgmtPage /></ProtectedRoute>} />
         <Route path="/hr/add_visitor" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><HRAddVisitorPage /></ProtectedRoute>} />
@@ -171,16 +165,12 @@ export default function App() {
         {/* <Route path="/hr/approvals" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><RegistrationManagement /></ProtectedRoute>} /> */}
 
 
-        {/* =========================================
-            SECURITY PORTAL ROUTES
-        ========================================= */}
+        {/*SECURITY PORTAL ROUTES*/}
         <Route path="/security" element={<ProtectedRoute requiredRole="security" userRole={userRole} isLoading={isLoading}><SecurityDashboard /></ProtectedRoute>} />
         <Route path="/security/verify/:visitorId" element={<ProtectedRoute requiredRole="security" userRole={userRole} isLoading={isLoading}><VisitorVerification /></ProtectedRoute>} />
 
 
-        {/* =========================================
-            CATCH-ALL (404)
-        ========================================= */}
+        {/*CATCH-ALL (404)*/}
         <Route path="*" element={
           <div className="h-screen w-full flex items-center justify-center bg-slate-50 text-slate-500">
             <div className="text-center">

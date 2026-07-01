@@ -28,6 +28,7 @@ import AddVisitorHRPage from './pages/hr/add_visitor_hr';
 import AddVisitorServicePage from './pages/hr/add_visitor_service';
 import EnterpriseVisitorProfile from './pages/hr/EnterpriseVisitorProfile';
 // import RegistrationManagement from './pages/hr/registration_management'; // We will build this for HR to approve users
+import Unauthorized from './pages/auth/unauthorized';
 
 // --- Security Pages ---
 import SecurityDashboard from './pages/security';
@@ -138,8 +139,7 @@ export default function App() {
         <Route path="/login" element={!userRole ? <Login /> : <Navigate to={`/${userRole === 'employee' ? 'emp' : userRole}`} replace />} />
         <Route path="/register" element={<Register/>} />
         <Route path="/pending" element={<DummyPage title="Pending HR Approval" />} />
-        <Route path="/unauthorized" element={<DummyPage title="401 - Unauthorized Access" />} />
-
+        <Route path="/unauthorized" element={<Unauthorized />} />
 
         {/*EMPLOYEE PORTAL ROUTES*/}
         <Route path="/emp" element={<ProtectedRoute requiredRole="employee" userRole={userRole} isLoading={isLoading}><EmployeeDashboard /></ProtectedRoute>} />

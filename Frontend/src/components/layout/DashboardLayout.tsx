@@ -32,7 +32,7 @@ export default function DashboardLayout({ children, role, userName, headerAction
       { label: 'Dashboard', icon: LayoutDashboard, path: '/hr' },
       { label: 'Visitor Management', icon: Users, path: '/hr/visitormgmt' },
       { label: 'Repeated Visitor Logs', icon: Repeat, path: '/hr/hrrep' },
-      { label: 'Analytics', icon: BarChart3, path: '/hr/analytics' },
+      // { label: 'Analytics', icon: BarChart3, path: '/hr/analytics' },
       { label: 'Audit Logs', icon: FileText, path: '/hr/audit' },
     ];
   } else if (role === 'security') {

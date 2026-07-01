@@ -6,6 +6,10 @@ import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
 import type { TableColumn } from '../../types/visitor';
 import { Shield, Eye, X, User, Activity, Clock, FileText, Download, AlertOctagon, CheckCircle, XCircle, UserPlus } from 'lucide-react';
+import { useNotification } from '../../hooks/useNotification';
+import NotificationToast from '../../components/common/NotificationToast';
+import HRNotificationCenter from './HRNotificationCenter';
+
 
 interface ExtendedAuditLog {
   id: string;
@@ -26,6 +30,7 @@ interface ExtendedAuditLog {
 }
 
 export default function AuditLogsPage() {
+  const {notifications, addNotification, removeNotification} = useNotification();
   const [activeTab, setActiveTab] = useState<'Account Requests' | 'System Logs'>('System Logs');
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
 
@@ -104,6 +109,8 @@ export default function AuditLogsPage() {
       setLogs(formattedLogs);
     } catch (error) {
       console.error('Error fetching data:', error);
+      addNotification('error', 'Failed to load visitor directory.');
+
     } finally {
       setLoading(false);
     }
@@ -295,7 +302,7 @@ export default function AuditLogsPage() {
   ];
 
   return (
-    <DashboardLayout role="hr" userName="System Admin">
+    <DashboardLayout role="hr" userName="System Admin" headerAction={<HRNotificationCenter/>}>
       <div className="max-w-7xl mx-auto space-y-6">
         
         <div className="flex items-center space-x-3">
@@ -529,6 +536,8 @@ export default function AuditLogsPage() {
         @keyframes slide-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
         .animate-slide-in-right { animation: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       `}} />
+
+      <NotificationToast notifications={notifications} onRemove={removeNotification} />
     </DashboardLayout>
   );
 }

@@ -6,6 +6,10 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import type { TableColumn } from '../../types/visitor';
 import { supabase } from '../../lib/supabase';
+import { useNotification } from '../../hooks/useNotification';
+import NotificationToast from '../../components/common/NotificationToast';
+import HRNotificationCenter from './HRNotificationCenter';
+
 
 // --- DATA MODELS ---
 interface VisitHistory {
@@ -39,6 +43,8 @@ interface VisitorProfile {
 
 export default function HRRepeatedVisitorLogPage() {
   const navigate = useNavigate();
+  const { notifications, addNotification, removeNotification } = useNotification();
+  
   const [directory, setDirectory] = useState<VisitorProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -114,6 +120,7 @@ export default function HRRepeatedVisitorLogPage() {
       }
     } catch (error) {
       console.error('Error fetching visitor directory:', error);
+      addNotification('error', 'Failed to load visitor directory.');
     } finally {
       setLoading(false);
     }
@@ -243,7 +250,7 @@ export default function HRRepeatedVisitorLogPage() {
 
   if (loading) {
     return (
-      <DashboardLayout role="hr" userName="Sinchana K">
+      <DashboardLayout role="hr" userName="Sinchana K" >
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-pulse flex flex-col items-center">
             <div className="h-8 w-8 bg-indigo-600 rounded-full mb-4"></div>
@@ -255,8 +262,7 @@ export default function HRRepeatedVisitorLogPage() {
   }
 
   return (
-    <DashboardLayout role="hr" userName="Sinchana K"
-    >
+    <DashboardLayout role="hr" userName="Sinchana K" headerAction={<HRNotificationCenter />}>
       <div className="max-w-7xl mx-auto space-y-6 pb-12">
         
         {/* Professional Identity Header */}
@@ -299,6 +305,9 @@ export default function HRRepeatedVisitorLogPage() {
         </div>
 
       </div>
+      
+      <NotificationToast notifications={notifications} onRemove={removeNotification} />
+      
     </DashboardLayout>
   );
 }

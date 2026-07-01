@@ -7,6 +7,10 @@ import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
 import type { VisitorRecord, TableColumn } from '../../types/visitor';
 import { supabase } from '../../lib/supabase';
+import { useNotification } from '../../hooks/useNotification';
+import NotificationToast from '../../components/common/NotificationToast';
+import HRNotificationCenter from './HRNotificationCenter';
+
 
 export interface ExtendedVisitorRecord extends VisitorRecord {
   requestedAt: string;
@@ -17,6 +21,7 @@ export interface ExtendedVisitorRecord extends VisitorRecord {
 }
 
 export default function VisitorMgmtPage() {
+  const { notifications, addNotification, removeNotification } = useNotification();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -155,8 +160,9 @@ export default function VisitorMgmtPage() {
       
       setRemarkModal({ isOpen: false, visitId: null, action: null, text: '' });
       setIsDrawerOpen(false);
+      addNotification('success', `Visitor request has been ${newStatus.toLowerCase()} successfully!`);
     } catch (err) {
-      alert("Failed to process status change.");
+      addNotification('error', "Failed to process status change.");
     }
   };
 
@@ -167,9 +173,9 @@ export default function VisitorMgmtPage() {
       
       setVisitorLogs(prev => prev.map(log => log.id === visitId ? { ...log, hr_remarks: remarkText } : log));
       if (selectedVisitor?.id === visitId) setSelectedVisitor(prev => prev ? { ...prev, hr_remarks: remarkText } : null);
-      alert("Internal note updated successfully!");
+      addNotification('success', "Internal note updated successfully!");
     } catch (error) {
-      alert("Failed to save note.");
+      addNotification('error', "Failed to save note.");
     }
   };
 
@@ -351,7 +357,7 @@ export default function VisitorMgmtPage() {
   }
 
   return (
-    <DashboardLayout role="hr" userName="Sinchana K">
+    <DashboardLayout role="hr" userName="Sinchana K" headerAction={<HRNotificationCenter />}>
       <div className="max-w-7xl mx-auto space-y-8">
         
         <div className="flex items-center space-x-3">
@@ -605,6 +611,9 @@ export default function VisitorMgmtPage() {
         )}
 
       </div>
+      
+      <NotificationToast notifications={notifications} onRemove={removeNotification} />
+
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes slide-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
         .animate-slide-in-right { animation: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }

@@ -13,6 +13,16 @@ export interface ExtendedVisitorRecord extends VisitorRecord {
   visitDate: string;
   passType: string;
 }
+interface PendingUser {
+  id: string;
+  auth_id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  department: string;
+  status: string;
+  created_at: string;
+}
 
 export default function HRDashboard() {
   const [dataList, setDataList] = useState<ExtendedVisitorRecord[]>([]);
@@ -21,7 +31,7 @@ export default function HRDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   
   // Real Database States
-  const [pendingUsers, setPendingUsers] = useState<any[]>([]);
+  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
   const [liveAuditLogs, setLiveAuditLogs] = useState<any[]>([]);
 
   // Modal & Drawer States
@@ -66,16 +76,33 @@ export default function HRDashboard() {
   // DATA FETCHING & REAL-TIME POLLING
   // ==========================================
 
-  const fetchPendingUsers = async () => {
-    // Bulletproof case-insensitive fetch
+const fetchPendingUsers = async () => {
+  try {
+    console.log('🔄 Fetching pending users...');
+    
     const { data, error } = await supabase
       .from('employee_registrations')
       .select('*')
-      .ilike('status', 'pending'); 
-    
-    if (data) setPendingUsers(data);
-    if (error) console.error("Failed to fetch pending users:", error);
-  };
+      .eq('status', 'Pending')  // Changed from ilike to eq with correct case
+      .order('created_at', { ascending: false });
+ 
+    if (error) {
+      console.error('❌ Error fetching pending users:', error);
+      return;
+    }
+ 
+    if (data && data.length > 0) {
+      console.log(`✅ Found ${data.length} pending users:`, data);
+      setPendingUsers(data);
+    } else {
+      console.log('📭 No pending users found');
+      setPendingUsers([]);
+    }
+  } catch (err) {
+    console.error('❌ Exception while fetching pending users:', err);
+  }
+};
+
 
   const fetchLiveAuditLogs = async () => {
     try {
@@ -160,6 +187,7 @@ export default function HRDashboard() {
     fetchLiveAuditLogs();
 
     const interval = setInterval(() => {
+      fetchVisits();
       fetchPendingUsers();
       fetchLiveAuditLogs();
     }, 10000);
@@ -177,48 +205,96 @@ export default function HRDashboard() {
   // ACTION HANDLERS
   // ==========================================
 
-  const handleApproveEmployee = async (user: any) => {
-    try {
-      await supabase.from('employees').insert([{
-        auth_id: user.auth_id,
-        name: user.full_name,
-        email: user.email,
-        phone: user.phone,
-        department: user.department,
-        role: 'employee' 
-      }]);
-
-      await supabase.from('employee_registrations').update({ status: 'approved' }).eq('id', user.id);
-
-      await supabase.from('audit_logs').insert([{
-        action: 'account_approved',
-        remarks: `HR authorized portal access for ${user.full_name} (${user.department})`,
-        performed_by: 'HR Admin', 
-        performed_by_role: 'hr'
-      }]);
-
-      fetchPendingUsers(); 
-      fetchLiveAuditLogs(); 
-    } catch (error) {
-      console.error("Approval failed", error);
-      alert("Failed to approve user.");
-    }
-  };
-
-  const handleRejectEmployee = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to decline access for ${name}?`)) return;
-    await supabase.from('employee_registrations').update({ status: 'rejected' }).eq('id', id);
+const handleApproveEmployee = async (user: any) => {
+  try {
+    console.log('✅ Approving employee:', user.full_name);
     
-    await supabase.from('audit_logs').insert([{
+    // 1. Create employee record
+    const { error: insertError } = await supabase.from('employees').insert([{
+      auth_id: user.auth_id,
+      name: user.full_name,
+      email: user.email,
+      phone: user.phone,
+      department: user.department,
+      role: 'employee' 
+    }]);
+ 
+    if (insertError) {
+      console.error('Error inserting employee:', insertError);
+      throw insertError;
+    }
+ 
+    // 2. Update registration status
+    const { error: updateError } = await supabase
+      .from('employee_registrations')
+      .update({ status: 'approved' })
+      .eq('id', user.id);
+ 
+    if (updateError) {
+      console.error('Error updating registration:', updateError);
+      throw updateError;
+    }
+ 
+    // 3. Log the action
+    const { error: logError } = await supabase.from('audit_logs').insert([{
+      action: 'account_approved',
+      remarks: `HR authorized portal access for ${user.full_name} (${user.department})`,
+      performed_by: 'HR Admin', 
+      performed_by_role: 'hr'
+    }]);
+ 
+    if (logError) {
+      console.error('Error logging action:', logError);
+    }
+ 
+    console.log('✅ Approval complete');
+    alert(`✅ Access approved for ${user.full_name}`);
+    fetchPendingUsers(); 
+    fetchLiveAuditLogs(); 
+  } catch (error) {
+    console.error("Approval failed:", error);
+    alert("❌ Failed to approve user. Check console for details.");
+  }
+};
+
+const handleRejectEmployee = async (id: string, name: string) => {
+  if (!window.confirm(`Are you sure you want to decline access for ${name}?`)) return;
+  
+  try {
+    console.log('❌ Rejecting employee:', name);
+    
+    // 1. Update registration status
+    const { error: updateError } = await supabase
+      .from('employee_registrations')
+      .update({ status: 'rejected' })
+      .eq('id', id);
+ 
+    if (updateError) {
+      console.error('Error updating registration:', updateError);
+      throw updateError;
+    }
+ 
+    // 2. Log the action
+    const { error: logError } = await supabase.from('audit_logs').insert([{
       action: 'account_rejected',
       remarks: `HR declined portal access request for ${name}.`,
       performed_by: 'HR Admin', 
       performed_by_role: 'hr'
     }]);
-
+ 
+    if (logError) {
+      console.error('Error logging action:', logError);
+    }
+ 
+    console.log('✅ Rejection complete');
+    alert(`✅ Access declined for ${name}`);
     fetchPendingUsers();
     fetchLiveAuditLogs();
-  };
+  } catch (error) {
+    console.error("Rejection failed:", error);
+    alert("❌ Failed to reject user. Check console for details.");
+  }
+};
 
   const handleUpdateStatus = async (visitId: string | null, newStatus: 'Approved' | 'Denied' | null, remarkText: string) => {
     if (!visitId || !newStatus) return;

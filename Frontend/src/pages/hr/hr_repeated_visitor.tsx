@@ -255,7 +255,8 @@ export default function HRRepeatedVisitorLogPage() {
   }
 
   return (
-    <DashboardLayout role="hr" userName="Sinchana K">
+    <DashboardLayout role="hr" userName="Sinchana K"
+    >
       <div className="max-w-7xl mx-auto space-y-6 pb-12">
         
         {/* Professional Identity Header */}

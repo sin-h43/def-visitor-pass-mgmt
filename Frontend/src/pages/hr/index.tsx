@@ -13,6 +13,7 @@ export interface ExtendedVisitorRecord extends VisitorRecord {
   requestedAt: string;
   visitDate: string;
   passType: string;
+  checkoutTime?: string;
 }
 interface PendingUser {
   id: string;
@@ -157,7 +158,16 @@ const fetchPendingUsers = async () => {
           if (dbType === 'prescheduled' || dbType === 'scheduled') uiPipeline = 'scheduled';
           if (dbType === 'repeated') uiPipeline = 'repeated';
 
-          const computedCategory = row.visitors?.nationality?.toLowerCase() !== 'indian' ? 'Foreign' : 'General';
+          let computedCategory = 'General';
+          if (row.visit_type) {
+            const type = row.visit_type.toLowerCase();
+            if (type.includes('govt')) computedCategory = 'Govt';
+            else if (type.includes('hr')) computedCategory = 'HR';
+            else if (type.includes('service')) computedCategory = 'Service';
+            else if (type.includes('foreign')) computedCategory = 'Foreign';
+          } else if (row.visitors?.nationality?.toLowerCase() !== 'indian') {
+            computedCategory = 'Foreign';
+          }
           const escortsArray = Array.isArray(row.escorts) ? row.escorts : (row.escorts ? [row.escorts] : []);
 
           return {
@@ -708,7 +718,7 @@ const handleRejectEmployee = async (id: string, name: string) => {
       </div>
 
       {/* REVIEW SLIDE-OUT DRAWER PORTAL */}
-      {isDrawerOpen && selectedVisitor && (
+{isDrawerOpen && selectedVisitor && (
         <div className="fixed inset-0 z-50 overflow-hidden">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setIsDrawerOpen(false)} />
           
@@ -725,86 +735,111 @@ const handleRejectEmployee = async (id: string, name: string) => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/50">
-              <section>
-                <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                  <Shield className="w-4 h-4 mr-2 text-amber-600" /> Audit & Request Tracking
-                </h3>
-                <div className="space-y-1 text-sm">
-                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Requested By</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.hostName}</span></div>
-                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Request Date</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.requestedAt}</span></div>
-                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Scheduled Visit</span><span className="col-span-2 font-medium text-slate-900 text-blue-600">{selectedVisitor.visitDate}</span></div>
-                </div>
-              </section>
+              {(() => {
+                const isForeign = selectedVisitor.category === 'Foreign';
+                const isGovt = selectedVisitor.category === 'Govt';
+                const isHR = selectedVisitor.category === 'HR';
+                const isService = selectedVisitor.category === 'Service';
 
-              <section>
-                <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                  <User className="w-4 h-4 mr-2 text-blue-600" /> Visitor Identity
-                </h3>
-                <div className="space-y-1 text-sm">
-                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Full Name</span><span className="col-span-2 font-bold text-slate-900">{selectedVisitor.visitorName}</span></div>
-                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Gender</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.gender}</span></div>
-                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Nationality</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.nationality}</span></div>
-                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Phone</span><span className="col-span-2 font-medium text-slate-900 font-mono">{selectedVisitor.phone}</span></div>
-                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Email</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.email}</span></div>
-                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">DOB</span><span className="col-span-2 font-medium text-slate-900 font-mono">{selectedVisitor.dob}</span></div>
-                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">ID Type</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.id_type}</span></div>
-                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">ID Number</span><span className="col-span-2 font-medium text-slate-900 font-mono tracking-wider">{selectedVisitor.id_number}</span></div>
-                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Organization</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.organization}</span></div>
-                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Designation</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.designation}</span></div>
-                </div>
-              </section>
+                const orgLabel = isGovt ? 'Command Ministry' : isService ? 'Contracting Agency' : isForeign ? 'Global Organization' : isHR ? 'Sponsoring Inst.' : 'Organization';
+                const desigLabel = isGovt ? 'Official Rank' : isService ? 'Field Trade' : isForeign ? 'Diplomatic Rank' : isHR ? 'HR Track' : 'Designation';
+                
+                const tagMatch = selectedVisitor.purpose.match(/^\[(.*?)\]\s*(.*)/);
+                const secureTag = tagMatch ? tagMatch[1] : null;
+                const cleanPurpose = tagMatch ? tagMatch[2].split(' | Accompanying')[0] : selectedVisitor.purpose.split(' | Accompanying')[0];
 
-              <section>
-                <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                  <Building className="w-4 h-4 mr-2 text-blue-600" /> Purpose of Visit
-                </h3>
-                <div className="space-y-1 text-sm">
-                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Department</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.department}</span></div>
-                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Pipeline</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.pipeline}</span></div>
-                  <div>
-                    <span className="text-slate-500 block mb-1">Declared Purpose</span>
-                    <div className="bg-white p-3 border border-slate-200 rounded-lg leading-relaxed shadow-sm text-slate-800 text-xs font-medium">
-                      {selectedVisitor.purpose}
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                  <Users className="w-4 h-4 mr-2 text-blue-600" /> Accompanying Escorts
-                </h3>
-                {selectedVisitor.escorts && selectedVisitor.escorts.length > 0 ? (
-                  <div className="space-y-3 mt-2">
-                    {selectedVisitor.escorts.map((escort, idx) => (
-                      <div key={idx} className="bg-white p-3 border border-slate-200 rounded-lg shadow-sm text-sm">
-                        <div className="grid grid-cols-3 gap-1 mb-1"><span className="text-slate-500">Name</span><span className="col-span-2 font-medium text-slate-900">{escort.name}</span></div>
-                        <div className="grid grid-cols-3 gap-1"><span className="text-slate-500">{escort.id_type || 'ID'}</span><span className="col-span-2 font-medium text-slate-900 font-mono">{escort.id_number}</span></div>
+                return (
+                  <>
+                    <section>
+                      <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
+                        <Shield className="w-4 h-4 mr-2 text-amber-600" /> Audit & Request Tracking
+                      </h3>
+                      <div className="space-y-1 text-sm">
+                        <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Requested By</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.hostName}</span></div>
+                        <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Request Date</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.requestedAt}</span></div>
+                        <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Scheduled Visit</span><span className="col-span-2 font-medium text-slate-900 text-blue-600">{selectedVisitor.visitDate}</span></div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-slate-400 italic">No additional personnel attached.</div>
-                )}
-              </section>
+                    </section>
 
-              <section>
-                <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                  <FileText className="w-4 h-4 mr-2 text-blue-600" /> Attached Credentials
-                </h3>
-                {selectedVisitor.documentUrl ? (
-                  <a href={selectedVisitor.documentUrl} target="_blank" rel="noopener noreferrer" className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex flex-col items-center justify-center text-center hover:bg-blue-100 transition-colors group cursor-pointer">
-                    <FileText className="w-8 h-8 mb-2 text-blue-500 group-hover:scale-110 transition-transform" />
-                    <span className="font-bold text-blue-700 text-xs">Review Clearance Document</span>
-                  </a>
-                ) : (
-                  <div className="bg-slate-50 border border-dashed border-slate-300 p-4 rounded-xl flex flex-col items-center justify-center text-center text-slate-400">
-                    <span className="text-xs font-medium">No files attached by sponsor.</span>
-                  </div>
-                )}
-              </section>
+                    <section>
+                      <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
+                        <User className="w-4 h-4 mr-2 text-blue-600" /> Visitor Identity
+                      </h3>
+                      <div className="space-y-1 text-sm">
+                        <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Full Name</span><span className="col-span-2 font-bold text-slate-900">{selectedVisitor.visitorName}</span></div>
+                        <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Gender</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.gender}</span></div>
+                        <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Nationality</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.nationality}</span></div>
+                        <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Phone</span><span className="col-span-2 font-medium text-slate-900 font-mono">{selectedVisitor.phone}</span></div>
+                        <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Email</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.email}</span></div>
+                        
+                        <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100"><span className="text-slate-500">{selectedVisitor.id_type || 'ID Type'}</span><span className="col-span-2 font-bold text-slate-900 font-mono tracking-wider">{selectedVisitor.id_number}</span></div>
+                        <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">{orgLabel}</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.organization}</span></div>
+                        <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">{desigLabel}</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.designation}</span></div>
+                        
+                        {secureTag && (
+                          <div className="grid grid-cols-3 gap-2 bg-amber-50 p-2 rounded border border-amber-100 mt-2">
+                            <span className="text-amber-700 font-semibold">{secureTag.split(':')[0]}</span>
+                            <span className="col-span-2 font-bold text-amber-900 font-mono">{secureTag.split(':')[1]}</span>
+                          </div>
+                        )}
+                      </div>
+                    </section>
+
+                    <section>
+                      <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
+                        <Building className="w-4 h-4 mr-2 text-blue-600" /> Purpose of Visit
+                      </h3>
+                      <div className="space-y-1 text-sm">
+                        <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Department</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.department}</span></div>
+                        <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Pipeline</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.pipeline}</span></div>
+                        <div>
+                          <span className="text-slate-500 block mb-1 mt-2">Declared Purpose</span>
+                          <div className="bg-white p-3 border border-slate-200 rounded-lg leading-relaxed shadow-sm text-slate-800 text-xs font-medium">
+                            {cleanPurpose}
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section>
+                      <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
+                        <Users className="w-4 h-4 mr-2 text-blue-600" /> Accompanying Escorts
+                      </h3>
+                      {selectedVisitor.escorts && selectedVisitor.escorts.length > 0 ? (
+                        <div className="space-y-3 mt-2">
+                          {selectedVisitor.escorts.map((escort: any, idx: number) => (
+                            <div key={idx} className="bg-white p-3 border border-slate-200 rounded-lg shadow-sm text-sm">
+                              <div className="grid grid-cols-3 gap-1 mb-1"><span className="text-slate-500">Name</span><span className="col-span-2 font-medium text-slate-900">{escort.name}</span></div>
+                              <div className="grid grid-cols-3 gap-1"><span className="text-slate-500">{escort.id_type || 'ID'}</span><span className="col-span-2 font-medium text-slate-900 font-mono">{escort.govId || escort.id_number}</span></div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-slate-400 italic">No additional personnel attached.</div>
+                      )}
+                    </section>
+
+                    <section>
+                      <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
+                        <FileText className="w-4 h-4 mr-2 text-blue-600" /> Attached Credentials
+                      </h3>
+                      {selectedVisitor.documentUrl ? (
+                        <a href={selectedVisitor.documentUrl} target="_blank" rel="noopener noreferrer" className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex flex-col items-center justify-center text-center hover:bg-blue-100 transition-colors group cursor-pointer">
+                          <FileText className="w-8 h-8 mb-2 text-blue-500 group-hover:scale-110 transition-transform" />
+                          <span className="font-bold text-blue-700 text-xs">Review Clearance Document</span>
+                        </a>
+                      ) : (
+                        <div className="bg-slate-50 border border-dashed border-slate-300 p-4 rounded-xl flex flex-col items-center justify-center text-center text-slate-400">
+                          <span className="text-xs font-medium">No files attached by sponsor.</span>
+                        </div>
+                      )}
+                    </section>
+                  </>
+                );
+              })()}
             </div>
 
+            {/* RESTORED BOTTOM PANEL */}
             <div className="p-6 border-t border-slate-100 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
               <div className="flex justify-between items-end mb-2">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">

@@ -1,5 +1,6 @@
 // components/common/RegistrationForm.tsx
 import { useState, useEffect } from 'react';
+import type {SyntheticEvent} from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { UploadCloud, Users, AlertCircle, CheckCircle2, Search, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -277,7 +278,7 @@ export default function RegistrationForm() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     // VALIDATION BLOCK
@@ -386,7 +387,7 @@ export default function RegistrationForm() {
         console.log('📝 Creating visit record with:', {
           visit_id: activeVisitId,
           visitor_id: activeVisitorId,
-          host_employee_id: currentUser.uuid,
+          host_employee_id: currentUser.empId,
           visitor_name: visitorName,
           department: department,
           purpose: finalPurpose,
@@ -400,7 +401,7 @@ export default function RegistrationForm() {
         const { error: visitError } = await supabase.from('visits').insert({
           visit_id: activeVisitId,
           visitor_id: activeVisitorId,
-          host_employee_id: currentUser.uuid,       
+          host_employee_id: currentUser.empId,       
           visit_type: dbVisitType, 
           pass_type: 'One_day',
           purpose: finalPurpose, 

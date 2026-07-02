@@ -4,7 +4,7 @@ import {
   ShieldCheck, ShieldAlert, Printer, UserMinus, Clock, 
   MessageSquare, CheckCircle, FileText, MapPin, Activity, 
   EyeOff, Eye, Building, Briefcase, ChevronRight, ArrowLeft,
-  Search, ExternalLink, User, AlertOctagon, X
+  Search, ExternalLink, User, AlertOctagon, X , Camera
 } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import VisitDetailDrawer from '../../components/common/hrVisitorDrawer';
@@ -242,8 +242,8 @@ export default function EnterpriseVisitorProfile() {
           </div>
           
           <div className="relative z-10 w-32 h-32 rounded-xl bg-slate-100 border-4 border-white shadow-xl overflow-hidden flex items-center justify-center mb-4">
-            {visitor.visitor_photo_url ? (
-              <img src={visitor.visitor_photo_url} alt="Profile" className="w-full h-full object-cover" />
+            {currentPass?.visitor_photo_url ? (
+              <img src={currentPass.visitor_photo_url} alt="Profile" className="w-full h-full object-cover" />
             ) : (
               <span className="text-slate-400 font-black text-4xl">{visitor.name.substring(0, 2).toUpperCase()}</span>
             )}
@@ -308,8 +308,8 @@ export default function EnterpriseVisitorProfile() {
                 
                 {/* ✅ REAL PROFILE PICTURE INJECTION */}
                 <div className="w-24 h-24 rounded-full bg-slate-800 border-2 border-slate-600 flex items-center justify-center text-slate-400 font-black text-3xl shadow-inner shrink-0 overflow-hidden">
-                  {visitor.visitor_photo_url ? (
-                    <img src={visitor.visitor_photo_url} alt="Profile" className="w-full h-full object-cover" />
+                  {currentPass?.visitor_photo_url ? (
+                    <img src={currentPass .visitor_photo_url} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                     visitor.name.substring(0, 2).toUpperCase()
                   )}
@@ -397,22 +397,47 @@ export default function EnterpriseVisitorProfile() {
               </div>
 
               {/* Box 3: Compliance Checklist */}
+{/* Box 3: Compliance Checklist */}
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm sm:col-span-2">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center border-b border-slate-100 pb-2">
                   <FileText className="w-4 h-4 mr-2 text-slate-500" /> Security Compliance Checklist
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="flex items-center gap-3 p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl">
-                    <CheckCircle className="w-5 h-5 text-emerald-500" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  
+                  {/* 1. ID Authentication (Dynamic based on check-in status) */}
+                  <div className={`flex items-center gap-3 p-3 rounded-xl border ${currentPass?.status === 'Active' || currentPass?.status === 'Completed' || currentPass?.status === 'Cleared' ? 'bg-emerald-50/50 border-emerald-200' : 'bg-amber-50/50 border-amber-200 border-dashed'}`}>
+                    {currentPass?.status === 'Active' || currentPass?.status === 'Completed' || currentPass?.status === 'Cleared' ? (
+                      <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
+                    ) : (
+                      <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0" />
+                    )}
                     <div>
-                      <div className="text-xs font-bold text-emerald-900">ID Authenticated</div>
-                      <div className="text-[10px] text-emerald-600 font-mono mt-0.5">Verified on file</div>
+                      <div className={`text-xs font-bold ${currentPass?.status === 'Active' || currentPass?.status === 'Completed' || currentPass?.status === 'Cleared' ? 'text-emerald-900' : 'text-amber-900'}`}>ID Authenticated</div>
+                      <div className={`text-[10px] font-mono mt-0.5 ${currentPass?.status === 'Active' || currentPass?.status === 'Completed' || currentPass?.status === 'Cleared' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        {currentPass?.status === 'Active' || currentPass?.status === 'Completed' || currentPass?.status === 'Cleared' ? 'Verified at Gate' : 'Pending Verification'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Photo Kiosk (Dynamic based on captured photo URL) */}
+                  <div className={`flex items-center gap-3 p-3 rounded-xl border ${currentPass?.visitor_photo_url ? 'bg-emerald-50/50 border-emerald-200' : 'bg-amber-50/50 border-amber-200 border-dashed'}`}>
+                    {currentPass?.visitor_photo_url ? (
+                       <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
+                    ) : (
+                       <Camera className="w-5 h-5 text-amber-500 shrink-0" />
+                    )}
+                    <div>
+                      <div className={`text-xs font-bold ${currentPass?.visitor_photo_url ? 'text-emerald-900' : 'text-amber-900'}`}>Kiosk Photo</div>
+                      <div className={`text-[10px] font-mono mt-0.5 ${currentPass?.visitor_photo_url ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        {currentPass?.visitor_photo_url ? 'Captured & Stored' : 'Missing Kiosk Scan'}
+                      </div>
                     </div>
                   </div>
                   
+                  {/* 3. Credential Scans (Dynamic based on document_url) */}
                   {visitor.document_url || currentPass?.document_url ? (
-                    <a href={visitor.document_url || currentPass?.document_url} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 bg-emerald-50/50 hover:bg-emerald-100 transition-colors border border-emerald-100 rounded-xl cursor-pointer">
-                      <CheckCircle className="w-5 h-5 text-emerald-500" />
+                    <a href={visitor.document_url || currentPass?.document_url} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 bg-emerald-50/50 hover:bg-emerald-100 transition-colors border border-emerald-200 rounded-xl cursor-pointer">
+                      <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
                       <div>
                         <div className="text-xs font-bold text-emerald-900">Credential Scans</div>
                         <div className="text-[10px] text-emerald-600 font-mono mt-0.5">Click to view log</div>
@@ -420,7 +445,7 @@ export default function EnterpriseVisitorProfile() {
                     </a>
                   ) : (
                     <div className="flex items-center gap-3 p-3 bg-rose-50/50 border border-rose-200 rounded-xl border-dashed">
-                      <ShieldAlert className="w-5 h-5 text-rose-500" />
+                      <ShieldAlert className="w-5 h-5 text-rose-500 shrink-0" />
                       <div>
                         <div className="text-xs font-bold text-rose-900">Missing Scan</div>
                         <div className="text-[10px] text-rose-600 font-mono mt-0.5">No doc attached</div>
@@ -428,8 +453,9 @@ export default function EnterpriseVisitorProfile() {
                     </div>
                   )}
 
-                  <div className={`flex items-center gap-3 p-3 rounded-xl border-dashed ${currentPass?.actual_out ? 'bg-emerald-50/50 border-emerald-200' : 'bg-amber-50/50 border-amber-200'}`}>
-                    <Clock className={`w-5 h-5 ${currentPass?.actual_out ? 'text-emerald-500' : 'text-amber-500'}`} />
+                  {/* 4. Exit Tracking (Dynamic based on actual_out) */}
+                  <div className={`flex items-center gap-3 p-3 rounded-xl border ${currentPass?.actual_out ? 'bg-emerald-50/50 border-emerald-200' : 'bg-amber-50/50 border-amber-200 border-dashed'}`}>
+                    <Clock className={`w-5 h-5 shrink-0 ${currentPass?.actual_out ? 'text-emerald-500' : 'text-amber-500'}`} />
                     <div>
                       <div className={`text-xs font-bold ${currentPass?.actual_out ? 'text-emerald-900' : 'text-amber-900'}`}>Exit Tracking</div>
                       <div className={`text-[10px] font-mono mt-0.5 ${currentPass?.actual_out ? 'text-emerald-600' : 'text-amber-600'}`}>
@@ -437,6 +463,7 @@ export default function EnterpriseVisitorProfile() {
                       </div>
                     </div>
                   </div>
+
                 </div>
               </div>
 

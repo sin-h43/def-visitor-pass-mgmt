@@ -12,7 +12,7 @@ export default function VisitorVerification() {
   // Scoped Security Guard State
   const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: 'Loading...', role: '' });
   
-  const [visitor, setVisitor] = useState<any>(null); 
+  const [visitor, setVisitor] = useState<Record<string, any> | null>(null); 
   const [loading, setLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -162,8 +162,9 @@ export default function VisitorVerification() {
       const fileName = `visitor-photos/${visitor.id}-${Date.now()}.jpg`;
       await supabase.storage.from('visitor_documents').upload(fileName, photoFile, { upsert: true });
       const { data } = supabase.storage.from('visitor_documents').getPublicUrl(fileName);
-      await supabase.from('visitors').update({ visitor_photo_url: data.publicUrl }).eq('visitor_id', visitor.id); 
-      alert('Photo attached.');
+      await supabase.from('visits').update({ visitor_photo_url: data.publicUrl }).eq('visit_id', visitor.id); 
+      setVisitor(prev => ({ ...prev, visitor_photo_url: data.publicUrl }));
+      alert('Photo securely attached to current pass.');
     } catch (error) {
       alert('Failed to save photo');
     } finally {

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { AlertCircle, User, Bell, Send, CheckCircle, Clock, LogOut, Check, MailOpen, CheckSquare, X } from 'lucide-react'; 
+import { AlertCircle, User, Bell, Send, CheckCircle, Clock, LogOut, Check, MailOpen, CheckSquare } from 'lucide-react'; 
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { fetchAndVerifyEmployee } from '../../lib/employeeUtils'; 
@@ -10,25 +10,15 @@ export default function EmpNotificationCenter() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: '', dept: '' });
 
-  // Track "Read" status
+  // ✅ UPGRADE: Track "Read" status and persist it in the browser's Local Storage
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => {
     const saved = localStorage.getItem('emp_read_notifs');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // ✅ RESTORED: Track "Ignored/Dismissed" status to permanently hide them
-  const [ignoredNotificationIds, setIgnoredNotificationIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('emp_ignored_notifs');
     return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {
     localStorage.setItem('emp_read_notifs', JSON.stringify(readNotificationIds));
   }, [readNotificationIds]);
-
-  useEffect(() => {
-    localStorage.setItem('emp_ignored_notifs', JSON.stringify(ignoredNotificationIds));
-  }, [ignoredNotificationIds]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -107,11 +97,6 @@ export default function EmpNotificationCenter() {
     );
   };
 
-  // ✅ RESTORED: Completely hide from the panel
-  const handleIgnoreNotification = (id: string) => {
-    setIgnoredNotificationIds(prev => [...prev, id]);
-  };
-
   const markAllAsRead = () => {
     const allIds = activeNotifications.map(n => n.id);
     setReadNotificationIds(prev => Array.from(new Set([...prev, ...allIds])));
@@ -119,9 +104,6 @@ export default function EmpNotificationCenter() {
 
   const activeNotifications = useMemo(() => {
     return shiftData.filter(v => {
-      // Safely filter out the ones the user explicitly dismissed
-      if (ignoredNotificationIds.includes(v.id)) return false;
-
       const notifyStatuses = ['Denied', 'Cleared', 'Active', 'Completed'];
       if (!notifyStatuses.includes(v.status)) return false;
       
@@ -134,15 +116,17 @@ export default function EmpNotificationCenter() {
     })
     .map(v => ({ ...v, isRead: readNotificationIds.includes(v.id) }))
     .sort((a, b) => {
+      // 1. Sort Unread before Read
       if (a.isRead && !b.isRead) return 1;
       if (!a.isRead && b.isRead) return -1;
+      // 2. Then sort by severity
       if (a.status === 'Denied') return -1;
       if (b.status === 'Denied') return 1;
       if (a.status === 'Active') return -1;
       if (b.status === 'Active') return 1;
       return 0;
     });
-  }, [shiftData, readNotificationIds, ignoredNotificationIds]);
+  }, [shiftData, readNotificationIds]);
 
   const unreadCount = activeNotifications.filter(n => !n.isRead).length;
 
@@ -223,44 +207,25 @@ export default function EmpNotificationCenter() {
                           {nIcon}
                           <span className={`font-bold text-xs uppercase tracking-wider ${visit.isRead ? 'text-slate-500' : 'text-slate-800'}`}>{nTitle}</span>
                         </div>
-                        <div className="flex gap-1.5">
-                          {visit.status !== 'Denied' && (
-                            <button 
-                              onClick={() => handleIgnoreNotification(visit.id)} 
-                              className={`text-[10px] font-bold px-2 py-1 rounded transition-colors flex items-center ${visit.isRead ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100' : 'text-slate-500 bg-white/50 hover:bg-white border border-slate-200'}`}
-                            >
-                              <X className="w-3 h-3 mr-1"/> Dismiss
-                            </button>
-                          )}
-                          <button 
-                            onClick={() => toggleReadStatus(visit.id)} 
-                            className={`text-[10px] font-bold px-2 py-1 rounded transition-colors flex items-center ${visit.isRead ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100' : 'text-blue-600 bg-white/50 hover:bg-white border border-blue-100'}`}
-                          >
-                            {visit.isRead ? <><MailOpen className="w-3 h-3 mr-1"/> Unread</> : <><Check className="w-3 h-3 mr-1"/> Mark Read</>}
-                          </button>
-                        </div>
+                        <button 
+                          onClick={() => toggleReadStatus(visit.id)} 
+                          className={`text-[10px] font-bold px-2 py-1 rounded transition-colors flex items-center ${visit.isRead ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100' : 'text-blue-600 bg-white/50 hover:bg-white border border-blue-100'}`}
+                        >
+                          {visit.isRead ? <><MailOpen className="w-3 h-3 mr-1"/> Unread</> : <><Check className="w-3 h-3 mr-1"/> Mark Read</>}
+                        </button>
                       </div>
                       <div className="pl-3">
                         <div className={`font-bold text-sm ${visit.isRead ? 'text-slate-600' : 'text-slate-900'}`}>{visit.visitorName} <span className="text-[10px] font-mono text-slate-400 font-normal ml-1">({visit.id})</span></div>
                         <p className={`text-xs mt-1 leading-snug ${visit.isRead ? 'text-slate-500' : 'text-slate-700'}`}>{nDesc}</p>
                       </div>
                       
-                      {/* ✅ FIX: Action buttons are now permanently visible for Denied passes! */}
-                      {visit.status === 'Denied' && (
-                        <div className="mt-2 ml-3 mr-1 flex gap-2">
-                          <button 
-                            onClick={() => handleIgnoreNotification(visit.id)}
-                            className="w-1/3 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-1"
-                          >
-                            <X className="w-3 h-3" /> Dismiss
-                          </button>
-                          <button 
-                            onClick={() => { setShowNotifications(false); navigate('/emp/add_visitor', { state: { autofill: visit, isEdit: true } }); }} 
-                            className="w-2/3 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-                          >
-                            <Send className="w-3.5 h-3.5" /> Fix & Resend
-                          </button>
-                        </div>
+                      {visit.status === 'Denied' && !visit.isRead && (
+                        <button 
+                          onClick={() => { setShowNotifications(false); navigate('/emp/add_visitor', { state: { autofill: visit, isEdit: true } }); }} 
+                          className="mt-2 ml-3 mr-1 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                        >
+                          <Send className="w-3.5 h-3.5" /> Fix & Resend Request
+                        </button>
                       )}
                     </div>
                   );

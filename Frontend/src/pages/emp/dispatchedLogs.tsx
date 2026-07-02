@@ -7,6 +7,7 @@ import VisitorTable  from '../../components/common/eVisitorTable';
 import type { VisitorRecord } from '../../components/common/eVisitorTable';
 import { supabase } from '../../lib/supabase';
 import { fetchAndVerifyEmployee } from '../../lib/employeeUtils'; // ✅ FIX: Added identity fetcher
+import EmpNotificationCenter from '../../components/common/empNotificationCenter';
 
 export default function DispatchedLogsPage() {
   const navigate = useNavigate();
@@ -36,7 +37,7 @@ export default function DispatchedLogsPage() {
   }, []);
 
   useEffect(() => {
-    if(!currentUser.id) return;
+    if(!currentUser.empId) return;
     async function fetchDispatchedLogs() {
       try {
         setLoading(true);
@@ -48,7 +49,7 @@ export default function DispatchedLogsPage() {
             escorts (name, phone, id_number, id_type, email, gender)
           `)
           // ✅ FIX: Fetch exclusively their own logs!
-          .or(`host_employee_id.eq.${currentUser.empId}`)
+          .eq('host_employee_id', currentUser.empId)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -106,7 +107,7 @@ export default function DispatchedLogsPage() {
       } catch (err) { console.error("Error fetching dispatched logs:", err); } finally { setLoading(false); }
     }
     fetchDispatchedLogs();
-  }, [currentUser.id]);
+  }, [currentUser.empId]);
 
   const filterBuckets = [
     { key: 'pipeline', title: 'Visit Type', options: [{ label: 'Walk-in', value: 'Walk-in' }, { label: 'Pre-Scheduled', value: 'Pre-Scheduled' }, { label: 'Repeated', value: 'Repeated' }] },
@@ -152,7 +153,7 @@ export default function DispatchedLogsPage() {
   }, [logs, searchTerm, selectedFilters]);
 
   return (
-    <DashboardLayout role="emp" userName={currentUser.name}>
+    <DashboardLayout role="emp" userName={currentUser.name} headerAction={<EmpNotificationCenter />}>
       <div className="max-w-7xl mx-auto">
         
         <div className="mb-6">

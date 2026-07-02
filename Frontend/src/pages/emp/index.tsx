@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { UserPlus, FileText, AlertCircle, X, User, Building, Bell, Send, CheckCircle, Clock, LogOut } from 'lucide-react'; 
+import { UserPlus, FileText, User, Building, X } from 'lucide-react'; 
 import { Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import SearchFilterMatrix from '../../components/common/SearchFilterMatrix';
@@ -7,8 +7,8 @@ import VisitorTable  from '../../components/common/eVisitorTable';
 import type { VisitorRecord as BaseVisitorRecord } from '../../components/common/eVisitorTable';
 import { supabase } from '../../lib/supabase';
 import { fetchAndVerifyEmployee } from '../../lib/employeeUtils'; 
+import EmpNotificationCenter from '../../components/common/empNotificationCenter';
 
-// Extend VisitorRecord to include actual_out and checked_in_time properties
 type VisitorRecord = BaseVisitorRecord & {
   actual_out?: string;
   checked_in_time?: string;
@@ -18,11 +18,9 @@ export default function EmployeeDashboard() {
   const navigate = useNavigate();
   const [shiftData, setShiftData] = useState<VisitorRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [ignoredNotificationIds, setIgnoredNotificationIds] = useState<string[]>([]);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
 
-  const [showNotifications, setShowNotifications] = useState(false);
   const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: '', dept: '' });
 
   useEffect(() => {
@@ -60,7 +58,7 @@ export default function EmployeeDashboard() {
           visitors (visitor_id, gender, name, phone, document_url, address, email, dob, organization, designation, id_type, id_number, nationality, checked_in_time, checked_out_time),
           escorts(name,phone,id_number,id_type,email,gender)
         `)
-        .or(`host_employee_id.eq.${currentUser.empId}`)
+        .eq('host_employee_id', currentUser.empId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -73,17 +71,15 @@ export default function EmployeeDashboard() {
 
           const escortsArray = Array.isArray(row.escorts) ? row.escorts : (row.escorts ? [row.escorts] : []);
           
-          // ✅ FIX: Bulletproof Status Mapping & Dynamic Expiration
           const rawStatus = (row.status || 'Pending').toLowerCase();
           let currentStatus = 'Pending';
           
-          if (rawStatus === 'approved') currentStatus = 'Cleared'; // UI expects 'Cleared'
+          if (rawStatus === 'approved') currentStatus = 'Cleared'; 
           else if (rawStatus === 'denied') currentStatus = 'Denied';
           else if (rawStatus === 'active') currentStatus = 'Active';
           else if (rawStatus === 'completed') currentStatus = 'Completed';
           else if (rawStatus === 'revoked') currentStatus = 'Revoked';
 
-          // Dynamically check if the pass time has expired
           if ((currentStatus === 'Cleared' || currentStatus === 'Pending') && row.end_date) {
             if (new Date() > new Date(row.end_date)) {
               currentStatus = 'Expired';
@@ -131,7 +127,6 @@ export default function EmployeeDashboard() {
 
   const filterBuckets = [
     { key: 'pipeline', title: 'Visit Type', options: [{ label: 'Walk-in', value: 'Walk-in' }, { label: 'Pre-Scheduled', value: 'Pre-Scheduled' }, { label: 'Repeated', value: 'Repeated' }] },
-    // ✅ FIX: Realigned bucket filters to strictly match UI expectations
     { key: 'status', title: 'Status', options: [{ label: 'Cleared', value: 'Cleared' }, { label: 'Active', value: 'Active' }, { label: 'Pending', value: 'Pending' }, { label: 'Denied', value: 'Denied' }, { label: 'Completed', value: 'Completed' }, { label: 'Expired', value: 'Expired' }] }
   ];
 
@@ -139,7 +134,6 @@ export default function EmployeeDashboard() {
     return shiftData.filter(item => {
       if (currentTab === 'Pre-Scheduled' && item.pipeline !== 'Pre-Scheduled') return false;
       if (currentTab === 'Repeated' && item.pipeline !== 'Repeated') return false;
-      // ✅ FIX: The Expired tab will now perfectly catch dynamically generated expired status
       if (currentTab === 'Expired' && item.status !== 'Expired') return false; 
       if (searchTerm) {
         const lowerQuery = searchTerm.toLowerCase();
@@ -173,125 +167,10 @@ export default function EmployeeDashboard() {
   const handleEdit = (visitor: VisitorRecord) => navigate('/emp/add_visitor', { state: { autofill: visitor, isEdit: true } });
   const handleReRegister = (visitor: VisitorRecord) => navigate('/emp/add_visitor', { state: { autofill: visitor } });
   const handleView = (visitor: VisitorRecord) => { setSelectedVisitor(visitor); setIsDrawerOpen(true); };
-  const handleIgnoreNotification = (id: string) => setIgnoredNotificationIds(prev => [...prev, id]);
-
-  const activeNotifications = useMemo(() => {
-    return shiftData.filter(v => {
-      if (ignoredNotificationIds.includes(v.id)) return false;
-      
-      // ✅ FIX: Restored 'Cleared' flag for the notification listener
-      const notifyStatuses = ['Denied', 'Cleared', 'Active', 'Completed'];
-      if (!notifyStatuses.includes(v.status)) return false;
-
-      if (v.status === 'Completed' && v.actual_out) {
-        const outTime = new Date(v.actual_out).getTime();
-        const twelveHoursAgo = new Date().getTime() - (12 * 60 * 60 * 1000);
-        if (outTime < twelveHoursAgo) return false;
-      }
-      return true;
-    }).sort((a, b) => {
-      if (a.status === 'Denied') return -1;
-      if (b.status === 'Denied') return 1;
-      if (a.status === 'Active') return -1;
-      if (b.status === 'Active') return 1;
-      return 0;
-    });
-  }, [shiftData, ignoredNotificationIds]);
 
   return (
-    <DashboardLayout 
-      role="emp" 
-      userName={currentUser.name}
-      headerAction={
-        <div className="relative">
-          <button 
-            onClick={() => setShowNotifications(!showNotifications)} 
-            className="relative p-2 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <Bell className="w-5 h-5 text-slate-700" />
-            {activeNotifications.length > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-[10px] font-bold text-white border-2 border-white shadow-sm animate-pulse">
-                {activeNotifications.length > 9 ? '9+' : activeNotifications.length}
-              </span>
-            )}
-          </button>
-          
-          {showNotifications && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-              <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in text-left flex flex-col max-h-[80vh]">
-                <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                  <h3 className="font-bold text-slate-800 text-sm">Status Updates</h3>
-                  <span className="text-[10px] font-bold text-slate-500">{activeNotifications.length} NEW</span>
-                </div>
-                <div className="overflow-y-auto bg-white flex-1 p-3 space-y-3 custom-scrollbar">
-                  {activeNotifications.length === 0 ? (
-                    <p className="text-xs text-slate-400 text-center py-6">No new status updates.</p>
-                  ) : (
-                    activeNotifications.map(visit => {
-                      let nIcon = <Clock className="w-4 h-4" />;
-                      let nColor = 'bg-slate-50 text-slate-600 border-slate-200';
-                      let nTitle = 'Update Pending';
-                      let nDesc = '';
-
-                      if (visit.status === 'Denied') {
-                        nIcon = <AlertCircle className="w-4 h-4 text-rose-600" />;
-                        nColor = 'bg-rose-50 border-rose-200';
-                        nTitle = 'Request Rejected';
-                        nDesc = `Feedback: "${visit.hr_remarks || 'Policy conflict or identity mismatch.'}"`;
-                      } else if (visit.status === 'Cleared') {
-                        nIcon = <CheckCircle className="w-4 h-4 text-emerald-600" />;
-                        nColor = 'bg-emerald-50 border-emerald-200';
-                        nTitle = 'HR Clearance Granted';
-                        nDesc = 'Pass generated. Awaiting visitor arrival.';
-                      } else if (visit.status === 'Active') {
-                        nIcon = <User className="w-4 h-4 text-blue-600" />;
-                        nColor = 'bg-blue-50 border-blue-200';
-                        nTitle = 'Visitor Arrived';
-                        nDesc = `Checked in at ${visit.checked_in_time ? new Date(visit.checked_in_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'the gate'}.`;
-                      } else if (visit.status === 'Completed') {
-                        nIcon = <LogOut className="w-4 h-4 text-slate-600" />;
-                        nColor = 'bg-slate-100 border-slate-300';
-                        nTitle = 'Visitor Departed';
-                        nDesc = `Checked out at ${visit.actual_out ? new Date(visit.actual_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'the gate'}.`;
-                      }
-
-                      return (
-                        <div key={visit.id} className={`border rounded-xl p-3 flex flex-col gap-2 relative overflow-hidden ${nColor}`}>
-                          <div className="flex justify-between items-start">
-                            <div className="flex items-center gap-2">
-                              {nIcon}
-                              <span className="font-bold text-xs uppercase tracking-wider text-slate-800">{nTitle}</span>
-                            </div>
-                            <button onClick={() => handleIgnoreNotification(visit.id)} className="text-slate-400 hover:text-slate-700 transition-colors">
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                          <div>
-                            <div className="font-bold text-sm text-slate-900">{visit.visitorName} <span className="text-[10px] font-mono text-slate-500 font-normal ml-1">({visit.id})</span></div>
-                            <p className="text-xs mt-1 text-slate-700 leading-snug">{nDesc}</p>
-                          </div>
-                          {visit.status === 'Denied' && (
-                            <button 
-                              onClick={() => { setShowNotifications(false); handleEdit(visit); }} 
-                              className="mt-2 w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-                            >
-                              <Send className="w-3.5 h-3.5" /> Fix & Resend Request
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      }
-    >
+    <DashboardLayout role="emp" userName={currentUser.name} headerAction={<EmpNotificationCenter />}>
       <div className="max-w-7xl mx-auto">
-        
         <div className="mb-6 flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-slate-800">Welcome Back, {currentUser.name}!</h1>
@@ -386,15 +265,13 @@ export default function EmployeeDashboard() {
                 </div>
                 {selectedVisitor.status === 'Denied' && (
                   <div className="mt-4 flex gap-2">
-                    <button onClick={() => { setIsDrawerOpen(false); handleIgnoreNotification(selectedVisitor.id); }} className="w-1/3 py-2.5 border border-slate-200 font-bold text-slate-600 rounded-xl hover:bg-slate-50 transition-colors text-xs">Dismiss</button>
-                    <button onClick={() => { setIsDrawerOpen(false); handleEdit(selectedVisitor); }} className="w-2/3 py-2.5 bg-blue-600 text-white font-bold rounded-xl shadow-sm hover:bg-blue-700 transition-colors text-xs">Correct & Resend</button>
+                    <button onClick={() => { setIsDrawerOpen(false); handleEdit(selectedVisitor); }} className="w-full py-2.5 bg-blue-600 text-white font-bold rounded-xl shadow-sm hover:bg-blue-700 transition-colors text-xs">Correct & Resend</button>
                   </div>
                 )}
               </div>
             </div>
           </div>
         )}
-
       </div>
     </DashboardLayout>
   );

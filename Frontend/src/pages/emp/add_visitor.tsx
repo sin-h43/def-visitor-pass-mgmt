@@ -3,11 +3,12 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import RegistrationForm from '../../components/common/RegistrationForm';
 import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import EmpNotificationCenter from '../../components/common/empNotificationCenter';
 
 export default function AddVisitorPage() {
 
   return (
-    <DashboardLayout role="emp" userName="Employee">
+    <DashboardLayout role="emp" userName="Employee" headerAction={<EmpNotificationCenter />}>
       <div className="max-w-4xl mx-auto">
         
         {/* Page Navigation/Header */}

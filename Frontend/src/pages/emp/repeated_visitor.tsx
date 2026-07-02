@@ -6,6 +6,7 @@ import DataTable from '../../components/common/DataTable';
 import type { TableColumn } from '../../types/visitor';
 import { supabase } from '../../lib/supabase';
 import { fetchAndVerifyEmployee } from '../../lib/employeeUtils'; // ✅ FIX: Added identity fetcher
+import EmpNotificationCenter from '../../components/common/empNotificationCenter';
 
 interface VisitHistory { visitId: string; date: string; rawDate: string; purpose: string; department: string; hostName: string; status: string; }
 interface VisitorProfile { id: string; name: string; phone: string; email: string; nationality: string; organization: string; idType: string; idNumber: string; dob: string; address: string; docUrl: string | null; totalVisits: number; lastVisitDate: string; rawLastVisit: number; history: VisitHistory[]; }
@@ -38,7 +39,7 @@ export default function EmployeeRepeatedVisitorLogPage() {
   }, []);
 
   const fetchVisitorDirectory = async () => {
-    if (!currentUser.id) return;
+    if (!currentUser.empId) return;
     try {
       setLoading(true);
       
@@ -50,7 +51,7 @@ export default function EmployeeRepeatedVisitorLogPage() {
           host:employees!visits_host_employee_id_fkey(name)
         `)
         // ✅ FIX: Fetch exclusively their own contact book!
-        .or(`host_employee_id.eq.${currentUser.empId}`)
+        .eq('host_employee_id', currentUser.empId)
         .order('start_date', { ascending: false });
 
       if (error) throw error;
@@ -94,7 +95,7 @@ export default function EmployeeRepeatedVisitorLogPage() {
     } catch (error) { console.error('Error fetching visitor directory:', error); } finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchVisitorDirectory(); }, [currentUser.id]);
+  useEffect(() => { fetchVisitorDirectory(); }, [currentUser.empId]);
 
   const handleReRegister = (profile: VisitorProfile) => {
     setIsDrawerOpen(false);
@@ -139,7 +140,7 @@ export default function EmployeeRepeatedVisitorLogPage() {
   }
 
   return (
-    <DashboardLayout role="emp" userName={currentUser.name}>
+    <DashboardLayout role="emp" userName={currentUser.name} headerAction={<EmpNotificationCenter />}>
       <div className="max-w-7xl mx-auto space-y-6 pb-12">
         <div className="flex items-center space-x-3">
           <div><h1 className="text-2xl font-bold text-slate-800 tracking-tight">My Visitor Directory</h1><p className="text-sm text-slate-500">History ledger tracking identities you have previously hosted.</p></div>

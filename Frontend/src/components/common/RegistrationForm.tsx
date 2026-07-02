@@ -231,10 +231,22 @@ const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: '', 
 
   const handleEscortChange = (index: number, field: keyof EscortPersonnel, value: string) => {
     const updatedEscorts = [...escorts];
-    updatedEscorts[index] = {
-      ...updatedEscorts[index],
-      [field]: value
-    };
+if (field === 'nationality') {
+      const natData = NATIONALITIES.find(n => n.label === value);
+      updatedEscorts[index] = {
+        ...updatedEscorts[index],
+        nationality: value,
+        // Preserve existing phone number if they just switch nationality by accident, 
+        // or just set the new country code if it's empty/just a country code
+        phone: natData?.code ? `${natData.code} ` : '' 
+      };
+    } else {
+      // Standard update for all other fields
+      updatedEscorts[index] = {
+        ...updatedEscorts[index],
+        [field]: value
+      };
+    }
     setEscorts(updatedEscorts);
   };
 

@@ -44,8 +44,10 @@ export default function AddVisitorServicePage() {
 
   // Operational Fields
   const [pipeline, setPipeline] = useState('New Visitor / Urgent Access');
-  const [scheduledDate, setScheduledDate] = useState('');
   const [department, setDepartment] = useState('Operations');
+  const [passType, setPassType] = useState('One_day');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   const [visitorId, setVisitorId] = useState<string | null>(null);
 
@@ -67,39 +69,21 @@ export default function AddVisitorServicePage() {
   const [tradeType, setTradeType] = useState('Facilities Maintenance');
   const [idType, setIdType] = useState('Business Vendor ID');
   const [idNumber, setIdNumber] = useState('');
-  const [hostId, setHostId] = useState('');
 
   const [searchResults, setSearchResults] = useState<ExistingVisitor[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
 
   const [headCount, setHeadCount] = useState<number>(0);
-  const [escorts, setEscorts] = useState<{name: string, govId: string, email:string, nationality:string, phone: string, gender:string}[]>([]);
+  const [escorts, setEscorts] = useState<{name: string, govId: string, email:string, nationality:string, phone: string, gender:string, idType: string}[]>([]);
 
   const [file, setFile] = useState<File | null>(null);
   const [uploadingText, setUploadingText] = useState('');
-
-    const [currentUserName, setCurrentUserName] = useState('Loading...');
-
-  useEffect(() => {
-    const loadUserProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        try {
-          const emp = await fetchAndVerifyEmployee(user.email);
-          setCurrentUserName(emp.name);
-        } catch(e) {
-          setCurrentUserName('HR Admin');
-        }
-      }
-    };
-    loadUserProfile();
-  }, []);
+  const [currentUserName, setCurrentUserName] = useState('Loading...');
 
   const maxAllowedDate = new Date();
   maxAllowedDate.setFullYear(maxAllowedDate.getFullYear() - 12);
   const maxDob = maxAllowedDate.toISOString().split('T')[0];
 
-  // Fetch Current HR User
   useEffect(() => {
     const loadUserProfile = async () => {
       try {
@@ -107,6 +91,7 @@ export default function AddVisitorServicePage() {
         if (!user?.email) return;
         const employee = await fetchAndVerifyEmployee(user.email);
         if (employee) {
+          setCurrentUserName(employee.name);
           setCurrentUser({
             uuid: employee.auth_id || employee.id,
             empId: employee.employee_id,
@@ -116,6 +101,7 @@ export default function AddVisitorServicePage() {
         }
       } catch (err) {
         console.error('Failed to load HR profile:', err);
+        setCurrentUserName('HR Admin');
       }
     };
     loadUserProfile();
@@ -149,7 +135,6 @@ export default function AddVisitorServicePage() {
     setEmail(visitor.email || '');
     setPhone(visitor.phone || '+91 ');
     setAddress(visitor.address || '');
-    
     setContractingCompany(visitor.organization || '');
     setTradeType(visitor.designation || 'Facilities Maintenance');
     setNationality(visitor.nationality || 'Indian');
@@ -160,7 +145,7 @@ export default function AddVisitorServicePage() {
     setIdNumber(visitor.id_number || '');
     
     setShowDropdown(false);
-    if (pipeline !== 'Pre-Scheduled Visit') setPipeline('Repeated Visitor');
+    setPipeline('Repeated Visitor');
   };
 
   const handleClearSelectedVisitor = () => {
@@ -185,7 +170,7 @@ export default function AddVisitorServicePage() {
       const newEscorts = [...prev];
       if (count > prev.length) {
         for (let i = prev.length; i < count; i++) {
-          newEscorts.push({ name: '', govId: '', email:'', phone:'', nationality: 'Indian', gender:'Others' });
+          newEscorts.push({ name: '', govId: '', email:'', phone:'', nationality: 'Indian', gender:'Others', idType: 'Aadhaar' });
         }
       } else {
         newEscorts.length = count;
@@ -194,23 +179,14 @@ export default function AddVisitorServicePage() {
     });
   }, [headCount]);
 
-  const handleEscortChange = (index: number, field: 'name' | 'govId' | 'phone' | 'nationality' | 'gender'| 'email', value: string) => {
+  const handleEscortChange = (index: number, field: 'name' | 'govId' | 'phone' | 'nationality' | 'gender'| 'email' | 'idType', value: string) => {
     const updatedEscorts = [...escorts];
-    
     if (field === 'nationality') {
       const natData = NATIONALITIES.find(n => n.label === value);
-      updatedEscorts[index] = {
-        ...updatedEscorts[index],
-        nationality: value,
-        phone: natData?.code ? `${natData.code} ` : ''
-      };
+      updatedEscorts[index] = { ...updatedEscorts[index], nationality: value, phone: natData?.code ? `${natData.code} ` : '' };
     } else {
-      updatedEscorts[index] = {
-        ...updatedEscorts[index],
-        [field]: value
-      };
+      updatedEscorts[index] = { ...updatedEscorts[index], [field]: value };
     }
-    
     setEscorts(updatedEscorts);
   };
 
@@ -233,16 +209,17 @@ export default function AddVisitorServicePage() {
     setError(null);
 
     try {
-      const timestamp = Date.now().toString().slice(-6);
-      const newVisitId = `VST${timestamp}`;
-      let activeVisitorId = visitorId;
+      // 1. Generate robust IDs
+      const uniqueSuffix = Date.now().toString(36) + Math.random().toString(36).substring(2, 6).toUpperCase();
+      const finalVisitorId = visitorId || `VIS-${uniqueSuffix}`;
+      const newVisitId = `VST-${uniqueSuffix}`;
+      
       let documentUrl = null;
 
       if (file) {
         setUploadingText('Uploading credentials scan...');
         const fileExt = file.name.split('.').pop();
         const fileName = `${newVisitId}_doc.${fileExt}`;
-
         const { error: uploadError } = await supabase.storage.from('visitor-documents').upload(fileName, file);
         if (uploadError) throw uploadError;
         const { data: publicUrlData } = supabase.storage.from('visitor-documents').getPublicUrl(fileName);
@@ -251,29 +228,26 @@ export default function AddVisitorServicePage() {
       
       setUploadingText('Saving vendor credentials logs...');
 
-      if (!activeVisitorId) {
-        const standardGeneratedId = `VIS${timestamp}`;
-        activeVisitorId = standardGeneratedId;
+      // 2. Upsert Visitor Details (so returning vendors get updated credentials!)
+      const { error: visitorError } = await supabase.from('visitors').upsert({
+        visitor_id: finalVisitorId,
+        name: visitorName,
+        email: email || null,
+        phone: phone,
+        gender: gender,
+        dob: dob || null,
+        address: address || null,
+        id_type: idType,
+        id_number: idNumber || 'Pending Verification',
+        nationality: nationality,
+        organization: contractingCompany || 'Outsourced Firm',
+        designation: tradeType || 'Service Technician',
+        document_url: documentUrl,
+      }, {
+        onConflict: 'visitor_id'
+      });
 
-        const { error: visitorError } = await supabase.from('visitors').insert({
-          visitor_id: standardGeneratedId,
-          name: visitorName,
-          email: email || null,
-          phone: phone,
-          gender: gender,
-          dob: dob || null,
-          visit_type: 'Service',
-          address: address || null,
-          id_type: idType,
-          id_number: idNumber || 'Pending Verification',
-          nationality: nationality,
-          organization: contractingCompany || 'Outsourced Firm',
-          designation: tradeType || 'Service Technician',
-          department: department
-        });
-
-        if (visitorError) throw visitorError;
-      }
+      if (visitorError) throw visitorError;
 
       let finalPurpose = `[VENDOR FIELD TRADE: ${tradeType}] ${purpose}`;
       if (escorts.length > 0) {
@@ -281,34 +255,50 @@ export default function AddVisitorServicePage() {
         finalPurpose += ` | Accompanying Crew Manifest: ${guestList}`;
       }
 
-      const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
+      const finalStartDate = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
+      const finalEndDate = endDate ? new Date(endDate).toISOString() : finalStartDate;
 
+      // 3. Insert the Visit Event
       const { error: visitError } = await supabase.from('visits').insert({
         visit_id: newVisitId,
-        visitor_id: activeVisitorId,
-        host_employee_id: hostId, 
-        created_by_employee_id: currentUser.empId, 
-        visit_type: 'service',
-        pass_type: 'One_Day',
+        visitor_id: finalVisitorId,
+        host_employee_id: currentUser.empId, 
+        visit_type: pipeline === 'Pre-Scheduled Visit' ? 'Scheduled' : 'immediate',
+        pass_type: passType,
         purpose: finalPurpose,
-        start_date: startDate,
-        end_date: startDate,
-        status: 'Pending',
-        document_url: documentUrl
+        start_date: finalStartDate,
+        end_date: finalEndDate,
+        status: 'Approved',
+        department: department
       });
 
       if (visitError) throw visitError;
+
+      // 4. Bulk Insert Escorts
+      if (escorts.length > 0) {
+        const escortsData = escorts.map((esc, index) => ({
+          escort_id: `ESC-${uniqueSuffix}-${index}`,
+          visit_id: newVisitId,
+          name: esc.name,
+          phone: esc.phone,
+          department: department, 
+          id_type: 'Government ID', 
+          id_number: esc.govId,
+          nationality: esc.nationality,
+          email: esc.email || null,
+          gender: esc.gender
+        }));
+
+        const { error: escortsError } = await supabase.from('escorts').insert(escortsData);
+        if (escortsError) throw escortsError;
+      }
 
       setSuccess(true);
       setTimeout(() => navigate('/hr/visitormgmt'), 2000);
 
     } catch (err: any) {
       console.error(err);
-      if (err.code === '23503' || err.message?.includes('foreign key')) {
-        setError(`❌ Database Error: The Host ID (${hostId}) could not be found. Please double-check the Host Employee ID.`);
-      } else {
-        setError(err.message || 'System failed to write secure vendor tokens.');
-      }
+      setError(err.message || 'System failed to write secure vendor tokens.');
     } finally {
       setLoading(false);
     }
@@ -368,12 +358,24 @@ export default function AddVisitorServicePage() {
               </div>
             </div>
 
-            {pipeline === 'Pre-Scheduled Visit' && (
-              <div className="p-4 bg-orange-50/30 border border-orange-100 rounded-xl animate-fade-in">
-                <label className="block text-xs font-bold text-orange-900 uppercase tracking-wider mb-1.5">Authorized Deployment Timestamp Window *</label>
-                <input required type="datetime-local" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className="w-full p-2.5 border border-orange-200 rounded-lg bg-white text-xs font-bold font-mono text-slate-700 outline-none" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-orange-50/30 border border-orange-100 rounded-xl animate-fade-in">
+              <div>
+                <label className="block text-xs font-bold text-orange-900 uppercase tracking-wider mb-1.5">Pass Type *</label>
+                <select required value={passType} onChange={(e) => setPassType(e.target.value)} className="w-full p-2.5 border border-orange-200 rounded-lg bg-white text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-orange-500">
+                  <option value="One_day">One Day Pass</option>
+                  <option value="Multi_day">Multi-Day Pass</option>
+                  <option value="Contractor">Extended Contractor</option>
+                </select>
               </div>
-            )}
+              <div>
+                <label className="block text-xs font-bold text-orange-900 uppercase tracking-wider mb-1.5">Start Date & Time *</label>
+                <input required type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-2.5 border border-orange-200 rounded-lg bg-white text-xs font-bold font-mono text-slate-700 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-orange-900 uppercase tracking-wider mb-1.5">End Date & Time *</label>
+                <input required type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-2.5 border border-orange-200 rounded-lg bg-white text-xs font-bold font-mono text-slate-700 outline-none" />
+              </div>
+            </div>
 
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pt-2 border-b border-slate-50 pb-1">Primary Base Identity</h4>
 
@@ -381,7 +383,7 @@ export default function AddVisitorServicePage() {
               <div className="relative">
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Technician Full Name *</label>
                 <div className="relative flex items-center">
-                  <input required type="text" value={visitorName} disabled={!!visitorId} onChange={(e) => { setVisitorName(e.target.value); setShowDropdown(true); }} onFocus={() => setShowDropdown(true)} placeholder="Type name to lookup profiles..." className="w-full p-2.5 pr-8 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-orange-500 disabled:bg-slate-50 disabled:text-slate-600 font-semibold" />
+                  <input required type="text" value={visitorName} disabled={!!visitorId} onChange={(e) => { setVisitorName(e.target.value); setShowDropdown(true); }} onFocus={() => setShowDropdown(true)} placeholder="Type name to lookup profiles..." className="w-full p-2.5 pr-8 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-orange-500 disabled:bg-slate-50 disabled:text-slate-600 font-semibold" autoComplete="off" />
                   {visitorId ? (
                     <button type="button" onClick={handleClearSelectedVisitor} className="absolute right-2.5 text-slate-400 hover:text-red-500 transition-colors" title="Clear profile layout">
                       <X className="w-4 h-4" />
@@ -427,7 +429,7 @@ export default function AddVisitorServicePage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">Contact Phone *</label>
-                  <input required type="tel" value={phone} disabled={!!visitorId} onChange={(e) => setPhone(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-orange-500 disabled:bg-slate-50" />
+                  <input required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-orange-500" />
                 </div>
               </div>
 
@@ -437,7 +439,7 @@ export default function AddVisitorServicePage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Representative Email Address</label>
-                <input type="email" value={email} disabled={!!visitorId} onChange={(e) => setEmail(e.target.value)} placeholder="vendor@firm.com" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-orange-500 disabled:bg-slate-50" />
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="vendor@firm.com" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-orange-500" />
               </div>
             </div>
 
@@ -446,7 +448,7 @@ export default function AddVisitorServicePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-orange-50/20 p-4 border border-orange-100 rounded-xl">
               <div>
                 <label className="block text-xs font-bold text-orange-800 uppercase tracking-wider mb-1">Field Trade / Classification *</label>
-                <select value={tradeType} disabled={!!visitorId} onChange={(e) => setTradeType(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-slate-50">
+                <select value={tradeType} onChange={(e) => setTradeType(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-orange-500">
                   <option value="Facilities Maintenance">Facilities & Infrastructure Maintenance</option>
                   <option value="IT Equipment Delivery">IT Infrastructure Hardware Vendor</option>
                   <option value="Catering Logistics">Catering & Logistics Vendor</option>
@@ -455,7 +457,7 @@ export default function AddVisitorServicePage() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-orange-800 uppercase tracking-wider mb-1">Contractor Authorization ID *</label>
-                <select value={idType} disabled={!!visitorId} onChange={(e) => setIdType(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-slate-50">
+                <select value={idType} onChange={(e) => setIdType(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-orange-500">
                   <option value="Business Vendor ID">Corporate Work Badge / Vendor ID</option>
                   <option value="Labor Token Certificate">Labor Token Certificate</option>
                   <option value="PAN Clearance Card">PAN Clearance Card</option>
@@ -463,24 +465,22 @@ export default function AddVisitorServicePage() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-orange-800 uppercase tracking-wider mb-1">Credential Serial Reference *</label>
-                <input required type="text" value={idNumber} disabled={!!visitorId} onChange={(e) => setIdNumber(e.target.value)} placeholder="Enter ID string" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono tracking-wider outline-none focus:ring-2 focus:ring-orange-500 uppercase disabled:bg-slate-50" />
+                <input required type="text" value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder="Enter ID string" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono tracking-wider outline-none focus:ring-2 focus:ring-orange-500 uppercase" />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1">Contracting Agency / Corporate Employer</label>
-                <input type="text" value={contractingCompany} disabled={!!visitorId} onChange={(e) => setContractingCompany(e.target.value)} placeholder="e.g. Acme Infrastructure Group" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-orange-500 disabled:bg-slate-50" />
+            <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1">Contracting Agency / Corporate Employer</label>
+                  <input type="text" value={contractingCompany} onChange={(e) => setContractingCompany(e.target.value)} placeholder="e.g. Acme Infrastructure Group" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-orange-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1">Permanent Corporate Address</label>
+                  <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Office Suite No, Tech Park Block, City..." className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-orange-500" />
+                </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1">Supervising Internal Plant Host Employee ID *</label>
-                <input required type="text" value={hostId} onChange={(e) => setHostId(e.target.value)} placeholder="e.g. EMP-12345" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-orange-500" />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-500 mb-1">Permanent Corporate Address</label>
-                <input type="text" value={address} disabled={!!visitorId} onChange={(e) => setAddress(e.target.value)} placeholder="Office Suite No, Tech Park Block, City..." className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-orange-500 disabled:bg-slate-50" />
-              </div>
-              <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Scope of Structural Work Assignment Purpose *</label>
                 <input required type="text" value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="e.g. Scheduled Server Rack Infrastructure Maintenance Support" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-orange-500" />
               </div>
@@ -509,7 +509,7 @@ export default function AddVisitorServicePage() {
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Gender *</label>
-                      <select value={escort.gender} onChange={(e) => handleEscortChange(index, 'gender', e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
+                      <select value={escort.gender} onChange={(e) => handleEscortChange(index, 'gender', e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500">
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
                         <option value="Non-binary">Non-binary</option>
@@ -518,25 +518,41 @@ export default function AddVisitorServicePage() {
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Nationality *</label>
-                      <select value={escort.nationality} onChange={(e) => handleEscortChange(index, 'nationality', e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
+                      <select value={escort.nationality} onChange={(e) => handleEscortChange(index, 'nationality', e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500">
                         {NATIONALITIES.map(nat => <option key={nat.label} value={nat.label}>{nat.label}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Contact Phone *</label>
-                      <input required type="tel" value={escort.phone} onChange={(e) => handleEscortChange(index, 'phone', e.target.value)} placeholder="+91 98765 43210" className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500 disabled:bg-slate-50" />
+                      <input required type="tel" value={escort.phone} onChange={(e) => handleEscortChange(index, 'phone', e.target.value)} placeholder="+91 98765 43210" className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Identification Serial ID *</label>
-                      <input required type="text" value={escort.govId} onChange={(e) => handleEscortChange(index, 'govId', e.target.value)} placeholder="Enter Serial ID" className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Email Address</label>
-                      <input type="email" value={escort.email || ''} onChange={(e) => handleEscortChange(index, 'email', e.target.value)} placeholder="e.g. name@domain.com" className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" />
-                    </div>
-                  </div>
+                  {/* BOTTOM ROW: ID Type, ID Number, Email */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                          
+                          {/* 1. ID Type Select */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Identification Type *</label>
+                            <select value={escort.idType} onChange={(e) => handleEscortChange(index, 'idType', e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500">
+                              <option value="PAN">PAN Clearance Card</option>
+                              <option value="Passport">Passport Document</option>
+                              <option value="Aadhaar">Aadhaar National ID</option>
+                            </select> 
+                          </div>
+
+                          {/* 2. Serial ID Input */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">{escort.idType} Serial ID *</label>
+                            <input required type="text" value={escort.govId} onChange={(e) => handleEscortChange(index, 'govId', e.target.value)} placeholder="Enter Serial ID" className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500" />
+                          </div>
+
+                          {/* 3. Email Input */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Email Address</label>
+                            <input type="email" value={escort.email || ''} onChange={(e) => handleEscortChange(index, 'email', e.target.value)} placeholder="e.g. name@domain.com" className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" />
+                          </div>
+
+                        </div>
                 </div>
               </div>
             ))}
@@ -547,7 +563,7 @@ export default function AddVisitorServicePage() {
             <div className="pt-4 border-t border-slate-100">
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5">Verification Trade credentials Scan Copy</label>
               <label className="border-2 border-dashed border-orange-200 rounded-xl p-6 bg-slate-50/60 flex flex-col items-center justify-center text-slate-400 hover:bg-orange-50/10 hover:border-orange-400 transition-all cursor-pointer relative">
-                <UploadCloud className="w-7 h-7 mb-1.5 text-orange-600" />
+                <UploadCloud className="w-7 h-7 mb-1.5 text-orange-600 animate-pulse" />
                 <span className="font-bold text-orange-900 text-xs">
                   {file ? (file as File).name : 'Click to Upload Corporate Work Authorization Copy'}
                 </span>

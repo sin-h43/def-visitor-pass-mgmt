@@ -75,7 +75,7 @@ export default function VisitorVerification() {
       if (data.end_date) {
         expiryTime = new Date(data.end_date);
       } else {
-        expiryTime.setHours(18, 0, 0, 0); 
+        expiryTime.setHours(18, 0, 0, 0); // Fallback if missing
       }
 
       const diffTime = expiryTime.getTime() - new Date().getTime();
@@ -106,9 +106,11 @@ export default function VisitorVerification() {
         host: data.host?.name || 'Unassigned',
         document_url: data.document_url || data.visitors?.document_url || null,
         hr_remarks: data.hr_remarks || '',  
+        pass_type: data.pass_type ? data.pass_type.replace('_', ' ') : 'One Day',
+        expiry_full: expiryTime.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        days_left: daysLeftDisplay,
         expiry: expiryTime.toISOString(),
-        expiry_display: expiryTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-        days_left: daysLeftDisplay
+        expiry_display: expiryTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
       });
 
       const mappedEscorts = (data.escorts || []).map((e:any) => ({ ...e, verified: false }));
@@ -293,9 +295,7 @@ export default function VisitorVerification() {
                   <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Address</span>
                   <span className="font-medium text-slate-800">{visitor.address}</span>
                 </div>
-              </div>
-            </div>
-            <div className="col-span-2 md:col-span-4 border-t border-slate-200/60 pt-4 mt-2 grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                <div className="col-span-2 md:col-span-4 border-t border-slate-200/60 pt-4 mt-2 grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
                   <div>
                     <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Authorized Pass Type</span>
                     <span className="font-bold text-blue-700 uppercase tracking-wide">{visitor.pass_type}</span>
@@ -311,6 +311,8 @@ export default function VisitorVerification() {
                     </span>
                   </div>
                 </div>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col">
@@ -415,10 +417,10 @@ export default function VisitorVerification() {
               </div>
 
               <div className="flex flex-col gap-3">
-                <button onClick={completeCheckin} disabled={!allDone || uploading} className={`w-full py-3.5 rounded-lg font-black text-xs tracking-widest shadow-sm transition-all ${allDone ? 'bg-slate-900 text-white hover:bg-slate-800 hover:shadow-md' : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'}`}>
+                <button onClick={completeCheckin} disabled={!allDone || uploading} className={`w-full py-3.5 rounded-lg font-bold text-xs tracking-widest shadow-sm transition-all ${allDone ? 'bg-slate-900 text-white hover:bg-slate-800 hover:shadow-md' : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'}`}>
                   {uploading ? 'Processing Secure Entry...' : 'Authorize Facility Access'}
                 </button>
-                <button onClick={() => setDenyModal(true)} disabled={uploading} className="w-full py-3.5 rounded-lg font-black text-xs tracking-widest bg-red-50 text-rose-600 border border-rose-200 hover:bg-rose-100 transition-colors">
+                <button onClick={() => setDenyModal(true)} disabled={uploading} className="w-full py-3.5 rounded-lg font-bold text-xs tracking-widest bg-red-50 text-rose-600 border border-rose-200 hover:bg-rose-100 transition-colors">
                   Deny Entry
                 </button>
               </div>

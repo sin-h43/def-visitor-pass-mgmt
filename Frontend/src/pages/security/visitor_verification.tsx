@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { Camera, Upload, MessageSquare, CheckCircle, Clock, FileText, Users, ExternalLink, ShieldAlert, AlertOctagon, X } from 'lucide-react';
+import SecurityNotificationCenter from './SecurityNotificationCenter';
 
 export default function VisitorVerification() {
   const { visitorId } = useParams<{ visitorId: string }>();
@@ -255,13 +256,13 @@ export default function VisitorVerification() {
     }
   };
 
-  if (loading) return <DashboardLayout role="security" userName={currentUser.name}><div className="flex h-screen items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-slate-900"></div></div></DashboardLayout>;
+  if (loading) return <DashboardLayout role="security" userName={currentUser.name} headerAction={<SecurityNotificationCenter />}><div className="flex h-screen items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-slate-900"></div></div></DashboardLayout>;
   if (!visitor) return null;
 
   const allDone = steps.filter(s => s.required).every(s => s.completed);
 
   return (
-    <DashboardLayout role="security" userName={currentUser.name}>
+    <DashboardLayout role="security" userName={currentUser.name} headerAction={<SecurityNotificationCenter />}>
       <div className="max-w-7xl mx-auto space-y-4">
         
         <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">

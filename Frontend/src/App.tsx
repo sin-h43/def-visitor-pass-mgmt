@@ -13,6 +13,7 @@ import EmployeeDashboard from './pages/emp/index';
 import AddVisitorPage from './pages/emp/add_visitor';
 import RepeatedVisitorPage from './pages/emp/repeated_visitor';
 import DispatchedLogsPage from './pages/emp/dispatchedLogs';
+import EmployeeSettingsPage from './pages/emp/settings';
 
 // --- HR Pages ---
 import HRDashboard from './pages/hr/index';
@@ -29,10 +30,12 @@ import AddVisitorServicePage from './pages/hr/add_visitor_service';
 import EnterpriseVisitorProfile from './pages/hr/EnterpriseVisitorProfile';
 // import RegistrationManagement from './pages/hr/registration_management'; // We will build this for HR to approve users
 import Unauthorized from './pages/auth/unauthorized';
+import HRSettingsPage from './pages/hr/settings';
 
 // --- Security Pages ---
 import SecurityDashboard from './pages/security';
 import VisitorVerification from './pages/security/visitor_verification';
+import SecuritySettingsPage from './pages/security/settings';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -146,7 +149,7 @@ export default function App() {
         <Route path="/emp/add_visitor" element={<ProtectedRoute requiredRole="employee" userRole={userRole} isLoading={isLoading}><AddVisitorPage /></ProtectedRoute>} />
         <Route path="/emp/repeated_visitor" element={<ProtectedRoute requiredRole="employee" userRole={userRole} isLoading={isLoading}><RepeatedVisitorPage /></ProtectedRoute>} />
         <Route path="/emp/dispatchedlogs" element={<ProtectedRoute requiredRole="employee" userRole={userRole} isLoading={isLoading}><DispatchedLogsPage /></ProtectedRoute>} />
-        <Route path="/emp/settings" element={<ProtectedRoute requiredRole="employee" userRole={userRole} isLoading={isLoading}><div className="p-8">Employee Settings (Coming Soon)</div></ProtectedRoute>} />
+        <Route path="/emp/settings" element={<ProtectedRoute requiredRole="employee" userRole={userRole} isLoading={isLoading}><EmployeeSettingsPage /></ProtectedRoute>} />
 
 
         {/*HR PORTAL ROUTES */}
@@ -162,13 +165,12 @@ export default function App() {
         <Route path="/hr/hrrep/:id" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><EnterpriseVisitorProfile /></ProtectedRoute>} />
         <Route path="/hr/analytics" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><AnalyticsPage /></ProtectedRoute>} />
         <Route path="/hr/audit" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><AuditPage /></ProtectedRoute>} />
-        {/* <Route path="/hr/approvals" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><RegistrationManagement /></ProtectedRoute>} /> */}
-
+        <Route path="/hr/settings" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><HRSettingsPage /></ProtectedRoute>} />
 
         {/*SECURITY PORTAL ROUTES*/}
         <Route path="/security" element={<ProtectedRoute requiredRole="security" userRole={userRole} isLoading={isLoading}><SecurityDashboard /></ProtectedRoute>} />
         <Route path="/security/verify/:visitorId" element={<ProtectedRoute requiredRole="security" userRole={userRole} isLoading={isLoading}><VisitorVerification /></ProtectedRoute>} />
-
+        <Route path="/security/settings" element={<ProtectedRoute requiredRole="security" userRole={userRole} isLoading={isLoading}><SecuritySettingsPage /></ProtectedRoute>} />
 
         {/*CATCH-ALL (404)*/}
         <Route path="*" element={

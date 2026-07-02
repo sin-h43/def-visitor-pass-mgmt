@@ -4,7 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
-import { CheckCircle, AlertCircle, Users, TrendingUp, ChevronRight, AlertOctagon, ShieldAlert, X, User, Bell } from 'lucide-react';
+import { CheckCircle, AlertCircle, Users, TrendingUp, ChevronRight, AlertOctagon, ShieldAlert, X, User } from 'lucide-react';
+import SecurityNotificationCenter from './SecurityNotificationCenter';
 
 interface QueueItemWithDetails {
   visitor_id: string;
@@ -46,11 +47,6 @@ export default function SecurityDashboard() {
   const [activeTab, setActiveTab] = useState<'pending' | 'active'>('pending');
   const [activeDesks] = useState<number[]>([1]); // GATE ONE restriction
 
-  // Real-time Notification & Forensic States
-  const [todaysApprovals, setTodaysApprovals] = useState<any[]>([]);
-  const [activeForensics, setActiveForensics] = useState<any[]>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
-
   // Emergency Modal State
   const [emergencyModal, setEmergencyModal] = useState<{isOpen: boolean, visitId: string, visitorId: string, name: string} | null>(null);
   const [emergencyReason, setEmergencyReason] = useState('');
@@ -74,9 +70,8 @@ export default function SecurityDashboard() {
 
   useEffect(() => {
     fetchQueues();
-    fetchNotifications();
     
-    const interval = setInterval(() => { fetchQueues(); fetchNotifications(); }, 30000); 
+    const interval = setInterval(() => { fetchQueues(); }, 30000); 
     const clockInterval = setInterval(() => { setCurrentTime(new Date()); scanForRealTimeOverstays(); }, 60000); 
     
     return () => { clearInterval(interval); clearInterval(clockInterval); };
@@ -143,20 +138,6 @@ export default function SecurityDashboard() {
     }
   };
 
-  const fetchNotifications = async () => {
-    try {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const { data: approvals } = await supabase.from('visits').select('visit_id, visitor_id, visitors(name)').eq('status', 'Approved').gte('start_date', todayStart.toISOString());
-      if (approvals) setTodaysApprovals(approvals);
-
-      const { data: forensics } = await supabase.from('forensic_incidents').select('*').eq('status', 'open');
-      if (forensics) setActiveForensics(forensics);
-    } catch (error) {
-      console.error('Error fetching notifications', error);
-    }
-  };
-
   const scanForRealTimeOverstays = async () => {
     if (activeCampus.length === 0) return;
     const now = new Date();
@@ -174,7 +155,6 @@ export default function SecurityDashboard() {
               visitor_id: visitor.visitor_id, visit_id: visitor.visit_id, incident_type: 'time_overage', severity, excess_minutes: excessMins,
               reason: `SYSTEM AUTO-SCAN: Visitor overstayed authorized checkout time.`, reported_by: 'Automated Daemon', status: 'open'
             }]);
-            fetchNotifications();
           }
         }
       }
@@ -209,7 +189,6 @@ export default function SecurityDashboard() {
       }]);
 
       fetchQueues();
-      fetchNotifications();
     } catch (error) { console.error('Checkout failed:', error); }
   };
 
@@ -255,7 +234,6 @@ export default function SecurityDashboard() {
     }
   };
 
-  // --- FILTERING LOGIC ---
   const handleFilterToggle = (groupKey: string, value: string) => {
     setSelectedFilters(prev => {
       const current = prev[groupKey] || [];
@@ -269,7 +247,7 @@ export default function SecurityDashboard() {
     { key: 'category', title: 'Clearance Category', options: [{ label: 'Govt / Defence', value: 'Govt' }, { label: 'Foreign National', value: 'Foreign' }, { label: 'Service / Vendor', value: 'Service' }, { label: 'HR Registry', value: 'HR' }, { label: 'General Walk-in', value: 'General' }] }
   ];
 
-const applyFilters = (data: QueueItemWithDetails[]) => {
+  const applyFilters = (data: QueueItemWithDetails[]) => {
     return data.filter(item => {
       const searchLower = searchTerm.toLowerCase();
       const safeName = item.visitor_name || '';
@@ -290,51 +268,16 @@ const applyFilters = (data: QueueItemWithDetails[]) => {
   const filteredQueue = useMemo(() => applyFilters(queue), [queue, searchTerm, selectedFilters]);
   const filteredActive = useMemo(() => applyFilters(activeCampus), [activeCampus, searchTerm, selectedFilters]);
 
-  const unreadCount = todaysApprovals.length + activeForensics.length;
-
   if (loading) {
     return (
-      <DashboardLayout role="security" userName={currentUser.name}>
+      <DashboardLayout role="security" userName={currentUser.name} headerAction={<SecurityNotificationCenter />}>
         <div className="flex items-center justify-center h-[60vh]"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-slate-900"></div></div>
       </DashboardLayout>
     );
   }
 
   return (
-    <DashboardLayout role="security" userName={currentUser.name} headerAction={
-        <div className="relative">
-          <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-2 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <Bell className="w-5 h-5 text-slate-700" />
-            {unreadCount > 0 && <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-[10px] font-bold text-white border-2 border-white shadow-sm animate-pulse">{unreadCount > 9 ? '9+' : unreadCount}</span>}
-          </button>
-          {showNotifications && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-              <div className="absolute right-0 mt-3 w-80 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in text-left flex flex-col max-h-[80vh]">
-                <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                  <h3 className="font-bold text-slate-800 text-sm">Security Feed</h3>
-                  <span className="text-[10px] font-bold text-slate-500">GATE ONE</span>
-                </div>
-                <div className="overflow-y-auto bg-white flex-1 p-3 space-y-4 custom-scrollbar">
-                  {activeForensics.length > 0 && (
-                    <div>
-                      <div className="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-2 flex items-center"><AlertOctagon className="w-3 h-3 mr-1" /> Active Breaches</div>
-                      <div className="space-y-2">{activeForensics.map((f, i) => <div key={i} className="bg-rose-50 border border-rose-100 rounded-lg p-2.5 text-xs"><p className="font-bold text-rose-800">Time Exceeded ({f.excess_minutes}m)</p><p className="text-rose-600 mt-0.5 line-clamp-1">{f.reason}</p></div>)}</div>
-                    </div>
-                  )}
-                  {todaysApprovals.length > 0 && (
-                    <div>
-                      <div className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider mb-2 flex items-center"><CheckCircle className="w-3 h-3 mr-1" /> Today's Approvals</div>
-                      <div className="space-y-2">{todaysApprovals.map((t, i) => <div key={i} className="bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 text-xs"><p className="font-bold text-emerald-800">{t.visitors?.name}</p><p className="text-emerald-600 font-mono mt-0.5">{t.visit_id}</p></div>)}</div>
-                    </div>
-                  )}
-                  {unreadCount === 0 && <p className="text-xs text-slate-400 text-center py-4">No active alerts for Gate One.</p>}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      }>
+    <DashboardLayout role="security" userName={currentUser.name} headerAction={<SecurityNotificationCenter />}>
       <div className="max-w-7xl mx-auto space-y-4">
         <div className="flex items-center space-x-3">
           <div className="p-2 bg-slate-900 text-white rounded-lg shadow-sm"><ShieldAlert className="w-6 h-6" /></div>
@@ -351,8 +294,8 @@ const applyFilters = (data: QueueItemWithDetails[]) => {
             <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600"><ShieldAlert size={20} /></div>
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm flex items-center justify-between">
-            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Forensic Alerts</p><p className={`text-2xl font-black mt-1 ${activeForensics.length > 0 ? 'text-rose-600' : 'text-slate-300'}`}>{activeForensics.length}</p></div>
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${activeForensics.length > 0 ? 'bg-rose-50 text-rose-600 animate-pulse' : 'bg-slate-50 text-slate-400'}`}><AlertOctagon size={20} /></div>
+            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Forensic Alerts</p><p className={`text-2xl font-black mt-1 ${activeCampus.some(v => calculateOverage(v.expected_out).exceeded) ? 'text-rose-600' : 'text-slate-300'}`}>Monitor</p></div>
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${activeCampus.some(v => calculateOverage(v.expected_out).exceeded) ? 'bg-rose-50 text-rose-600 animate-pulse' : 'bg-slate-50 text-slate-400'}`}><AlertOctagon size={20} /></div>
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm flex items-center justify-between">
             <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Gates</p><p className="text-2xl font-black font-bold text-purple-600 mt-1">{activeDesks.length}/1</p></div>

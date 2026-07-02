@@ -27,15 +27,12 @@ const PRIORITY_ORDER = { high: 1, medium: 2, low: 3 };
 export default function SecurityDashboard() {
   const navigate = useNavigate();
   
-  // Scoped Security Guard State
   const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: 'Loading...', role: '' });
   
-  // Dashboard Queues
   const [queue, setQueue] = useState<QueueItemWithDetails[]>([]);
   const [activeCampus, setActiveCampus] = useState<QueueItemWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
     priority: [],
@@ -45,9 +42,8 @@ export default function SecurityDashboard() {
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [activeTab, setActiveTab] = useState<'pending' | 'active'>('pending');
-  const [activeDesks] = useState<number[]>([1]); // GATE ONE restriction
+  const [activeDesks] = useState<number[]>([1]);
 
-  // Emergency Modal State
   const [emergencyModal, setEmergencyModal] = useState<{isOpen: boolean, visitId: string, visitorId: string, name: string} | null>(null);
   const [emergencyReason, setEmergencyReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -70,10 +66,8 @@ export default function SecurityDashboard() {
 
   useEffect(() => {
     fetchQueues();
-    
     const interval = setInterval(() => { fetchQueues(); }, 30000); 
     const clockInterval = setInterval(() => { setCurrentTime(new Date()); scanForRealTimeOverstays(); }, 60000); 
-    
     return () => { clearInterval(interval); clearInterval(clockInterval); };
   }, [activeCampus]);
 
@@ -94,13 +88,11 @@ export default function SecurityDashboard() {
         const isForeign = visitLog.visitors?.nationality?.toLowerCase() !== 'indian';
         const dbType = (visitLog.visit_type || '').toLowerCase();
         
-        // Dynamically compute category
         if (dbType.includes('govt')) category = 'Govt';
         else if (dbType.includes('hr')) category = 'HR';
         else if (dbType.includes('service')) category = 'Service';
         else if (dbType.includes('foreign') || isForeign) category = 'Foreign';
 
-        // Dynamically compute priority
         if (category === 'Foreign' || category === 'Govt' || visitLog.department?.toLowerCase().includes('defence')) priority = 'high';
         else if (category === 'Service') priority = 'medium';
 
@@ -124,6 +116,7 @@ export default function SecurityDashboard() {
             ...visitLog.visitors,
             purpose: visitLog.purpose,
             employee_name: visitLog.host?.name || 'Unassigned',
+            is_banned: visitLog.visitors?.is_banned || false // Map the new ban field
           },
         };
       });
@@ -178,7 +171,6 @@ export default function SecurityDashboard() {
       const nowIso = now.toISOString();
       await supabase.from('visits').update({ status: 'Completed', actual_out: nowIso }).eq('visit_id', visitId);
       await supabase.from('visitors').update({ checked_out_time: nowIso }).eq('visitor_id', visitorId);
-
       await supabase.from('time_tracking_logs').update({ actual_out_time: nowIso, time_exceeded: isOverage, excess_minutes: excessMins }).eq('visit_id', visitId);
 
       await supabase.from('audit_logs').insert([{
@@ -332,14 +324,22 @@ export default function SecurityDashboard() {
                 </div>
               ) : (
                 filteredQueue.map((item) => (
-                  <div key={item.visit_id} className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col md:flex-row md:items-center justify-between shadow-sm hover:shadow-md transition-all gap-4">
+                  <div key={item.visit_id} className={`bg-white rounded-xl border p-5 flex flex-col md:flex-row md:items-center justify-between shadow-sm transition-all gap-4 ${item.visitor_details?.is_banned ? 'border-rose-300 bg-rose-50/10' : 'border-slate-200 hover:shadow-md'}`}>
                     <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center border border-slate-200 shrink-0"><User className="text-slate-400 w-6 h-6" /></div>
+                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center border shrink-0 ${item.visitor_details?.is_banned ? 'bg-rose-50 border-rose-200 text-rose-500' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
+                        {item.visitor_details?.is_banned ? <AlertOctagon className="w-6 h-6" /> : <User className="w-6 h-6" />}
+                      </div>
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-bold text-slate-900 text-base">{item.visitor_name}</h3>
+                          <h3 className={`font-bold text-base ${item.visitor_details?.is_banned ? 'text-rose-900' : 'text-slate-900'}`}>{item.visitor_name}</h3>
                           <span className="text-[10px] font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold border border-blue-100">{item.visitor_id}</span>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border ${getPriorityColor(item.priority)}`}>{item.priority} Priority</span>
+                          {/* HR Ban Indicator */}
+                          {item.visitor_details?.is_banned && (
+                            <span className="text-[10px] font-bold bg-rose-600 text-white px-2 py-0.5 rounded uppercase tracking-wider animate-pulse flex items-center">
+                              <ShieldAlert className="w-3 h-3 mr-1"/> Banned
+                            </span>
+                          )}
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-1 text-xs">
                           <div><span className="text-slate-400 font-medium">Category:</span> <span className="text-slate-700 font-bold uppercase">{item.category}</span></div>
@@ -348,8 +348,8 @@ export default function SecurityDashboard() {
                         </div>
                       </div>
                     </div>
-                    <button onClick={() => navigate(`/security/verify/${item.visitor_id}`)} className="w-full md:w-auto px-6 py-2.5 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-sm shrink-0">
-                      Verify & Grant Access <ChevronRight size={16} />
+                    <button onClick={() => navigate(`/security/verify/${item.visitor_id}`)} className={`w-full md:w-auto px-6 py-2.5 text-white text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm shrink-0 ${item.visitor_details?.is_banned ? 'bg-rose-700 hover:bg-rose-800' : 'bg-slate-900 hover:bg-slate-800'}`}>
+                      {item.visitor_details?.is_banned ? 'Enforce Ban' : 'Verify & Grant Access'} <ChevronRight size={16} />
                     </button>
                   </div>
                 ))
@@ -412,7 +412,7 @@ export default function SecurityDashboard() {
       </div>
 
       {emergencyModal?.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border border-rose-100">
             <div className="p-5 bg-rose-50 border-b border-rose-100 flex justify-between items-center">
               <div>

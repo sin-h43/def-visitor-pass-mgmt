@@ -3,14 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import { Camera, Upload, MessageSquare, CheckCircle, Clock, FileText, Users, ExternalLink, ShieldAlert, AlertOctagon, X } from 'lucide-react';
+import { Camera, Upload, MessageSquare, CheckCircle, Clock, FileText, Users, ExternalLink, ShieldAlert, AlertOctagon, X, Ban } from 'lucide-react';
 import SecurityNotificationCenter from './SecurityNotificationCenter';
 
 export default function VisitorVerification() {
   const { visitorId } = useParams<{ visitorId: string }>();
   const navigate = useNavigate();
   
-  // Scoped Security Guard State
   const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: 'Loading...', role: '' });
   
   const [visitor, setVisitor] = useState<Record<string, any> | null>(null); 
@@ -25,7 +24,6 @@ export default function VisitorVerification() {
   const [deskNumber, setDeskNumber] = useState(1);
   const [escorts, setEscorts] = useState<any[]>([]);
 
-  // Security Deny Modal State
   const [securityNote, setSecurityNote] = useState('');
   const [denyModal, setDenyModal] = useState(false);
   const [denyReason, setDenyReason] = useState('');
@@ -76,7 +74,7 @@ export default function VisitorVerification() {
       if (data.end_date) {
         expiryTime = new Date(data.end_date);
       } else {
-        expiryTime.setHours(18, 0, 0, 0); // Fallback if missing
+        expiryTime.setHours(18, 0, 0, 0); 
       }
 
       const diffTime = expiryTime.getTime() - new Date().getTime();
@@ -111,7 +109,12 @@ export default function VisitorVerification() {
         expiry_full: expiryTime.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
         days_left: daysLeftDisplay,
         expiry: expiryTime.toISOString(),
-        expiry_display: expiryTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+        expiry_display: expiryTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        
+        // Map Ban Details
+        is_banned: data.visitors?.is_banned || false,
+        banned_reason: data.visitors?.banned_reason || '',
+        banned_at: data.visitors?.banned_at || null,
       });
 
       const mappedEscorts = (data.escorts || []).map((e:any) => ({ ...e, verified: false }));
@@ -194,11 +197,9 @@ export default function VisitorVerification() {
         security_remarks: securityNote || null 
       };
 
-      // 1. Mark visitor Active
       await supabase.from('visits').update(updates).eq('visit_id', visitor.visit_id); 
       await supabase.from('visitors').update({ checked_in_time: checkInStamp }).eq('visitor_id', visitor.id); 
       
-      // 2. Initialize Time Tracking Forensics DB Log
       await supabase.from('time_tracking_logs').insert([{
         visit_id: visitor.visit_id,
         visitor_id: visitor.id,
@@ -208,7 +209,6 @@ export default function VisitorVerification() {
         logged_to_forensic: false
       }]);
 
-      // 3. Fire highly detailed log to HR Dashboard
       await supabase.from('audit_logs').insert([{
         visitor_id: visitor.id, 
         action: 'checked_in', 
@@ -236,7 +236,6 @@ export default function VisitorVerification() {
         security_remarks: `[DENIED AT GATE]: ${denyReason}` 
       }).eq('visit_id', visitor.visit_id); 
       
-      // Strict alert directly to HR Audit Log
       await supabase.from('audit_logs').insert([{
         visitor_id: visitor.id, 
         action: 'rejected', 
@@ -259,7 +258,8 @@ export default function VisitorVerification() {
   if (loading) return <DashboardLayout role="security" userName={currentUser.name} headerAction={<SecurityNotificationCenter />}><div className="flex h-screen items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-slate-900"></div></div></DashboardLayout>;
   if (!visitor) return null;
 
-  const allDone = steps.filter(s => s.required).every(s => s.completed);
+  // Lock out the Authorize button completely if banned
+  const allDone = steps.filter(s => s.required).every(s => s.completed) && !visitor.is_banned;
 
   return (
     <DashboardLayout role="security" userName={currentUser.name} headerAction={<SecurityNotificationCenter />}>
@@ -276,6 +276,27 @@ export default function VisitorVerification() {
             </div>
           </div>
         </div>
+
+        {/* HR BAN CRITICAL BANNER */}
+        {visitor.is_banned && (
+          <div className="bg-rose-50 border-2 border-rose-500 rounded-xl p-5 mb-4 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in">
+            <div className="flex items-start gap-4">
+              <Ban className="w-10 h-10 text-rose-600 shrink-0" />
+              <div>
+                <h2 className="text-lg font-black text-rose-800 uppercase tracking-wider">Permanent Ban Active</h2>
+                <p className="text-sm text-rose-700 mt-0.5">
+                  <strong className="font-black">Reason:</strong> {visitor.banned_reason}
+                </p>
+                <p className="text-xs text-rose-600 mt-1 font-mono">
+                  Banned on: {new Date(visitor.banned_at).toLocaleString('en-GB')}
+                </p>
+              </div>
+            </div>
+            <button onClick={() => { setDenyReason('HR Permanent Ban Active'); setDenyModal(true); }} className="w-full md:w-auto px-6 py-3 bg-rose-600 text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-sm hover:bg-rose-700 transition-colors">
+              Enforce Denial
+            </button>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           
@@ -419,14 +440,15 @@ export default function VisitorVerification() {
               </div>
 
               <div className="flex flex-col gap-3">
-                <button onClick={completeCheckin} disabled={!allDone || uploading} className={`w-full py-3.5 rounded-lg font-bold text-xs tracking-widest shadow-sm transition-all ${allDone ? 'bg-slate-900 text-white hover:bg-slate-800 hover:shadow-md' : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'}`}>
+                <button onClick={completeCheckin} disabled={!allDone || uploading || visitor.is_banned} className={`w-full py-3.5 rounded-lg font-bold text-xs tracking-widest shadow-sm transition-all ${allDone ? 'bg-slate-900 text-white hover:bg-slate-800 hover:shadow-md' : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'}`}>
                   {uploading ? 'Processing Secure Entry...' : 'Authorize Facility Access'}
                 </button>
                 <button onClick={() => setDenyModal(true)} disabled={uploading} className="w-full py-3.5 rounded-lg font-bold text-xs tracking-widest bg-red-50 text-rose-600 border border-rose-200 hover:bg-rose-100 transition-colors">
                   Deny Entry
                 </button>
               </div>
-              {!allDone && <p className="text-[10px] font-bold text-amber-600 mt-4 text-center uppercase tracking-wider flex items-center justify-center"><ShieldAlert className="w-3 h-3 mr-1.5"/> Awaiting Mandatory Validations</p>}
+              {!allDone && !visitor.is_banned && <p className="text-[10px] font-bold text-amber-600 mt-4 text-center uppercase tracking-wider flex items-center justify-center"><ShieldAlert className="w-3 h-3 mr-1.5"/> Awaiting Mandatory Validations</p>}
+              {visitor.is_banned && <p className="text-[10px] font-bold text-rose-600 mt-4 text-center uppercase tracking-wider flex items-center justify-center"><Ban className="w-3 h-3 mr-1.5"/> Authorization Locked by HR</p>}
             </div>
           </div>
         </div>

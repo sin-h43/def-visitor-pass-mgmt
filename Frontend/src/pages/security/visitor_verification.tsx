@@ -75,8 +75,19 @@ export default function VisitorVerification() {
       if (data.end_date) {
         expiryTime = new Date(data.end_date);
       } else {
-        // Fallback to 18:00 only if the database is completely missing a date
         expiryTime.setHours(18, 0, 0, 0); 
+      }
+
+      const diffTime = expiryTime.getTime() - new Date().getTime();
+      const daysLeftRaw = diffTime / (1000 * 60 * 60 * 24);
+      let daysLeftDisplay;
+      
+      if (daysLeftRaw < 0) {
+        daysLeftDisplay = 'Expired';
+      } else if (daysLeftRaw < 1) {
+        daysLeftDisplay = 'Expires Today';
+      } else {
+        daysLeftDisplay = `${Math.ceil(daysLeftRaw)} Days Left`;
       }
 
       setVisitor({
@@ -94,9 +105,10 @@ export default function VisitorVerification() {
         id_number: data.visitors?.id_number || data.visitors?.identity_number || 'N/A',
         host: data.host?.name || 'Unassigned',
         document_url: data.document_url || data.visitors?.document_url || null,
-        hr_remarks: data.hr_remarks || '',
+        hr_remarks: data.hr_remarks || '',  
         expiry: expiryTime.toISOString(),
-        expiry_display: expiryTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+        expiry_display: expiryTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        days_left: daysLeftDisplay
       });
 
       const mappedEscorts = (data.escorts || []).map((e:any) => ({ ...e, verified: false }));
@@ -283,6 +295,22 @@ export default function VisitorVerification() {
                 </div>
               </div>
             </div>
+            <div className="col-span-2 md:col-span-4 border-t border-slate-200/60 pt-4 mt-2 grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                  <div>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Authorized Pass Type</span>
+                    <span className="font-bold text-blue-700 uppercase tracking-wide">{visitor.pass_type}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Target Expiry Date & Time</span>
+                    <span className="font-bold text-slate-800">{visitor.expiry_full}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Validity Remaining</span>
+                    <span className={`font-bold ${visitor.days_left === 'Expired' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      {visitor.days_left}
+                    </span>
+                  </div>
+                </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col">
@@ -404,7 +432,7 @@ export default function VisitorVerification() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
             <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-rose-100 transform scale-100 transition-all">
               <div className="p-5 bg-rose-50 border-b border-rose-100 flex justify-between items-center">
-                <h3 className="font-black text-rose-800 flex items-center"><AlertOctagon className="w-5 h-5 mr-2"/> Deny Access</h3>
+                <h3 className="font-bold text-rose-800 flex items-center"><AlertOctagon className="w-5 h-5 mr-2"/> Deny Access</h3>
                 <button onClick={() => setDenyModal(false)} className="text-rose-400 hover:text-rose-700 transition-colors"><X size={20}/></button>
               </div>
               <div className="p-6 space-y-4">

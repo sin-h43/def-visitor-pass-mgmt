@@ -7,6 +7,7 @@ import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
 import type { TableColumn, VisitorRecord } from '../../types/visitor';
 import { supabase } from '../../lib/supabase';
+import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
 
 export interface ExtendedVisitorRecord extends VisitorRecord {
   requestedAt: string;
@@ -48,6 +49,23 @@ export default function HRDashboard() {
     pipeline: ['immediate', 'scheduled', 'repeated'],
     status: ['Pending', 'Approved', 'Denied', 'Cleared', 'Active']
   });
+  // Dynamic User State
+  const [currentUserName, setCurrentUserName] = useState('Loading...');
+
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        try {
+          const emp = await fetchAndVerifyEmployee(user.email);
+          setCurrentUserName(emp.name);
+        } catch(e) {
+          setCurrentUserName('HR Admin');
+        }
+      }
+    };
+    loadUserProfile();
+  }, []);
 
   const navigate = useNavigate();
   const [readLogs, setReadLogs] = useState<string[]>(JSON.parse(localStorage.getItem('readLogs') || '[]'));
@@ -396,7 +414,7 @@ const handleRejectEmployee = async (id: string, name: string) => {
 
   if (loading) {
     return (
-      <DashboardLayout role="hr" userName="HR Admin">
+    <DashboardLayout role="hr" userName={currentUserName}>
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-pulse flex flex-col items-center">
             <div className="h-8 w-8 bg-blue-600 rounded-full mb-4"></div>

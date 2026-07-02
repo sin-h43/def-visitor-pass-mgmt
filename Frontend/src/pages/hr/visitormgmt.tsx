@@ -79,7 +79,6 @@ export default function VisitorMgmtPage() {
     try {
       setLoading(true);
       
-      // FIX: Used '*' to prevent 400 Bad Request crashes if specific columns are missing
       const { data, error } = await supabase
         .from('visits')
         .select(`
@@ -373,7 +372,7 @@ export default function VisitorMgmtPage() {
   }
 
   return (
-    <DashboardLayout role="hr" userName="Sinchana K" headerAction={<HRNotificationCenter />}>
+    <DashboardLayout role="hr" userName={currentUserName} headerAction={<HRNotificationCenter />}>
       <div className="max-w-7xl mx-auto space-y-8">
         
         <div className="flex items-center space-x-3">

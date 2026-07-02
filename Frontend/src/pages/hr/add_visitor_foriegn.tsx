@@ -81,7 +81,22 @@ export default function AddVisitorForeignPage() {
   // File Upload State
   const [file, setFile] = useState<File | null>(null);
   const [uploadingText, setUploadingText] = useState('');
-  
+    const [currentUserName, setCurrentUserName] = useState('Loading...');
+
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        try {
+          const emp = await fetchAndVerifyEmployee(user.email);
+          setCurrentUserName(emp.name);
+        } catch(e) {
+          setCurrentUserName('HR Admin');
+        }
+      }
+    };
+    loadUserProfile();
+  }, []);
   const maxAllowedDate = new Date();
   maxAllowedDate.setFullYear(maxAllowedDate.getFullYear() - 12);
   const maxDob = maxAllowedDate.toISOString().split('T')[0];
@@ -300,7 +315,7 @@ export default function AddVisitorForeignPage() {
 
   if (success) {
     return (
-      <DashboardLayout role="hr" userName="Sinchana K">
+      <DashboardLayout role="hr" userName={currentUserName}>
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-8 max-w-4xl shadow-sm text-center animate-fade-in mx-auto mt-10">
           <CheckCircle2 className="w-16 h-16 text-amber-600 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-amber-800 mb-2">Border Entry Logged Successfully</h2>
@@ -311,7 +326,7 @@ export default function AddVisitorForeignPage() {
   }
 
   return (
-    <DashboardLayout role="hr" userName="Sinchana K">
+    <DashboardLayout role="hr" userName={currentUserName}>
       <div className="max-w-4xl mx-auto pb-12 font-sans text-slate-800">
         <div className="mb-6">
           <button type="button" onClick={() => navigate(-1)} className="flex items-center text-xs font-bold text-slate-400 hover:text-slate-800 transition-colors">

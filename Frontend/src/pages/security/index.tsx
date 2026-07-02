@@ -269,11 +269,20 @@ export default function SecurityDashboard() {
     { key: 'category', title: 'Clearance Category', options: [{ label: 'Govt / Defence', value: 'Govt' }, { label: 'Foreign National', value: 'Foreign' }, { label: 'Service / Vendor', value: 'Service' }, { label: 'HR Registry', value: 'HR' }, { label: 'General Walk-in', value: 'General' }] }
   ];
 
-  const applyFilters = (data: QueueItemWithDetails[]) => {
+const applyFilters = (data: QueueItemWithDetails[]) => {
     return data.filter(item => {
-      const matchesSearch = item.visitor_name?.toLowerCase().includes(searchTerm.toLowerCase()) || item.visitor_id.toLowerCase().includes(searchTerm.toLowerCase());
+      const searchLower = searchTerm.toLowerCase();
+      const safeName = item.visitor_name || '';
+      const safeVisitorId = item.visitor_id || '';
+      const safeVisitId = item.visit_id || '';
+
+      const matchesSearch = safeName.toLowerCase().includes(searchLower) || 
+                            safeVisitorId.toLowerCase().includes(searchLower) || 
+                            safeVisitId.toLowerCase().includes(searchLower);
+
       const matchesPriority = selectedFilters.priority.length === 0 || selectedFilters.priority.includes(item.priority);
       const matchesCategory = selectedFilters.category.length === 0 || selectedFilters.category.includes(item.category);
+      
       return matchesSearch && matchesPriority && matchesCategory;
     });
   };

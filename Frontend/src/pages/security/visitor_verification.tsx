@@ -71,10 +71,12 @@ export default function VisitorVerification() {
 
       if (error) throw error;
 
-      const now = new Date();
-      let expiryTime = new Date(now.setHours(18, 0, 0, 0)); 
-      if (data.duration_hours) {
-        expiryTime = new Date(new Date().getTime() + data.duration_hours * 3600000);
+      let expiryTime = new Date();
+      if (data.end_date) {
+        expiryTime = new Date(data.end_date);
+      } else {
+        // Fallback to 18:00 only if the database is completely missing a date
+        expiryTime.setHours(18, 0, 0, 0); 
       }
 
       setVisitor({

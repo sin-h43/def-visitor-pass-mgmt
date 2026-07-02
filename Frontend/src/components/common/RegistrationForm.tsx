@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { UploadCloud, Users, AlertCircle, CheckCircle2, Search, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { fetchAndVerifyEmployee, employeeIdExists } from '../../lib/employeeUtils'; //[cite: 2]
 
 const NATIONALITIES = [
   { label: 'Indian', code: '+91' },
@@ -60,9 +61,7 @@ export default function RegistrationForm() {
   const [scheduledDate, setScheduledDate] = useState('');
   const [department, setDepartment] = useState(prefillData?.department || 'Research Wing');
 
-  // FIX APPLIED: Link the existing visitorId if passed from Repeated Visitor page
   const [visitorId, setVisitorId] = useState<string | null>(prefillData?.visitorId || null); 
-  
   const [visitorName, setVisitorName] = useState(prefillData?.visitorName || '');
   const [gender, setGender] = useState(prefillData?.gender && prefillData.gender !== 'Others' ? prefillData.gender : 'Others');
   const [dob, setDob] = useState(prefillData?.dob !== 'N/A' ? (prefillData?.dob || '') : '');
@@ -76,32 +75,55 @@ export default function RegistrationForm() {
     if (prefillData?.purpose) return prefillData.purpose.split(' | Accompanying:')[0];
     return '';
   });
-  // DYNAMIC USER STATE
-const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: '', dept: '' });
 
+  // DYNAMIC USER STATE (Updated to hold UUID)
+  const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: '', dept: '' });
+
+  // UPDATED HOOK: Load user profile with robust error handling
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        const { data: emp } = await supabase.from('employees').select('*').eq('email', user.email).single();
-      if (emp) {
-          setCurrentUser({ 
-            uuid: emp.id,                  
-            empId: emp.employee_id,        
-            name: emp.name, 
-            dept: emp.department || 'General Unit' 
-          });
+    const loadUserProfile = async () => {
+      try {
+        console.log('🔄 Loading current user profile...'); //[cite: 2]
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.email) {
+          console.warn('⚠️ No authenticated user found'); //[cite: 2]
+          setError('❌ You must be logged in to register a visitor.'); //[cite: 2]
+          return;
         }
+
+        console.log(`🔍 Fetching employee record for: ${user.email}`); //[cite: 2]
+        
+        const employee = await fetchAndVerifyEmployee(user.email); //[cite: 2]
+        
+        if (!employee.id) {
+          throw new Error('Employee record has no ID. Contact HR.'); //[cite: 2]
+        }
+
+        console.log(`✅ User profile loaded: ${employee.name} (${employee.department})`); //[cite: 2]
+        
+        setCurrentUser({ 
+          uuid: employee.id,
+          empId: employee.employee_id,         
+          name: employee.name, 
+          dept: employee.department || 'General Unit' 
+        });
+        
+        setError(null); //[cite: 2]
+        
+      } catch (err: any) {
+        console.error('❌ Profile loading failed:', err); //[cite: 2]
+        setError(err.message || 'Failed to load your employee profile'); //[cite: 2]
       }
     };
-    fetchUser();
+
+    loadUserProfile();
   }, []);
   
   const [organization, setOrganization] = useState(prefillData?.organization !== 'N/A' ? (prefillData?.organization || '') : '');
   const [designation, setDesignation] = useState('');
   const [nationality, setNationality] = useState(prefillData?.nationality || 'Indian');
 
-  // Autofill Synchronization Hook
   useEffect(() => {
     if (prefillData) {
       if (prefillData.designation && prefillData.designation !== 'N/A') {
@@ -121,11 +143,9 @@ const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: '', 
     }
   }, [prefillData]);
   
-  // Autocomplete UI States
   const [searchResults, setSearchResults] = useState<ExistingVisitor[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // Accompanying Contingent State
   const [headCount, setHeadCount] = useState<number>(prefillData?.escorts?.length || 0);
   const [escorts, setEscorts] = useState<EscortPersonnel[]>(
     prefillData?.escorts?.map((e: any) => ({ 
@@ -139,11 +159,9 @@ const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: '', 
     })) || []
   );
 
-  // File Asset Tokens
   const [file, setFile] = useState<File | null>(null);
   const [uploadingText, setUploadingText] = useState('');
 
-  // 12+ Age Requirement Calculator
   const maxAllowedDate = new Date();
   maxAllowedDate.setFullYear(maxAllowedDate.getFullYear() - 12);
   const maxDob = maxAllowedDate.toISOString().split('T')[0];
@@ -229,24 +247,24 @@ const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: '', 
     });
   }, [headCount]);
 
+  // LINK ESCORT NATIONALITY AND PHONE LOGIC
   const handleEscortChange = (index: number, field: keyof EscortPersonnel, value: string) => {
     const updatedEscorts = [...escorts];
-if (field === 'nationality') {
+    
+    if (field === 'nationality') {
       const natData = NATIONALITIES.find(n => n.label === value);
       updatedEscorts[index] = {
         ...updatedEscorts[index],
         nationality: value,
-        // Preserve existing phone number if they just switch nationality by accident, 
-        // or just set the new country code if it's empty/just a country code
         phone: natData?.code ? `${natData.code} ` : '' 
       };
     } else {
-      // Standard update for all other fields
       updatedEscorts[index] = {
         ...updatedEscorts[index],
         [field]: value
       };
     }
+    
     setEscorts(updatedEscorts);
   };
 
@@ -259,12 +277,41 @@ if (field === 'nationality') {
     }
   };
 
-const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // VALIDATION BLOCK
+    if (!currentUser.uuid) {
+      console.error('❌ Validation failed: currentUser.uuid is empty'); //[cite: 2]
+      setError('❌ Your employee profile failed to load. Please refresh the page and try again.'); //[cite: 2]
+      return;
+    }
+
+    if (!currentUser.uuid.match(/^[0-9a-f\-]{36}$/)) {
+      console.error('❌ Invalid UUID format:', currentUser.uuid); //[cite: 2]
+      setError('❌ Invalid employee ID format. Contact HR.'); //[cite: 2]
+      return;
+    }
+
+    console.log(`📝 Starting visitor registration for: ${visitorName}`); //[cite: 2]
+    console.log(`👤 Host employee ID: ${currentUser.uuid}`); //[cite: 2]
+    
     setLoading(true);
     setError(null);
 
     try {
+      console.log(`🔍 Pre-flight: Verifying employee ${currentUser.uuid} exists...`); //[cite: 2]
+      const empExists = await employeeIdExists(currentUser.uuid); //[cite: 2]
+      
+      if (!empExists) {
+        console.error('❌ Pre-flight failed: Employee does not exist in database'); //[cite: 2]
+        setError(`❌ Your employee record does not exist in the system. ID: ${currentUser.uuid}. Please contact HR to activate your account.`); //[cite: 2]
+        setLoading(false);
+        return;
+      }
+      
+      console.log('✅ Pre-flight passed: Employee exists in database'); //[cite: 2]
+
       const timestamp = Date.now().toString().slice(-6);
       const activeVisitId = isEdit ? existingVisitId : `VST${timestamp}`;
       let activeVisitorId = visitorId;
@@ -294,8 +341,8 @@ const handleSubmit = async (e: React.FormEvent) => {
         const guestList = escorts.map(esc => `${esc.name} (${esc.idType}: ${esc.govId})`).join(', ');
         finalPurpose += ` | Accompanying: ${guestList}`;
       }
-const dbVisitType = pipeline === 'Pre-Scheduled Visit' ? 'scheduled' : (pipeline === 'Repeated Visitor' ? 'repeated' : 'immediate');      
-const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
+      const dbVisitType = pipeline === 'Pre-Scheduled Visit' ? 'scheduled' : (pipeline === 'Repeated Visitor' ? 'repeated' : 'immediate');      
+      const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
 
       if (isEdit) {
         if (activeVisitorId) {
@@ -303,7 +350,7 @@ const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date
             name: visitorName, email: email || null, phone: phone, gender: gender || 'Others',
             dob: dob || null, address: address || null, id_type: idType, id_number: idNumber || 'Pending',
             nationality: nationality, organization: organization || null, designation: designation || null, department: department || null,
-            ...(documentUrl && { document_url: documentUrl }) // MOVED HERE: Saves to visitors table
+            ...(documentUrl && { document_url: documentUrl }) 
           }).eq('visitor_id', activeVisitorId);
         }
 
@@ -328,28 +375,59 @@ const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date
             gender: gender || 'Others', dob: dob || null, address: address || null, id_type: idType,
             id_number: idNumber || 'Pending', nationality: nationality, organization: organization || null,
             designation: designation || null,
-            document_url: documentUrl // ADDED HERE: Saves to visitors table
+            document_url: documentUrl
           });
           if (visitorError) throw visitorError;
         } else if (documentUrl) {
-          // If it's a repeated visitor but they uploaded a NEW document, update their profile
           await supabase.from('visitors').update({ document_url: documentUrl }).eq('visitor_id', activeVisitorId);
         }
-        //insert new pass req
-      const { error: visitError } = await supabase.from('visits').insert({
-        visit_id: activeVisitId,
-        visitor_id: activeVisitorId,
-        host_employee_id: currentUser.uuid,       
-        visit_type: dbVisitType, 
-        pass_type: 'One_day',
-        purpose: finalPurpose, 
-        start_date: startDate,
-        end_date: startDate,
-        status: 'Pending' ,
-        department: department,
-        hr_remarks:null,
-      });
-        if (visitError) throw visitError;
+        
+        // ENHANCED VISIT CREATION BLOCK
+        console.log('📝 Creating visit record with:', {
+          visit_id: activeVisitId,
+          visitor_id: activeVisitorId,
+          host_employee_id: currentUser.uuid,
+          visitor_name: visitorName,
+          department: department,
+          purpose: finalPurpose,
+          start_date: startDate,
+          status: 'Pending'
+        }); //[cite: 2]
+
+        if (!currentUser.uuid) throw new Error('Employee ID is missing. Cannot create visit without host employee.'); //[cite: 2]
+        if (!activeVisitorId) throw new Error('Visitor ID is missing. Cannot create visit without visitor.'); //[cite: 2]
+
+        const { error: visitError } = await supabase.from('visits').insert({
+          visit_id: activeVisitId,
+          visitor_id: activeVisitorId,
+          host_employee_id: currentUser.uuid,       
+          visit_type: dbVisitType, 
+          pass_type: 'One_day',
+          purpose: finalPurpose, 
+          start_date: startDate,
+          end_date: startDate,
+          status: 'Pending',
+          department: department,
+          hr_remarks: null,
+        });
+
+        if (visitError) {
+          console.error('❌ Visit creation failed with error:', visitError); //[cite: 2]
+          
+          if (visitError.code === '23503') {
+            console.error('🔴 Foreign key constraint violation detected'); //[cite: 2]
+            console.error('   - Table: visits'); //[cite: 2]
+            console.error('   - Column: host_employee_id'); //[cite: 2]
+            console.error('   - Value: ' + currentUser.uuid); //[cite: 2]
+            console.error('   - Message: Employee does not exist in employees table'); //[cite: 2]
+            
+            if (visitError.message.includes('host_employee_id_fkey')) {
+              throw new Error(`❌ Your employee record does not exist in the system. Employee ID: ${currentUser.uuid}. Please ask HR to verify your account is activated.`); //[cite: 2]
+            }
+          }
+          throw visitError;
+        }
+        console.log('✅ Visit created successfully'); //[cite: 2]
       }
 
       setSuccess(true);
@@ -358,8 +436,16 @@ const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date
       }, 2000);
 
     } catch (err: any) {
-      console.error('Registration Transaction Failure:', err);
-      setError(err.message || 'System failed to securely process core entry clearance.');
+      console.error('❌ Registration Transaction Failure:', err); //[cite: 2]
+      if (err.code === '23503' || err.message.includes('foreign key')) {
+        if (err.message.includes('host_employee_id_fkey')) {
+          setError(`❌ Employee record validation failed. Your ID (${currentUser.uuid}) could not be found in the system. Please contact HR to resolve this issue.`); //[cite: 2]
+        } else {
+          setError(`❌ Database constraint violation: ${err.message}. Contact HR for assistance.`); //[cite: 2]
+        }
+      } else {
+        setError(err.message || 'System failed to securely process core entry clearance.'); //[cite: 2]
+      }
     } finally {
       setLoading(false);
     }

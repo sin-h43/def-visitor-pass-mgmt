@@ -206,56 +206,42 @@ const fetchPendingUsers = async () => {
   // ==========================================
 
 const handleApproveEmployee = async (user: any) => {
-  try {
-    console.log('✅ Approving employee:', user.full_name);
-    
-    // 1. Create employee record
-    const { error: insertError } = await supabase.from('employees').insert([{
-      auth_id: user.auth_id,
-      name: user.full_name,
-      email: user.email,
-      phone: user.phone,
-      department: user.department,
-      role: 'employee' 
-    }]);
- 
-    if (insertError) {
-      console.error('Error inserting employee:', insertError);
-      throw insertError;
+    try {
+      // 1. Generate a random employee ID (e.g., EMP-49281)
+      const generatedEmpId = `EMP-${Math.floor(10000 + Math.random() * 90000)}`;
+
+      // 2. Insert into employees table WITH the generated ID
+      const { error: insertError } = await supabase.from('employees').insert([{
+        employee_id: generatedEmpId, // <--- THIS FIXES THE 400 ERROR
+        auth_id: user.auth_id,
+        name: user.full_name,
+        email: user.email,
+        phone: user.phone,
+        department: user.department,
+        role: 'employee' 
+      }]);
+
+      if (insertError) throw insertError;
+
+      // 3. Update their registration status
+      const { error: updateError } = await supabase.from('employee_registrations').update({ status: 'approved' }).eq('id', user.id);
+      
+      if (updateError) throw updateError;
+
+      // 4. Log the audit
+      await supabase.from('audit_logs').insert([{
+        action: 'account_approved',
+        remarks: `HR authorized portal access for ${user.full_name} (${user.department})`,
+        performed_by: 'HR Admin', 
+        performed_by_role: 'hr'
+      }]);
+
+      setPendingUsers((prevUsers) => prevUsers.filter((u) => u.id !== user.id));
+    } catch (error) {
+      console.error("Approval failed", error);
+      alert("Failed to approve user. Check console for details.");
     }
- 
-    // 2. Update registration status
-    const { error: updateError } = await supabase
-      .from('employee_registrations')
-      .update({ status: 'approved' })
-      .eq('id', user.id);
- 
-    if (updateError) {
-      console.error('Error updating registration:', updateError);
-      throw updateError;
-    }
- 
-    // 3. Log the action
-    const { error: logError } = await supabase.from('audit_logs').insert([{
-      action: 'account_approved',
-      remarks: `HR authorized portal access for ${user.full_name} (${user.department})`,
-      performed_by: 'HR Admin', 
-      performed_by_role: 'hr'
-    }]);
- 
-    if (logError) {
-      console.error('Error logging action:', logError);
-    }
- 
-    console.log('✅ Approval complete');
-    alert(`✅ Access approved for ${user.full_name}`);
-    fetchPendingUsers(); 
-    fetchLiveAuditLogs(); 
-  } catch (error) {
-    console.error("Approval failed:", error);
-    alert("❌ Failed to approve user. Check console for details.");
-  }
-};
+  };
 
 const handleRejectEmployee = async (id: string, name: string) => {
   if (!window.confirm(`Are you sure you want to decline access for ${name}?`)) return;

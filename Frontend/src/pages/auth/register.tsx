@@ -47,7 +47,7 @@ export default function Register() {
           status: 'Pending'
         }
       ]);
-
+      
       if (dbError) throw dbError;
     // 3. NEW: Fire off an Audit Log so the HR Bell rings immediately!
           await supabase.from('audit_logs').insert([{

@@ -68,7 +68,7 @@ export default function RegistrationForm() {
   const [dob, setDob] = useState(prefillData?.dob !== 'N/A' ? (prefillData?.dob || '') : '');
   const [email, setEmail] = useState(prefillData?.email !== 'N/A' ? (prefillData?.email || '') : '');
   const [phone, setPhone] = useState(prefillData?.phone !== 'N/A' ? (prefillData?.phone || '+91 ') : '+91 ');
-  const [idType, setIdType] = useState(prefillData?.id_type || 'PAN');
+  const [idType, setIdType] = useState(prefillData?.id_type || 'Aadhar');
   const [idNumber, setIdNumber] = useState(prefillData?.id_number !== 'N/A' ? (prefillData?.id_number || '') : '');
   const [address, setAddress] = useState(prefillData?.address !== 'N/A' ? (prefillData?.address || '') : '');
   
@@ -77,16 +77,17 @@ export default function RegistrationForm() {
     return '';
   });
   // DYNAMIC USER STATE
-  const [currentUser, setCurrentUser] = useState({ empId: '', name: '', dept: '' });
+const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: '', dept: '' });
 
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user?.email) {
         const { data: emp } = await supabase.from('employees').select('*').eq('email', user.email).single();
-        if (emp) {
+      if (emp) {
           setCurrentUser({ 
-            empId: emp.id, 
+            uuid: emp.id,                  
+            empId: emp.employee_id,        
             name: emp.name, 
             dept: emp.department || 'General Unit' 
           });
@@ -213,7 +214,7 @@ export default function RegistrationForm() {
         for (let i = prev.length; i < count; i++) {
           newEscorts.push({ 
             name: '', 
-            idType: 'PAN', 
+            idType: 'Aadhar', 
             govId: '', 
             email: '', 
             phone: '', 
@@ -281,7 +282,8 @@ const handleSubmit = async (e: React.FormEvent) => {
         const guestList = escorts.map(esc => `${esc.name} (${esc.idType}: ${esc.govId})`).join(', ');
         finalPurpose += ` | Accompanying: ${guestList}`;
       }
-const dbVisitType = pipeline === 'Pre-Scheduled Visit' ? 'scheduled' : (pipeline === 'Repeated Visitor' ? 'repeated' : 'immediate');      const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
+const dbVisitType = pipeline === 'Pre-Scheduled Visit' ? 'scheduled' : (pipeline === 'Repeated Visitor' ? 'repeated' : 'immediate');      
+const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
 
       if (isEdit) {
         if (activeVisitorId) {
@@ -293,13 +295,13 @@ const dbVisitType = pipeline === 'Pre-Scheduled Visit' ? 'scheduled' : (pipeline
           }).eq('visitor_id', activeVisitorId);
         }
 
-const { error: updateError } = await supabase.from('visits').update({
+        const { error: updateError } = await supabase.from('visits').update({
           visit_type: dbVisitType, 
           purpose: finalPurpose, 
           start_date: startDate, 
           end_date: startDate,
-          status: 'Pending',       // <--- Resets the status
-          hr_remarks: null,        // <--- Clears the old rejection note
+          status: 'Pending',       
+          hr_remarks: null,        
           department: department
         }).eq('visit_id', activeVisitId);
 
@@ -313,7 +315,7 @@ const { error: updateError } = await supabase.from('visits').update({
             visitor_id: standardGeneratedId, name: visitorName, email: email || null, phone: phone,
             gender: gender || 'Others', dob: dob || null, address: address || null, id_type: idType,
             id_number: idNumber || 'Pending', nationality: nationality, organization: organization || null,
-            designation: designation || null, department: department || null,
+            designation: designation || null,
             document_url: documentUrl // ADDED HERE: Saves to visitors table
           });
           if (visitorError) throw visitorError;
@@ -321,15 +323,20 @@ const { error: updateError } = await supabase.from('visits').update({
           // If it's a repeated visitor but they uploaded a NEW document, update their profile
           await supabase.from('visitors').update({ document_url: documentUrl }).eq('visitor_id', activeVisitorId);
         }
-const { error: visitError } = await supabase.from('visits').insert({
-  visit_id: activeVisitId,
-  visitor_id: activeVisitorId,
-  host_employee_id: currentUser.empId,       // <-- NOW DYNAMIC
-  created_by_employee_id: currentUser.empId,  visit_type: dbVisitType, pass_type: 'One_day',
-  purpose: finalPurpose, start_date: startDate,
-  end_date: startDate,
-  status: 'Pending' 
-});
+        //insert new pass req
+      const { error: visitError } = await supabase.from('visits').insert({
+        visit_id: activeVisitId,
+        visitor_id: activeVisitorId,
+        host_employee_id: currentUser.uuid,       
+        visit_type: dbVisitType, 
+        pass_type: 'One_day',
+        purpose: finalPurpose, 
+        start_date: startDate,
+        end_date: startDate,
+        status: 'Pending' ,
+        department: department,
+        hr_remarks:null,
+      });
         if (visitError) throw visitError;
       }
 
@@ -500,6 +507,7 @@ const { error: visitError } = await supabase.from('visits').insert({
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1">ID Type *</label>
               <select value={idType} disabled={!!visitorId && !isEdit} onChange={(e) => setIdType(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
+                <option value="Aadhar">Aadhar Card</option>
                 <option value="PAN">PAN Card</option>
                 <option value="Passport">Passport</option>
                 <option value="Driving License">Driving License</option>

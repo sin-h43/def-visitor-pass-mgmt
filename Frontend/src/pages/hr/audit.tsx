@@ -117,9 +117,14 @@ export default function AuditLogsPage() {
   };
 
   // --- ACCOUNT ACTION HANDLERS ---
-  const handleApproveEmployee = async (user: any) => {
+const handleApproveEmployee = async (user: any) => {
     try {
-      await supabase.from('employees').insert([{
+      // 1. Generate a random employee ID (e.g., EMP-49281)
+      const generatedEmpId = `EMP-${Math.floor(10000 + Math.random() * 90000)}`;
+
+      // 2. Insert into employees table WITH the generated ID
+      const { error: insertError } = await supabase.from('employees').insert([{
+        employee_id: generatedEmpId, // <--- THIS FIXES THE 400 ERROR
         auth_id: user.auth_id,
         name: user.full_name,
         email: user.email,
@@ -128,8 +133,14 @@ export default function AuditLogsPage() {
         role: 'employee' 
       }]);
 
-      await supabase.from('employee_registrations').update({ status: 'approved' }).eq('id', user.id);
+      if (insertError) throw insertError;
 
+      // 3. Update their registration status
+      const { error: updateError } = await supabase.from('employee_registrations').update({ status: 'approved' }).eq('id', user.id);
+      
+      if (updateError) throw updateError;
+
+      // 4. Log the audit
       await supabase.from('audit_logs').insert([{
         action: 'account_approved',
         remarks: `HR authorized portal access for ${user.full_name} (${user.department})`,
@@ -138,12 +149,21 @@ export default function AuditLogsPage() {
       }]);
 
       fetchData(); 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Approval failed", error);
-      alert("Failed to approve user.");
+      
+      // Catch the duplicate email error specifically
+      if (error.code === '23505') {
+        alert("This user is already an active employee! Updating their request status...");
+        
+        // Auto-fix the glitch by marking them approved in the queue
+        await supabase.from('employee_registrations').update({ status: 'approved' }).eq('id', user.id);
+        fetchData(); // or whatever your refresh function is
+      } else {
+        alert("Failed to approve user. Check console for details.");
+      }
     }
   };
-
   const handleRejectEmployee = async (id: string, name: string) => {
     if (!window.confirm(`Are you sure you want to decline access for ${name}?`)) return;
     

@@ -313,7 +313,12 @@ const handleRejectEmployee = async (id: string, name: string) => {
   const handleUpdateStatus = async (visitId: string | null, newStatus: 'Approved' | 'Denied' | null, remarkText: string) => {
     if (!visitId || !newStatus) return;
     try {
-      const { error } = await supabase.from('visits').update({ status: newStatus, hr_remarks: remarkText }).eq('visit_id', visitId);
+      const updatePayload: any = { status: newStatus, hr_remarks: remarkText };
+      if (newStatus === 'Approved') {
+        updatePayload.approved_at = new Date().toISOString();
+      }
+      
+      const { error } = await supabase.from('visits').update(updatePayload).eq('visit_id', visitId);
       if (error) throw error;
       
       await supabase.from('audit_logs').insert([{

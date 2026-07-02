@@ -258,6 +258,8 @@ export default function AddVisitorServicePage() {
       const finalStartDate = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
       const finalEndDate = endDate ? new Date(endDate).toISOString() : finalStartDate;
 
+      const exactApprovalTime = new Date().toISOString();
+
       // 3. Insert the Visit Event
       const { error: visitError } = await supabase.from('visits').insert({
         visit_id: newVisitId,
@@ -269,6 +271,7 @@ export default function AddVisitorServicePage() {
         start_date: finalStartDate,
         end_date: finalEndDate,
         status: 'Approved',
+        approved_at: exactApprovalTime,
         department: department
       });
 

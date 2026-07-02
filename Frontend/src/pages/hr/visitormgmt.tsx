@@ -159,9 +159,13 @@ export default function VisitorMgmtPage() {
   const handleConfirmAction = async (visitId: string | null, newStatus: 'Approved' | 'Denied' | null, remarkText: string) => {
     if (!visitId || !newStatus) return;
     try {
+      const updatePayload: any = { status: newStatus, hr_remarks: remarkText };
+      if (newStatus === 'Approved') {
+        updatePayload.approved_at = new Date().toISOString();
+      }
       const { error } = await supabase
         .from('visits')
-        .update({ status: newStatus, hr_remarks: remarkText })
+        .update(updatePayload)
         .eq('visit_id', visitId);
 
       if (error) throw error;

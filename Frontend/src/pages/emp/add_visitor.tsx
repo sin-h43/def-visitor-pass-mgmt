@@ -4,11 +4,32 @@ import RegistrationForm from '../../components/common/RegistrationForm';
 import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import EmpNotificationCenter from '../../components/common/empNotificationCenter';
+import { useState, useEffect } from 'react';
+import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
+import { supabase } from '../../lib/supabase';
 
 export default function AddVisitorPage() {
 
+  const [currentUser, setCurrentUser] = useState({ name: 'Loading...' });
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        try {
+          const emp = await  fetchAndVerifyEmployee(user.email);
+          setCurrentUser({ name: emp.name });
+        } catch (error) {
+          console.error("Failed to load employee identity", error);
+          setCurrentUser({ name: 'Employee' }); // Fallback if it fails
+        }
+      }
+    };
+    fetchUser();
+  }, []);
+  
   return (
-    <DashboardLayout role="emp" userName="Employee" headerAction={<EmpNotificationCenter />}>
+    <DashboardLayout role="emp" userName={currentUser.name} headerAction={<EmpNotificationCenter />}>
       <div className="max-w-4xl mx-auto">
         
         {/* Page Navigation/Header */}

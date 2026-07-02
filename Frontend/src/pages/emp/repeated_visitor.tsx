@@ -50,7 +50,7 @@ export default function EmployeeRepeatedVisitorLogPage() {
           host:employees!visits_host_employee_id_fkey(name)
         `)
         // ✅ FIX: Fetch exclusively their own contact book!
-        .or(`host_employee_id.eq.${currentUser.id},created_by_employee_id.eq.${currentUser.empId}`)
+        .or(`host_employee_id.eq.${currentUser.empId}`)
         .order('start_date', { ascending: false });
 
       if (error) throw error;

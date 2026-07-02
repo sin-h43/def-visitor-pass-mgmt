@@ -306,7 +306,8 @@ const handleRejectEmployee = async (id: string, name: string) => {
     fetchLiveAuditLogs();
   } catch (error) {
     console.error("Rejection failed:", error);
-    alert("❌ Failed to reject user. Check console for details.");
+    alert
+    ("❌ Failed to reject user. Check console for details.");
   }
 };
 

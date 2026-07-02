@@ -43,12 +43,12 @@ export default function DispatchedLogsPage() {
         const { data, error } = await supabase
           .from('visits')
           .select(`
-            visit_id, visit_type, department, purpose, status, hr_remarks, start_date, created_at,
+          visit_id, visit_type, department, purpose, status, hr_remarks, start_date, end_date, created_at, actual_out,
             visitors (visitor_id, gender, name, document_url, phone, address, email, dob, organization, designation, id_type, id_number, nationality),
             escorts (name, phone, id_number, id_type, email, gender)
           `)
           // ✅ FIX: Fetch exclusively their own logs!
-          .or(`host_employee_id.eq.${currentUser.id},created_by_employee_id.eq.${currentUser.empId}`)
+          .or(`host_employee_id.eq.${currentUser.empId}`)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -61,6 +61,22 @@ export default function DispatchedLogsPage() {
 
             const escortsArray = Array.isArray(row.escorts) ? row.escorts : (row.escorts ? [row.escorts] : []);
             
+                      const rawStatus = (row.status || 'Pending').toLowerCase();
+          let currentStatus = 'Pending';
+          
+          if (rawStatus === 'approved') currentStatus = 'Cleared'; // UI expects 'Cleared'
+          else if (rawStatus === 'denied') currentStatus = 'Denied';
+          else if (rawStatus === 'active') currentStatus = 'Active';
+          else if (rawStatus === 'completed') currentStatus = 'Completed';
+          else if (rawStatus === 'revoked') currentStatus = 'Revoked';
+
+          // Dynamically check if the pass time has expired
+          if ((currentStatus === 'Cleared' || currentStatus === 'Pending') && row.end_date) {
+            if (new Date() > new Date(row.end_date)) {
+              currentStatus = 'Expired';
+            }
+          }
+
             return {
               id: row.visit_id,
               visitorId: row.visitors?.visitor_id, 
@@ -80,7 +96,7 @@ export default function DispatchedLogsPage() {
               hostDept: currentUser.dept,
               escorts: escortsArray,
               requestDate: new Date(row.start_date || row.created_at).toLocaleString('en-GB', { hour12: false, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-              status: row.status === 'Approved' ? 'Approved' : row.status,
+            status: currentStatus,
               organization: row.visitors?.organization || 'N/A',
               hr_remarks: row.hr_remarks || ''
             };
@@ -94,7 +110,7 @@ export default function DispatchedLogsPage() {
 
   const filterBuckets = [
     { key: 'pipeline', title: 'Visit Type', options: [{ label: 'Walk-in', value: 'Walk-in' }, { label: 'Pre-Scheduled', value: 'Pre-Scheduled' }, { label: 'Repeated', value: 'Repeated' }] },
-    { key: 'status', title: 'Status', options: [{ label: 'Approved', value: 'Approved' }, { label: 'Pending', value: 'Pending' }, { label: 'Expired', value: 'Expired' }, { label: 'Completed', value: 'Completed' }] },
+    { key: 'status', title: 'Status', options: [{ label: 'Approved', value: 'Approved' }, { label: 'Pending', value: 'Pending' }, { label: 'Expired', value: 'Expired' }, { label: 'Completed', value: 'Completed' },{ label: 'Completed', value: 'Completed' }] },
     { key: 'department', title: 'Department', options: [{ label: 'Research Wing', value: 'Research Wing' }, { label: 'IT Department', value: 'IT Department' }, { label: 'Cyber Security Unit', value: 'Cyber Security Unit' }, { label: 'Human Resources', value: 'Human Resources' }, { label: 'General Unit', value: 'General Unit' }] }
   ];
 

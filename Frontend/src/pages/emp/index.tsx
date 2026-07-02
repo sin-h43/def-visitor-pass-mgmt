@@ -8,8 +8,7 @@ import type { VisitorRecord as BaseVisitorRecord } from '../../components/common
 import { supabase } from '../../lib/supabase';
 import { fetchAndVerifyEmployee } from '../../lib/employeeUtils'; 
 
-
-// ✅ FIX: Extend VisitorRecord to include actual_out and checked_in_time properties
+// Extend VisitorRecord to include actual_out and checked_in_time properties
 type VisitorRecord = BaseVisitorRecord & {
   actual_out?: string;
   checked_in_time?: string;
@@ -23,10 +22,7 @@ export default function EmployeeDashboard() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
 
-  // Dropdown state for the Bell Icon
   const [showNotifications, setShowNotifications] = useState(false);
-
-  // Store both the UUID and the EMP-ID string
   const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: '', dept: '' });
 
   useEffect(() => {
@@ -60,7 +56,7 @@ export default function EmployeeDashboard() {
       const { data, error } = await supabase
         .from('visits')
         .select(`
-          visit_id, visit_type, department, purpose, status, hr_remarks, start_date, created_at, actual_out,
+          visit_id, visit_type, department, purpose, status, hr_remarks, start_date, end_date, created_at, actual_out,
           visitors (visitor_id, gender, name, phone, document_url, address, email, dob, organization, designation, id_type, id_number, nationality, checked_in_time, checked_out_time),
           escorts(name,phone,id_number,id_type,email,gender)
         `)
@@ -76,6 +72,23 @@ export default function EmployeeDashboard() {
           if (row.visit_type === 'REPEATED' || row.visit_type?.toLowerCase() === 'repeated') uiPipeline = 'Repeated';
 
           const escortsArray = Array.isArray(row.escorts) ? row.escorts : (row.escorts ? [row.escorts] : []);
+          
+          // ✅ FIX: Bulletproof Status Mapping & Dynamic Expiration
+          const rawStatus = (row.status || 'Pending').toLowerCase();
+          let currentStatus = 'Pending';
+          
+          if (rawStatus === 'approved') currentStatus = 'Cleared'; // UI expects 'Cleared'
+          else if (rawStatus === 'denied') currentStatus = 'Denied';
+          else if (rawStatus === 'active') currentStatus = 'Active';
+          else if (rawStatus === 'completed') currentStatus = 'Completed';
+          else if (rawStatus === 'revoked') currentStatus = 'Revoked';
+
+          // Dynamically check if the pass time has expired
+          if ((currentStatus === 'Cleared' || currentStatus === 'Pending') && row.end_date) {
+            if (new Date() > new Date(row.end_date)) {
+              currentStatus = 'Expired';
+            }
+          }
           
           return {
             id: row.visit_id,
@@ -95,7 +108,7 @@ export default function EmployeeDashboard() {
             hostDept: currentUser.dept,
             escorts: escortsArray,
             requestDate: new Date(row.start_date || row.created_at).toLocaleString('en-GB', { hour12: false, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-            status: row.status === 'Approved' ? 'Approved' : (row.status === 'Denied' ? 'Denied' : row.status),
+            status: currentStatus,
             organization: row.visitors?.organization || 'N/A',
             created_at: row.created_at,
             hr_remarks: row.hr_remarks || '',
@@ -118,14 +131,16 @@ export default function EmployeeDashboard() {
 
   const filterBuckets = [
     { key: 'pipeline', title: 'Visit Type', options: [{ label: 'Walk-in', value: 'Walk-in' }, { label: 'Pre-Scheduled', value: 'Pre-Scheduled' }, { label: 'Repeated', value: 'Repeated' }] },
-    { key: 'status', title: 'Status', options: [{ label: 'Approved', value: 'Approved' }, { label: 'Active', value: 'Active' }, { label: 'Pending', value: 'Pending' }, { label: 'Denied', value: 'Denied' }, { label: 'Completed', value: 'Completed' }] }
+    // ✅ FIX: Realigned bucket filters to strictly match UI expectations
+    { key: 'status', title: 'Status', options: [{ label: 'Cleared', value: 'Cleared' }, { label: 'Active', value: 'Active' }, { label: 'Pending', value: 'Pending' }, { label: 'Denied', value: 'Denied' }, { label: 'Completed', value: 'Completed' }, { label: 'Expired', value: 'Expired' }] }
   ];
 
   const visibleRows = useMemo(() => {
     return shiftData.filter(item => {
       if (currentTab === 'Pre-Scheduled' && item.pipeline !== 'Pre-Scheduled') return false;
       if (currentTab === 'Repeated' && item.pipeline !== 'Repeated') return false;
-      if (currentTab === 'Expired' && item.status !== 'Expired') return false;
+      // ✅ FIX: The Expired tab will now perfectly catch dynamically generated expired status
+      if (currentTab === 'Expired' && item.status !== 'Expired') return false; 
       if (searchTerm) {
         const lowerQuery = searchTerm.toLowerCase();
         if (!item.visitorName.toLowerCase().includes(lowerQuery) && !item.id.toLowerCase().includes(lowerQuery)) return false;
@@ -164,7 +179,8 @@ export default function EmployeeDashboard() {
     return shiftData.filter(v => {
       if (ignoredNotificationIds.includes(v.id)) return false;
       
-      const notifyStatuses = ['Denied', 'Approved', 'Active', 'Completed'];
+      // ✅ FIX: Restored 'Cleared' flag for the notification listener
+      const notifyStatuses = ['Denied', 'Cleared', 'Active', 'Completed'];
       if (!notifyStatuses.includes(v.status)) return false;
 
       if (v.status === 'Completed' && v.actual_out) {
@@ -223,7 +239,7 @@ export default function EmployeeDashboard() {
                         nColor = 'bg-rose-50 border-rose-200';
                         nTitle = 'Request Rejected';
                         nDesc = `Feedback: "${visit.hr_remarks || 'Policy conflict or identity mismatch.'}"`;
-                      } else if (visit.status === 'Approved') {
+                      } else if (visit.status === 'Cleared') {
                         nIcon = <CheckCircle className="w-4 h-4 text-emerald-600" />;
                         nColor = 'bg-emerald-50 border-emerald-200';
                         nTitle = 'HR Clearance Granted';

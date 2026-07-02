@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import type {SyntheticEvent} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Users, UploadCloud, CheckCircle2, Globe, Search, X } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { supabase } from '../../lib/supabase';
+import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
 
 const NATIONALITIES = [
   { label: 'Indian', code: '+91' },
@@ -17,7 +19,6 @@ const NATIONALITIES = [
   { label: 'Other', code: '' }
 ];
 
-// CHANGE: Added Interface for foreign profile data lookup
 interface ExistingVisitor {
   visitor_id: string;
   name: string;
@@ -46,8 +47,11 @@ export default function AddVisitorForeignPage() {
   const [scheduledDate, setScheduledDate] = useState('');
   const [department, setDepartment] = useState('Research Wing');
 
-  // CHANGE: Tracking token for existing profile linking
+  // Tracking token for existing profile linking
   const [visitorId, setVisitorId] = useState<string | null>(null);
+
+  // Auth/HR State
+  const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: '', dept: '' });
 
   // Visitor Profile Metadata
   const [visitorName, setVisitorName] = useState('');
@@ -66,7 +70,7 @@ export default function AddVisitorForeignPage() {
   const [visaNumber, setVisaNumber] = useState('');
   const [hostId, setHostId] = useState('');
 
-  // CHANGE: Autocomplete state variables
+  // Autocomplete state variables
   const [searchResults, setSearchResults] = useState<ExistingVisitor[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
 
@@ -78,12 +82,33 @@ export default function AddVisitorForeignPage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploadingText, setUploadingText] = useState('');
   
-  // Calculate max allowed date for 12+ age requirement
   const maxAllowedDate = new Date();
   maxAllowedDate.setFullYear(maxAllowedDate.getFullYear() - 12);
   const maxDob = maxAllowedDate.toISOString().split('T')[0];
 
-  // CHANGE: Live debounce search against Supabase visitors table
+  // Fetch Current HR User
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.email) return;
+        const employee = await fetchAndVerifyEmployee(user.email);
+        if (employee) {
+          setCurrentUser({
+            uuid: employee.auth_id || employee.id,
+            empId: employee.employee_id,
+            name: employee.name,
+            dept: employee.department || 'General Unit'
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load HR profile:', err);
+      }
+    };
+    loadUserProfile();
+  }, []);
+
+  // Live debounce search
   useEffect(() => {
     if (visitorName.trim().length < 2 || visitorId) {
       setSearchResults([]);
@@ -97,16 +122,13 @@ export default function AddVisitorForeignPage() {
         .ilike('name', `%${visitorName}%`)
         .limit(5);
 
-      if (!error && data) {
-        setSearchResults(data as ExistingVisitor[]);
-      }
+      if (!error && data) setSearchResults(data as ExistingVisitor[]);
     };
 
     const debounceTimer = setTimeout(searchVisitors, 300);
     return () => clearTimeout(debounceTimer);
   }, [visitorName, visitorId]);
 
-  // CHANGE: Handler to map and autofill the selected foreign delegate profile
   const handleSelectVisitor = (visitor: ExistingVisitor) => {
     setVisitorId(visitor.visitor_id);
     setVisitorName(visitor.name);
@@ -118,15 +140,12 @@ export default function AddVisitorForeignPage() {
     setOrganization(visitor.organization || '');
     setDesignation(visitor.designation || '');
     setNationality(visitor.nationality || 'American');
-    setPassportNumber(visitor.id_number || ''); // Maps the stored base ID directly to Passport
+    setPassportNumber(visitor.id_number || ''); 
     
     setShowDropdown(false);
-    if (pipeline !== 'Pre-Scheduled Visit') {
-      setPipeline('Repeated Visitor');
-    }
+    if (pipeline !== 'Pre-Scheduled Visit') setPipeline('Repeated Visitor');
   };
 
-  // CHANGE: Handler to reset back to a blank unregistered slate
   const handleClearSelectedVisitor = () => {
     setVisitorId(null);
     setVisitorName('');
@@ -142,14 +161,13 @@ export default function AddVisitorForeignPage() {
     setPipeline('New Visitor / Urgent Access');
   };
 
-  // Dynamically structure escort rows
   useEffect(() => {
     const count = Math.max(0, Math.min(headCount, 10));
     setEscorts(prev => {
       const newEscorts = [...prev];
       if (count > prev.length) {
         for (let i = prev.length; i < count; i++) {
-          newEscorts.push({ name: '', govId: '', email:'', phone:'', nationality: '', gender:'Others' });
+          newEscorts.push({ name: '', govId: '', email:'', phone:'', nationality: 'Indian', gender:'Others' });
         }
       } else {
         newEscorts.length = count;
@@ -158,9 +176,24 @@ export default function AddVisitorForeignPage() {
     });
   }, [headCount]);
 
+  // Enhanced escort mapping
   const handleEscortChange = (index: number, field: 'name' | 'govId' | 'phone' | 'nationality' | 'gender'| 'email', value: string) => {
     const updatedEscorts = [...escorts];
-    updatedEscorts[index][field] = value;
+    
+    if (field === 'nationality') {
+      const natData = NATIONALITIES.find(n => n.label === value);
+      updatedEscorts[index] = {
+        ...updatedEscorts[index],
+        nationality: value,
+        phone: natData?.code ? `${natData.code} ` : ''
+      };
+    } else {
+      updatedEscorts[index] = {
+        ...updatedEscorts[index],
+        [field]: value
+      };
+    }
+    
     setEscorts(updatedEscorts);
   };
 
@@ -168,45 +201,39 @@ export default function AddVisitorForeignPage() {
     const selectedNat = e.target.value;
     setNationality(selectedNat);
     const natData = NATIONALITIES.find(n => n.label === selectedNat);
-    if (natData && natData.code) {
-      setPhone(`${natData.code} `);
-    }
+    if (natData && natData.code) setPhone(`${natData.code} `);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (!currentUser.empId) {
+      setError('❌ Your employee profile failed to load. Please refresh the page and try again.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
       const timestamp = Date.now().toString().slice(-6);
       const newVisitId = `VST${timestamp}`;
-      
-      // CHANGE: Bind dynamic variable reference for tracking existing DB profiles
       let activeVisitorId = visitorId;
-
       let documentUrl = null;
+
       if (file) {
         setUploadingText('Uploading border scans...');
         const fileExt = file.name.split('.').pop();
         const fileName = `${newVisitId}_doc.${fileExt}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('visitor-documents')
-          .upload(fileName, file);
-
+        const { error: uploadError } = await supabase.storage.from('visitor-documents').upload(fileName, file);
         if (uploadError) throw uploadError;
-
-        const { data: publicUrlData } = supabase.storage
-          .from('visitor-documents')
-          .getPublicUrl(fileName);
-          
+        const { data: publicUrlData } = supabase.storage.from('visitor-documents').getPublicUrl(fileName);
         documentUrl = publicUrlData.publicUrl;
       }
       
       setUploadingText('Saving international manifest...');
 
-      // CHANGE: Wrapped insert logic in conditional. Only create new row if activeVisitorId is empty
       if (!activeVisitorId) {
         const standardGeneratedId = `VIS${timestamp}`;
         activeVisitorId = standardGeneratedId;
@@ -232,7 +259,6 @@ export default function AddVisitorForeignPage() {
         if (visitorError) throw visitorError;
       }
 
-      // Pack entry visa metrics into custom purpose string layout safely
       let finalPurpose = `[VISA REFERENCE ID: ${visaNumber}] ${purpose}`;
       if (escorts.length > 0) {
         const guestList = escorts.map(esc => `${esc.name} (ID: ${esc.govId})`).join(', ');
@@ -241,12 +267,11 @@ export default function AddVisitorForeignPage() {
 
       const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
 
-      // 2. Insert Visit Record (using linked or newly generated activeVisitorId)
       const { error: visitError } = await supabase.from('visits').insert({
         visit_id: newVisitId,
-        visitor_id: activeVisitorId, // CHANGE: Mapped identifier
-        host_employee_id: hostId || 'EMP001',
-        created_by_employee_id: 'EMP001',
+        visitor_id: activeVisitorId,
+        host_employee_id: hostId, // Explicitly using manual form input
+        created_by_employee_id: currentUser.empId, // Dynamically linked creator
         visit_type: 'Foreign',
         pass_type: 'One_day',
         purpose: finalPurpose,
@@ -259,13 +284,15 @@ export default function AddVisitorForeignPage() {
       if (visitError) throw visitError;
 
       setSuccess(true);
-      setTimeout(() => {
-        navigate('/hr/visitormgmt');
-      }, 2000);
+      setTimeout(() => navigate('/hr/visitormgmt'), 2000);
 
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'System failed to register international tracking logs.');
+      if (err.code === '23503' || err.message?.includes('foreign key')) {
+        setError(`❌ Database Error: The Host ID (${hostId}) could not be found. Please double-check the Host Employee ID.`);
+      } else {
+        setError(err.message || 'System failed to register international tracking logs.');
+      }
     } finally {
       setLoading(false);
     }
@@ -286,15 +313,12 @@ export default function AddVisitorForeignPage() {
   return (
     <DashboardLayout role="hr" userName="Sinchana K">
       <div className="max-w-4xl mx-auto pb-12 font-sans text-slate-800">
-        
-        {/* Navigation Return Row */}
         <div className="mb-6">
           <button type="button" onClick={() => navigate(-1)} className="flex items-center text-xs font-bold text-slate-400 hover:text-slate-800 transition-colors">
             <ArrowLeft className="w-3.5 h-3.5 mr-1.5" /> Back to Clearance Ledger
           </button>
         </div>
 
-        {/* Master Box Panel */}
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
           <div className="border-b border-slate-100 pb-4 mb-5">
             <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
@@ -308,15 +332,10 @@ export default function AddVisitorForeignPage() {
           )}
 
           <form className="space-y-5" onSubmit={handleSubmit}>
-            
-            {/* Context Pathway Controller */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-amber-50/40 p-4 border border-amber-100/60 rounded-xl">
               <div>
                 <label className="block text-xs font-bold text-amber-800 uppercase tracking-wider mb-1.5">Processing Pipeline Track *</label>
-                <select 
-                  required value={pipeline} onChange={(e) => setPipeline(e.target.value)}
-                  className="w-full p-2.5 border border-amber-200 rounded-xl bg-white text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500"
-                >
+                <select required value={pipeline} onChange={(e) => setPipeline(e.target.value)} className="w-full p-2.5 border border-amber-200 rounded-xl bg-white text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500">
                   <option>New Visitor / Urgent Access</option>
                   <option>Pre-Scheduled Visit</option>
                   <option>Repeated Visitor</option>
@@ -324,10 +343,7 @@ export default function AddVisitorForeignPage() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-amber-800 uppercase tracking-wider mb-1.5">Target Destination Unit *</label>
-                <select 
-                  required value={department} onChange={(e) => setDepartment(e.target.value)}
-                  className="w-full p-2.5 border border-amber-200 rounded-xl bg-white text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500"
-                >
+                <select required value={department} onChange={(e) => setDepartment(e.target.value)} className="w-full p-2.5 border border-amber-200 rounded-xl bg-white text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500">
                   <option value="Research Wing">Research Wing Operations</option>
                   <option value="IT Department">IT Department Systems</option>
                   <option value="Operations">Operations General Base</option>
@@ -345,33 +361,13 @@ export default function AddVisitorForeignPage() {
 
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pt-2 border-b border-slate-50 pb-1">Primary Base Identity</h4>
 
-            {/* Core Identity Parameters */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              
-              {/* CHANGE: Converted Full Name input into an interactive search container matching the Amber theme */}
               <div className="relative">
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Delegate Full Name *</label>
                 <div className="relative flex items-center">
-                  <input 
-                    required 
-                    type="text" 
-                    value={visitorName} 
-                    disabled={!!visitorId}
-                    onChange={(e) => {
-                      setVisitorName(e.target.value);
-                      setShowDropdown(true);
-                    }} 
-                    onFocus={() => setShowDropdown(true)}
-                    placeholder="Type name to lookup profiles..." 
-                    className="w-full p-2.5 pr-8 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-amber-500 disabled:bg-slate-50 disabled:text-slate-600 font-semibold" 
-                  />
+                  <input required type="text" value={visitorName} disabled={!!visitorId} onChange={(e) => { setVisitorName(e.target.value); setShowDropdown(true); }} onFocus={() => setShowDropdown(true)} placeholder="Type name to lookup profiles..." className="w-full p-2.5 pr-8 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-amber-500 disabled:bg-slate-50 disabled:text-slate-600 font-semibold" />
                   {visitorId ? (
-                    <button 
-                      type="button" 
-                      onClick={handleClearSelectedVisitor}
-                      className="absolute right-2.5 text-slate-400 hover:text-red-500 transition-colors"
-                      title="Clear profile layout"
-                    >
+                    <button type="button" onClick={handleClearSelectedVisitor} className="absolute right-2.5 text-slate-400 hover:text-red-500 transition-colors" title="Clear profile layout">
                       <X className="w-4 h-4" />
                     </button>
                   ) : (
@@ -379,32 +375,20 @@ export default function AddVisitorForeignPage() {
                   )}
                 </div>
 
-                {/* Popover Matrix for Autocomplete Results */}
                 {showDropdown && searchResults.length > 0 && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-slate-100">
                     {searchResults.map((visitor) => (
-                      <div 
-                        key={visitor.visitor_id}
-                        onClick={() => handleSelectVisitor(visitor)}
-                        className="px-4 py-2.5 text-xs text-slate-700 hover:bg-amber-50/70 cursor-pointer flex justify-between items-center transition-colors"
-                      >
+                      <div key={visitor.visitor_id} onClick={() => handleSelectVisitor(visitor)} className="px-4 py-2.5 text-xs text-slate-700 hover:bg-amber-50/70 cursor-pointer flex justify-between items-center transition-colors">
                         <div>
                           <span className="font-bold text-slate-900 block">{visitor.name}</span>
                           <span className="text-[10px] text-slate-400 font-mono block">{visitor.email || 'No email registered'}</span>
                         </div>
-                        <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold font-mono">
-                          Passport: {visitor.id_number || 'N/A'}
-                        </span>
+                        <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold font-mono">Passport: {visitor.id_number || 'N/A'}</span>
                       </div>
                     ))}
                   </div>
                 )}
-                
-                {visitorId && (
-                  <span className="text-[10px] text-amber-600 font-bold mt-1 block">
-                    ✓ Linked international profile verified.
-                  </span>
-                )}
+                {visitorId && <span className="text-[10px] text-amber-600 font-bold mt-1 block">✓ Linked international profile verified.</span>}
               </div>
               
               <div className="grid grid-cols-3 gap-2">
@@ -420,12 +404,9 @@ export default function AddVisitorForeignPage() {
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">Nationality *</label>
                   <select value={nationality} disabled={!!visitorId} onChange={handleNationalityChange} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-amber-500 disabled:bg-slate-50">
-                    {NATIONALITIES.map(nat => (
-                      <option key={nat.label} value={nat.label}>{nat.label}</option>
-                    ))}
+                    {NATIONALITIES.map(nat => <option key={nat.label} value={nat.label}>{nat.label}</option>)}
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">Contact Phone *</label>
                   <input required type="tel" value={phone} disabled={!!visitorId} onChange={(e) => setPhone(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-amber-500 disabled:bg-slate-50" />
@@ -442,23 +423,19 @@ export default function AddVisitorForeignPage() {
               </div>
             </div>
 
-            {/* DYNAMIC AMBER PASSPORT SUBSECTION PANEL */}
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pt-2 border-b border-slate-50 pb-1">Security & Track Verification</h4>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-amber-50/20 p-4 border border-amber-100 rounded-xl">
               <div>
                 <label className="block text-xs font-bold text-amber-800 uppercase tracking-wider mb-1">Passport Document Serial ID *</label>
-                {/* CHANGE: Passport disabled if linked, as it's permanent profile data */}
                 <input required type="text" value={passportNumber} disabled={!!visitorId} onChange={(e) => setPassportNumber(e.target.value)} placeholder="Enter Passport Serial Number" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono tracking-wider outline-none focus:ring-2 focus:ring-amber-500 uppercase disabled:bg-slate-50" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-amber-800 uppercase tracking-wider mb-1">Visa Tracking Clearance Number *</label>
-                {/* CHANGE: Visa Number remains active, as visa authorizations change per visit trip */}
                 <input required type="text" value={visaNumber} onChange={(e) => setVisaNumber(e.target.value)} placeholder="Enter Visa Entry Control ID" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono tracking-wider outline-none focus:ring-2 focus:ring-amber-500 uppercase" />
               </div>
             </div>
 
-            {/* Background Demographics */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Representing Global Organization</label>
@@ -470,7 +447,7 @@ export default function AddVisitorForeignPage() {
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Assigned Domestic Sponsor Personnel ID *</label>
-                <input required type="text" value={hostId} onChange={(e) => setHostId(e.target.value)} placeholder="e.g. EMP001" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-amber-500" />
+                <input required type="text" value={hostId} onChange={(e) => setHostId(e.target.value)} placeholder="e.g. EMP-12345" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-amber-500" />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-slate-500 mb-1">International Terminal Address</label>
@@ -482,7 +459,6 @@ export default function AddVisitorForeignPage() {
               </div>
             </div>
 
-            {/* Escorts Group Block */}
             <div className="border border-slate-200 rounded-xl bg-slate-50/40 overflow-hidden mt-2">
               <div className="p-4 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100">
                 <div>
@@ -493,113 +469,56 @@ export default function AddVisitorForeignPage() {
 
               {escorts.length > 0 && (
                 <div className="p-4 bg-white space-y-3.5">
-              {escorts.map((escort, index) => (
-  <div key={index} className="flex flex-col gap-3 p-3.5 border border-slate-200 rounded-xl bg-slate-50/50 relative">
-    {/* Row Index Badge */}
-    <div className="absolute -left-2 -top-2 w-5 h-5 bg-purple-800 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white shadow-sm">
-      {index + 1}
-    </div>
-    
-    {/* All fields wrapped in a single container with two rows */}
-    <div className="flex flex-col gap-3 w-full">
-      
-      {/* FIRST ROW: Name, Gender, Nationality, Contact Phone */}
-      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
-        {/* 1. Member Full Name */}
-        <div className='sm:col-span-2'>
-          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Member Full Name *</label>
-          <input 
-            required
-            type="text" 
-            value={escort.name}
-            onChange={(e) => handleEscortChange(index, 'name', e.target.value)}
-            placeholder="Enter name" 
-            className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" 
-          />
-        </div>
-
-        {/* 2. Gender */}
-        <div>
-          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Gender *</label>
-          <select 
-            value={escort.gender} 
-            onChange={(e) => handleEscortChange(index, 'gender', e.target.value)} 
-            className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50"
-          >
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-            <option value="Non-binary">Non-binary</option>
-            <option value="Others">Others</option>
-          </select>
-        </div>
-
-        {/* 3. Nationality */}
-        <div>
-          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Nationality *</label>
-          <select 
-            value={escort.nationality} 
-            onChange={(e) => handleEscortChange(index, 'nationality', e.target.value)} 
-            className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50"
-          >
-            {NATIONALITIES.map(nat => (
-              <option key={nat.label} value={nat.label}>{nat.label}</option>
-            ))}
-          </select>
-        </div>
-        
-        {/* 4. Contact Phone */}
-        <div>
-          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Contact Phone *</label>
-          <input 
-            required 
-            type="tel" 
-            value={escort.phone} 
-            onChange={(e) => handleEscortChange(index, 'phone', e.target.value)} 
-            placeholder="+91 98765 43210" 
-            className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500 disabled:bg-slate-50" 
-          />
-        </div>
-      </div>
-
-      {/* SECOND ROW: Serial ID & Email Address */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
-        {/* 5. Identification Serial ID */}
-        <div>
-          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Identification Serial ID *</label>
-          <input 
-            required
-            type="text" 
-            value={escort.govId}
-            onChange={(e) => handleEscortChange(index, 'govId', e.target.value)}
-            placeholder="Enter Serial ID" 
-            className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500" 
-          />
-        </div>
-
-        {/* 6. Email Address */}
-        <div>
-          <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Email Address</label>
-          <input 
-            type="email" 
-            value={escort.email || ''}
-            onChange={(e) => handleEscortChange(index, 'email', e.target.value)}
-            placeholder="e.g. name@domain.com" 
-            className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" 
-          />
-        </div>
-      </div>
-
-    </div>
-  </div>
-))}
+                  {escorts.map((escort, index) => (
+                    <div key={index} className="flex flex-col gap-3 p-3.5 border border-slate-200 rounded-xl bg-slate-50/50 relative">
+                      <div className="absolute -left-2 -top-2 w-5 h-5 bg-purple-800 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white shadow-sm">
+                        {index + 1}
+                      </div>
+                      <div className="flex flex-col gap-3 w-full">
+                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+                          <div className='sm:col-span-2'>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Member Full Name *</label>
+                            <input required type="text" value={escort.name} onChange={(e) => handleEscortChange(index, 'name', e.target.value)} placeholder="Enter name" className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Gender *</label>
+                            <select value={escort.gender} onChange={(e) => handleEscortChange(index, 'gender', e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
+                              <option value="Male">Male</option>
+                              <option value="Female">Female</option>
+                              <option value="Non-binary">Non-binary</option>
+                              <option value="Others">Others</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Nationality *</label>
+                            <select value={escort.nationality} onChange={(e) => handleEscortChange(index, 'nationality', e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
+                              {NATIONALITIES.map(nat => <option key={nat.label} value={nat.label}>{nat.label}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Contact Phone *</label>
+                            <input required type="tel" value={escort.phone} onChange={(e) => handleEscortChange(index, 'phone', e.target.value)} placeholder="+91 98765 43210" className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500 disabled:bg-slate-50" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Identification Serial ID *</label>
+                            <input required type="text" value={escort.govId} onChange={(e) => handleEscortChange(index, 'govId', e.target.value)} placeholder="Enter Serial ID" className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500" />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Email Address</label>
+                            <input type="email" value={escort.email || ''} onChange={(e) => handleEscortChange(index, 'email', e.target.value)} placeholder="e.g. name@domain.com" className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
 
-            {/* Document Scans */}
             <div className="pt-4 border-t border-slate-100">
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5">Verification Scan Credentials Copy</label>
-              
               <label className="border-2 border-dashed border-amber-200 rounded-xl p-6 bg-slate-50/60 flex flex-col items-center justify-center text-slate-400 hover:bg-amber-50/10 hover:border-amber-400 transition-all cursor-pointer relative">
                 <UploadCloud className="w-7 h-7 mb-1.5 text-amber-600" />
                 <span className="font-bold text-amber-900 text-xs">
@@ -609,7 +528,6 @@ export default function AddVisitorForeignPage() {
                 <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
               </label>
 
-              {/* Action Triggers */}
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-50 mt-4">
                 <button type="button" onClick={() => navigate('/hr/visitormgmt')} className="px-5 py-2 rounded-xl font-bold text-slate-400 hover:bg-slate-100 transition-colors text-xs">
                   Cancel Registry
@@ -619,16 +537,9 @@ export default function AddVisitorForeignPage() {
                 </button>
               </div>
             </div>
-
           </form>
         </div>
-
       </div>
-
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes fade-in { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: scale(1); } }
-        .animate-fade-in { animation: fade-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-      `}} />
     </DashboardLayout>
   );
 }

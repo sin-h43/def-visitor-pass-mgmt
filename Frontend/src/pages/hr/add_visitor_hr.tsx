@@ -228,10 +228,12 @@ export default function AddVisitorHRPage() {
     setError(null);
 
     try {
-      const timestamp = Date.now().toString().slice(-6);
-      const finalVisitorId = existingVisitorId || `VIS${timestamp}`;
-      const newVisitorId = `VIS${timestamp}`;
-      const newVisitId = `VST${timestamp}`;
+// 1. Generate a robust unique suffix to permanently stop 409 collisions
+      const uniqueSuffix = Date.now().toString(36) + Math.random().toString(36).substring(2, 6).toUpperCase();
+      
+      // 2. Map the final ID. If autofilled, it uses existingVisitorId. If new, it creates one.
+      const finalVisitorId = existingVisitorId || `VIS-${uniqueSuffix}`;
+      const newVisitId = `VST-${uniqueSuffix}`;
 
       let documentUrl = null;
       if (file) {
@@ -246,7 +248,6 @@ export default function AddVisitorHRPage() {
       }
       
       setUploadingText('Saving secure HR registries...');
-
 // ✅ Changed to .upsert and added the onConflict rule at the bottom
       const { error: visitorError } = await supabase.from('visitors').upsert({
         visitor_id: finalVisitorId,
@@ -277,13 +278,13 @@ export default function AddVisitorHRPage() {
       }
 
       // const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
-const finalStartDate = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
+      const finalStartDate = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
       // Default end date to start date + 1 hour if not provided, or map to user input
       const finalEndDate = endDate ? new Date(endDate).toISOString() : finalStartDate;
       const { error: visitError } = await supabase.from('visits').insert({
         visit_id: newVisitId,
-        visitor_id: newVisitorId,
-        host_employee_id: hostId,
+        visitor_id: finalVisitorId,
+        host_employee_id: currentUser.empId, // Dynamically linked to the HR's employee ID
         visit_type: pipeline === 'Pre-Scheduled Visit' ? 'Scheduled' : 'immediate', // Dynamically matching your DB
         pass_type: passType,
         purpose: finalPurpose,
@@ -299,7 +300,7 @@ const finalStartDate = startDate ? new Date(startDate).toISOString() : new Date(
       if (escorts.length > 0) {
         // Map the React state array to match your Supabase escorts table schema
         const escortsData = escorts.map((esc, index) => ({
-          escort_id: `ESC${timestamp}${index}`, // Generate unique ID appended with index
+          escort_id: `ESC-${uniqueSuffix}-${index}`, // Generate unique ID appended with index
           visit_id: newVisitId,
           name: esc.name,
           phone: esc.phone,
@@ -540,6 +541,32 @@ const finalStartDate = startDate ? new Date(startDate).toISOString() : new Date(
                       <div className="absolute -left-2 -top-2 w-5 h-5 bg-purple-800 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white shadow-sm">
                         {index + 1}
                       </div>
+                      <div className="flex flex-col gap-3 w-full">
+                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+                          <div className='sm:col-span-2'>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Member Full Name *</label>
+                            <input required type="text" value={escort.name} onChange={(e) => handleEscortChange(index, 'name', e.target.value)} placeholder="Enter name" className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Gender *</label>
+                            <select value={escort.gender} onChange={(e) => handleEscortChange(index, 'gender', e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
+                              <option value="Male">Male</option>
+                              <option value="Female">Female</option>
+                              <option value="Non-binary">Non-binary</option>
+                              <option value="Others">Others</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Nationality *</label>
+                            <select value={escort.nationality} onChange={(e) => handleEscortChange(index, 'nationality', e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
+                              {NATIONALITIES.map(nat => <option key={nat.label} value={nat.label}>{nat.label}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Contact Phone *</label>
+                            <input required type="tel" value={escort.phone} onChange={(e) => handleEscortChange(index, 'phone', e.target.value)} placeholder="+91 98765 43210" className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500 disabled:bg-slate-50" />
+                          </div>
+                        </div>
 {/* BOTTOM ROW: ID Type, ID Number, Email */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                           
@@ -566,7 +593,9 @@ const finalStartDate = startDate ? new Date(startDate).toISOString() : new Date(
                           </div>
 
                         </div>
-                    </div>
+                        </div>
+                      </div>
+                    
                   ))}
                 </div>
               )}

@@ -44,10 +44,11 @@ export default function AddVisitorForeignPage() {
 
   // Operational Fields
   const [pipeline, setPipeline] = useState('New Visitor / Urgent Access');
-  const [scheduledDate, setScheduledDate] = useState('');
   const [department, setDepartment] = useState('Research Wing');
+  const [passType, setPassType] = useState('One_day');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
-  // Tracking token for existing profile linking
   const [visitorId, setVisitorId] = useState<string | null>(null);
 
   // Auth/HR State
@@ -68,40 +69,21 @@ export default function AddVisitorForeignPage() {
   // Foreign National Specific Fields
   const [passportNumber, setPassportNumber] = useState('');
   const [visaNumber, setVisaNumber] = useState('');
-  const [hostId, setHostId] = useState('');
 
-  // Autocomplete state variables
   const [searchResults, setSearchResults] = useState<ExistingVisitor[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // Accompanying Contingent State
   const [headCount, setHeadCount] = useState<number>(0);
   const [escorts, setEscorts] = useState<{name: string, govId: string, email:string, nationality:string, phone: string, gender:string}[]>([]);
 
-  // File Upload State
   const [file, setFile] = useState<File | null>(null);
   const [uploadingText, setUploadingText] = useState('');
-    const [currentUserName, setCurrentUserName] = useState('Loading...');
+  const [currentUserName, setCurrentUserName] = useState('Loading...');
 
-  useEffect(() => {
-    const loadUserProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        try {
-          const emp = await fetchAndVerifyEmployee(user.email);
-          setCurrentUserName(emp.name);
-        } catch(e) {
-          setCurrentUserName('HR Admin');
-        }
-      }
-    };
-    loadUserProfile();
-  }, []);
   const maxAllowedDate = new Date();
   maxAllowedDate.setFullYear(maxAllowedDate.getFullYear() - 12);
   const maxDob = maxAllowedDate.toISOString().split('T')[0];
 
-  // Fetch Current HR User
   useEffect(() => {
     const loadUserProfile = async () => {
       try {
@@ -109,6 +91,7 @@ export default function AddVisitorForeignPage() {
         if (!user?.email) return;
         const employee = await fetchAndVerifyEmployee(user.email);
         if (employee) {
+          setCurrentUserName(employee.name);
           setCurrentUser({
             uuid: employee.auth_id || employee.id,
             empId: employee.employee_id,
@@ -118,12 +101,12 @@ export default function AddVisitorForeignPage() {
         }
       } catch (err) {
         console.error('Failed to load HR profile:', err);
+        setCurrentUserName('HR Admin');
       }
     };
     loadUserProfile();
   }, []);
 
-  // Live debounce search
   useEffect(() => {
     if (visitorName.trim().length < 2 || visitorId) {
       setSearchResults([]);
@@ -158,7 +141,7 @@ export default function AddVisitorForeignPage() {
     setPassportNumber(visitor.id_number || ''); 
     
     setShowDropdown(false);
-    if (pipeline !== 'Pre-Scheduled Visit') setPipeline('Repeated Visitor');
+    setPipeline('Repeated Visitor');
   };
 
   const handleClearSelectedVisitor = () => {
@@ -191,24 +174,14 @@ export default function AddVisitorForeignPage() {
     });
   }, [headCount]);
 
-  // Enhanced escort mapping
   const handleEscortChange = (index: number, field: 'name' | 'govId' | 'phone' | 'nationality' | 'gender'| 'email', value: string) => {
     const updatedEscorts = [...escorts];
-    
     if (field === 'nationality') {
       const natData = NATIONALITIES.find(n => n.label === value);
-      updatedEscorts[index] = {
-        ...updatedEscorts[index],
-        nationality: value,
-        phone: natData?.code ? `${natData.code} ` : ''
-      };
+      updatedEscorts[index] = { ...updatedEscorts[index], nationality: value, phone: natData?.code ? `${natData.code} ` : '' };
     } else {
-      updatedEscorts[index] = {
-        ...updatedEscorts[index],
-        [field]: value
-      };
+      updatedEscorts[index] = { ...updatedEscorts[index], [field]: value };
     }
-    
     setEscorts(updatedEscorts);
   };
 
@@ -231,16 +204,16 @@ export default function AddVisitorForeignPage() {
     setError(null);
 
     try {
-      const timestamp = Date.now().toString().slice(-6);
-      const newVisitId = `VST${timestamp}`;
-      let activeVisitorId = visitorId;
+      const uniqueSuffix = Date.now().toString(36) + Math.random().toString(36).substring(2, 6).toUpperCase();
+      const finalVisitorId = visitorId || `VIS-${uniqueSuffix}`;
+      const newVisitId = `VST-${uniqueSuffix}`;
+      
       let documentUrl = null;
 
       if (file) {
         setUploadingText('Uploading border scans...');
         const fileExt = file.name.split('.').pop();
         const fileName = `${newVisitId}_doc.${fileExt}`;
-
         const { error: uploadError } = await supabase.storage.from('visitor-documents').upload(fileName, file);
         if (uploadError) throw uploadError;
         const { data: publicUrlData } = supabase.storage.from('visitor-documents').getPublicUrl(fileName);
@@ -249,66 +222,75 @@ export default function AddVisitorForeignPage() {
       
       setUploadingText('Saving international manifest...');
 
-      if (!activeVisitorId) {
-        const standardGeneratedId = `VIS${timestamp}`;
-        activeVisitorId = standardGeneratedId;
+      const { error: visitorError } = await supabase.from('visitors').upsert({
+        visitor_id: finalVisitorId,
+        name: visitorName,
+        email: email || null,
+        phone: phone,
+        gender: gender,
+        dob: dob || null,
+        address: address || null,
+        id_type: 'Passport',
+        id_number: passportNumber || 'Pending Verification',
+        nationality: nationality,
+        organization: organization || 'Global Delegation',
+        designation: designation || 'International Delegate',
+        document_url: documentUrl,
+      }, {
+        onConflict: 'visitor_id'
+      });
 
-        const { error: visitorError } = await supabase.from('visitors').insert({
-          visitor_id: standardGeneratedId,
-          name: visitorName,
-          email: email || null,
-          phone: phone,
-          gender: gender,
-          dob: dob || null,
-          address: address || null,
-          id_type: 'Passport',
-          id_number: passportNumber || 'Pending Verification',
-          nationality: nationality,
-          organization: organization || 'Global Delegation',
-          designation: designation || 'International Delegate',
-          // department: department,
-          // visit_type: 'foreign',
-          // pass_type: 'One_day',
-        });
-
-        if (visitorError) throw visitorError;
-      }
+      if (visitorError) throw visitorError;
 
       let finalPurpose = `[VISA REFERENCE ID: ${visaNumber}] ${purpose}`;
-      if (escorts.length > 0) {
-        const guestList = escorts.map(esc => `${esc.name} (ID: ${esc.govId})`).join(', ');
-        finalPurpose += ` | Accompanying Guest Manifest: ${guestList}`;
-      }
+      // if (escorts.length > 0) {
+      //   const guestList = escorts.map(esc => `${esc.name} (ID: ${esc.govId})`).join(', ');
+      //   finalPurpose += ` | Accompanying Guest Manifest: ${guestList}`;
+      // }
 
-      const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
+      const finalStartDate = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
+      const finalEndDate = endDate ? new Date(endDate).toISOString() : finalStartDate;
 
       const { error: visitError } = await supabase.from('visits').insert({
         visit_id: newVisitId,
-        visitor_id: activeVisitorId,
-        host_employee_id: hostId, 
-        created_by_employee_id: currentUser.empId, 
-        visit_type: 'Foreign',
-        pass_type: 'One_day',
+        visitor_id: finalVisitorId,
+        host_employee_id: currentUser.empId, 
+        visit_type: pipeline === 'Pre-Scheduled Visit' ? 'Scheduled' : 'immediate',
+        pass_type: passType,
         purpose: finalPurpose,
-        start_date: startDate,
-        end_date: startDate,
-        status: 'Pending',
-        document_url: documentUrl,
-        department: department,
+        start_date: finalStartDate,
+        end_date: finalEndDate,
+        status: 'Approved',
+        approved_at: new Date().toISOString(), // Automatically log approval time
+        department: department
       });
 
       if (visitError) throw visitError;
+
+      if (escorts.length > 0) {
+        const escortsData = escorts.map((esc, index) => ({
+          escort_id: `ESC-${uniqueSuffix}-${index}`,
+          visit_id: newVisitId,
+          name: esc.name,
+          phone: esc.phone,
+          department: department, 
+          id_type: 'Government ID', 
+          id_number: esc.govId,
+          nationality: esc.nationality,
+          email: esc.email || null,
+          gender: esc.gender
+        }));
+
+        const { error: escortsError } = await supabase.from('escorts').insert(escortsData);
+        if (escortsError) throw escortsError;
+      }
 
       setSuccess(true);
       setTimeout(() => navigate('/hr/visitormgmt'), 2000);
 
     } catch (err: any) {
       console.error(err);
-      if (err.code === '23503' || err.message?.includes('foreign key')) {
-        setError(`❌ Database Error: The Host ID (${hostId}) could not be found. Please double-check the Host Employee ID.`);
-      } else {
-        setError(err.message || 'System failed to register international tracking logs.');
-      }
+      setError(err.message || 'System failed to register international tracking logs.');
     } finally {
       setLoading(false);
     }
@@ -368,12 +350,24 @@ export default function AddVisitorForeignPage() {
               </div>
             </div>
 
-            {pipeline === 'Pre-Scheduled Visit' && (
-              <div className="p-4 bg-amber-50/30 border border-amber-100 rounded-xl animate-fade-in">
-                <label className="block text-xs font-bold text-amber-900 uppercase tracking-wider mb-1.5">Scheduled Arrival Timestamp Window Target *</label>
-                <input required type="datetime-local" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className="w-full p-2.5 border border-amber-200 rounded-lg bg-white text-xs font-bold font-mono text-slate-700 outline-none" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-amber-50/30 border border-amber-100 rounded-xl animate-fade-in">
+              <div>
+                <label className="block text-xs font-bold text-amber-900 uppercase tracking-wider mb-1.5">Pass Type *</label>
+                <select required value={passType} onChange={(e) => setPassType(e.target.value)} className="w-full p-2.5 border border-amber-200 rounded-lg bg-white text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500">
+                  <option value="One_day">One Day Pass</option>
+                  <option value="Multi_day">Multi-Day Pass</option>
+                  <option value="Contractor">Extended Contractor</option>
+                </select>
               </div>
-            )}
+              <div>
+                <label className="block text-xs font-bold text-amber-900 uppercase tracking-wider mb-1.5">Start Date & Time *</label>
+                <input required type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-2.5 border border-amber-200 rounded-lg bg-white text-xs font-bold font-mono text-slate-700 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-amber-900 uppercase tracking-wider mb-1.5">End Date & Time *</label>
+                <input required type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-2.5 border border-amber-200 rounded-lg bg-white text-xs font-bold font-mono text-slate-700 outline-none" />
+              </div>
+            </div>
 
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pt-2 border-b border-slate-50 pb-1">Primary Base Identity</h4>
 
@@ -381,7 +375,7 @@ export default function AddVisitorForeignPage() {
               <div className="relative">
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Delegate Full Name *</label>
                 <div className="relative flex items-center">
-                  <input required type="text" value={visitorName} disabled={!!visitorId} onChange={(e) => { setVisitorName(e.target.value); setShowDropdown(true); }} onFocus={() => setShowDropdown(true)} placeholder="Type name to lookup profiles..." className="w-full p-2.5 pr-8 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-amber-500 disabled:bg-slate-50 disabled:text-slate-600 font-semibold" />
+                  <input required type="text" value={visitorName} disabled={!!visitorId} onChange={(e) => { setVisitorName(e.target.value); setShowDropdown(true); }} onFocus={() => setShowDropdown(true)} placeholder="Type name to lookup profiles..." className="w-full p-2.5 pr-8 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-amber-500 disabled:bg-slate-50 disabled:text-slate-600 font-semibold" autoComplete="off" />
                   {visitorId ? (
                     <button type="button" onClick={handleClearSelectedVisitor} className="absolute right-2.5 text-slate-400 hover:text-red-500 transition-colors" title="Clear profile layout">
                       <X className="w-4 h-4" />
@@ -425,7 +419,7 @@ export default function AddVisitorForeignPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">Contact Phone *</label>
-                  <input required type="tel" value={phone} disabled={!!visitorId} onChange={(e) => setPhone(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-amber-500 disabled:bg-slate-50" />
+                  <input required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-amber-500" />
                 </div>
               </div>
 
@@ -435,7 +429,7 @@ export default function AddVisitorForeignPage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Secure Email Address</label>
-                <input type="email" value={email} disabled={!!visitorId} onChange={(e) => setEmail(e.target.value)} placeholder="delegate@domain.com" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-amber-500 disabled:bg-slate-50" />
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="delegate@domain.com" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-amber-500" />
               </div>
             </div>
 
@@ -444,7 +438,7 @@ export default function AddVisitorForeignPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-amber-50/20 p-4 border border-amber-100 rounded-xl">
               <div>
                 <label className="block text-xs font-bold text-amber-800 uppercase tracking-wider mb-1">Passport Document Serial ID *</label>
-                <input required type="text" value={passportNumber} disabled={!!visitorId} onChange={(e) => setPassportNumber(e.target.value)} placeholder="Enter Passport Serial Number" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono tracking-wider outline-none focus:ring-2 focus:ring-amber-500 uppercase disabled:bg-slate-50" />
+                <input required type="text" value={passportNumber} onChange={(e) => setPassportNumber(e.target.value)} placeholder="Enter Passport Serial Number" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono tracking-wider outline-none focus:ring-2 focus:ring-amber-500 uppercase" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-amber-800 uppercase tracking-wider mb-1">Visa Tracking Clearance Number *</label>
@@ -455,19 +449,15 @@ export default function AddVisitorForeignPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Representing Global Organization</label>
-                <input type="text" value={organization} disabled={!!visitorId} onChange={(e) => setOrganization(e.target.value)} placeholder="e.g. United Nations Embassy Unit" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-amber-500 disabled:bg-slate-50" />
+                <input type="text" value={organization} onChange={(e) => setOrganization(e.target.value)} placeholder="e.g. United Nations Embassy Unit" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-amber-500" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Official Rank / Designation</label>
-                <input type="text" value={designation} disabled={!!visitorId} onChange={(e) => setDesignation(e.target.value)} placeholder="e.g. Diplomatic Counsel Envoy" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-amber-500 disabled:bg-slate-50" />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-500 mb-1">Assigned Domestic Sponsor Personnel ID *</label>
-                <input required type="text" value={hostId} onChange={(e) => setHostId(e.target.value)} placeholder="e.g. EMP-12345" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-amber-500" />
+                <input type="text" value={designation} onChange={(e) => setDesignation(e.target.value)} placeholder="e.g. Diplomatic Counsel Envoy" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-amber-500" />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-slate-500 mb-1">International Terminal Address</label>
-                <input type="text" value={address} disabled={!!visitorId} onChange={(e) => setAddress(e.target.value)} placeholder="Consulate Suite No, Hotel Complex, City..." className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-amber-500 disabled:bg-slate-50" />
+                <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Consulate Suite No, Hotel Complex, City..." className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-amber-500" />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Purpose Statement of International Dispatch *</label>
@@ -487,7 +477,7 @@ export default function AddVisitorForeignPage() {
                 <div className="p-4 bg-white space-y-3.5">
                   {escorts.map((escort, index) => (
                     <div key={index} className="flex flex-col gap-3 p-3.5 border border-slate-200 rounded-xl bg-slate-50/50 relative">
-                      <div className="absolute -left-2 -top-2 w-5 h-5 bg-purple-800 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white shadow-sm">
+                      <div className="absolute -left-2 -top-2 w-5 h-5 bg-amber-800 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white shadow-sm">
                         {index + 1}
                       </div>
                       <div className="flex flex-col gap-3 w-full">
@@ -498,7 +488,7 @@ export default function AddVisitorForeignPage() {
                           </div>
                           <div>
                             <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Gender *</label>
-                            <select value={escort.gender} onChange={(e) => handleEscortChange(index, 'gender', e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
+                            <select value={escort.gender} onChange={(e) => handleEscortChange(index, 'gender', e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500">
                               <option value="Male">Male</option>
                               <option value="Female">Female</option>
                               <option value="Non-binary">Non-binary</option>
@@ -507,13 +497,13 @@ export default function AddVisitorForeignPage() {
                           </div>
                           <div>
                             <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Nationality *</label>
-                            <select value={escort.nationality} onChange={(e) => handleEscortChange(index, 'nationality', e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
+                            <select value={escort.nationality} onChange={(e) => handleEscortChange(index, 'nationality', e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500">
                               {NATIONALITIES.map(nat => <option key={nat.label} value={nat.label}>{nat.label}</option>)}
                             </select>
                           </div>
                           <div>
                             <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Contact Phone *</label>
-                            <input required type="tel" value={escort.phone} onChange={(e) => handleEscortChange(index, 'phone', e.target.value)} placeholder="+91 98765 43210" className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500 disabled:bg-slate-50" />
+                            <input required type="tel" value={escort.phone} onChange={(e) => handleEscortChange(index, 'phone', e.target.value)} placeholder="+91 98765 43210" className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500" />
                           </div>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
@@ -536,7 +526,7 @@ export default function AddVisitorForeignPage() {
             <div className="pt-4 border-t border-slate-100">
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5">Verification Scan Credentials Copy</label>
               <label className="border-2 border-dashed border-amber-200 rounded-xl p-6 bg-slate-50/60 flex flex-col items-center justify-center text-slate-400 hover:bg-amber-50/10 hover:border-amber-400 transition-all cursor-pointer relative">
-                <UploadCloud className="w-7 h-7 mb-1.5 text-amber-600" />
+                <UploadCloud className="w-7 h-7 mb-1.5 text-amber-600 animate-pulse" />
                 <span className="font-bold text-amber-900 text-xs">
                   {file ? (file as File).name : 'Click to Upload Passport Scans copy'}
                 </span>

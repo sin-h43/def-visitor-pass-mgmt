@@ -272,10 +272,10 @@ export default function AddVisitorHRPage() {
       if (visitorError) throw visitorError;
 
       let finalPurpose = `[HR TRACK: ${hrOnboardingTrack}] ${purpose}`;
-      if (escorts.length > 0) {
-        const guestList = escorts.map(esc => `${esc.name} (ID: ${esc.govId})`).join(', ');
-        finalPurpose += ` | Accompanying Guest Manifest: ${guestList}`;
-      }
+      // if (escorts.length > 0) {
+      //   const guestList = escorts.map(esc => `${esc.name} (ID: ${esc.govId})`).join(', ');
+      //   finalPurpose += ` | Accompanying Guest Manifest: ${guestList}`;
+      // }
 
       // const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
       const finalStartDate = startDate ? new Date(startDate).toISOString() : new Date().toISOString();

@@ -250,10 +250,10 @@ export default function AddVisitorServicePage() {
       if (visitorError) throw visitorError;
 
       let finalPurpose = `[VENDOR FIELD TRADE: ${tradeType}] ${purpose}`;
-      if (escorts.length > 0) {
-        const guestList = escorts.map(esc => `${esc.name} (ID: ${esc.govId})`).join(', ');
-        finalPurpose += ` | Accompanying Crew Manifest: ${guestList}`;
-      }
+      // if (escorts.length > 0) {
+      //   const guestList = escorts.map(esc => `${esc.name} (ID: ${esc.govId})`).join(', ');
+      //   finalPurpose += ` | Accompanying Crew Manifest: ${guestList}`;
+      // }
 
       const finalStartDate = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
       const finalEndDate = endDate ? new Date(endDate).toISOString() : finalStartDate;

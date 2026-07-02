@@ -9,7 +9,7 @@ import { Shield, Eye, X, User, Activity, Clock, FileText, Download, AlertOctagon
 import { useNotification } from '../../hooks/useNotification';
 import NotificationToast from '../../components/common/NotificationToast';
 import HRNotificationCenter from './HRNotificationCenter';
-
+import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
 
 interface ExtendedAuditLog {
   id: string;
@@ -37,7 +37,23 @@ export default function AuditLogsPage() {
   const [logs, setLogs] = useState<ExtendedAuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  
+    // Dynamic User State
+  const [currentUserName, setCurrentUserName] = useState('Loading...');
+
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        try {
+          const emp = await fetchAndVerifyEmployee(user.email);
+          setCurrentUserName(emp.name);
+        } catch(e) {
+          setCurrentUserName('HR Admin');
+        }
+      }
+    };
+    loadUserProfile();
+  }, []);
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
     action: [],
     role: [],
@@ -322,7 +338,7 @@ const handleApproveEmployee = async (user: any) => {
   ];
 
   return (
-    <DashboardLayout role="hr" userName="System Admin" headerAction={<HRNotificationCenter/>}>
+    <DashboardLayout role="hr" userName={currentUserName} headerAction={<HRNotificationCenter/>}>
       <div className="max-w-7xl mx-auto space-y-6">
         
         <div className="flex items-center space-x-3">

@@ -428,7 +428,7 @@ const handleRejectEmployee = async (id: string, name: string) => {
   return (
     <DashboardLayout 
       role="hr" 
-      userName="HR Admin"
+      userName={currentUserName}
       headerAction={
         /* --- COMBINED NOTIFICATION CENTER (ACTIONABLE + FEED) --- */
         <div className="relative">

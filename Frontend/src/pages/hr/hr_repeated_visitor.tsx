@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { useNotification } from '../../hooks/useNotification';
 import NotificationToast from '../../components/common/NotificationToast';
 import HRNotificationCenter from './HRNotificationCenter';
+import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
 
 
 // --- DATA MODELS ---
@@ -23,7 +24,7 @@ interface VisitHistory {
 }
 
 interface VisitorProfile {
-  id: string; // visitor_id
+  id: string; 
   name: string;
   phone: string;
   email: string;
@@ -49,6 +50,23 @@ export default function HRRepeatedVisitorLogPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('All Visitors');
+  // Dynamic User State
+  const [currentUserName, setCurrentUserName] = useState('Loading...');
+
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        try {
+          const emp = await fetchAndVerifyEmployee(user.email);
+          setCurrentUserName(emp.name);
+        } catch(e) {
+          setCurrentUserName('HR Admin');
+        }
+      }
+    };
+    loadUserProfile();
+  }, []);
 
   // --- SUPABASE FETCH & DATA GROUPING ---
   const fetchVisitorDirectory = async () => {
@@ -250,7 +268,7 @@ export default function HRRepeatedVisitorLogPage() {
 
   if (loading) {
     return (
-      <DashboardLayout role="hr" userName="Sinchana K" >
+      <DashboardLayout role="hr" userName={currentUserName} >
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-pulse flex flex-col items-center">
             <div className="h-8 w-8 bg-indigo-600 rounded-full mb-4"></div>
@@ -262,7 +280,7 @@ export default function HRRepeatedVisitorLogPage() {
   }
 
   return (
-    <DashboardLayout role="hr" userName="Sinchana K" headerAction={<HRNotificationCenter />}>
+    <DashboardLayout role="hr" userName={currentUserName} headerAction={<HRNotificationCenter />}>
       <div className="max-w-7xl mx-auto space-y-6 pb-12">
         
         {/* Professional Identity Header */}

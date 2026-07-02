@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase';
 import { useNotification } from '../../hooks/useNotification';
 import NotificationToast from '../../components/common/NotificationToast';
 import HRNotificationCenter from './HRNotificationCenter';
+import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
 
 
 export interface ExtendedVisitorRecord extends VisitorRecord {
@@ -39,7 +40,22 @@ export default function VisitorMgmtPage() {
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<ExtendedVisitorRecord | null>(null);
+  const [currentUserName, setCurrentUserName] = useState('Loading...');
 
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        try {
+          const emp = await fetchAndVerifyEmployee(user.email);
+          setCurrentUserName(emp.name);
+        } catch(e) {
+          setCurrentUserName('HR Admin');
+        }
+      }
+    };
+    loadUserProfile();
+  }, []);
   const [panelRemark, setPanelRemark] = useState('');
   const [remarkModal, setRemarkModal] = useState<{
     isOpen: boolean;
@@ -345,7 +361,7 @@ export default function VisitorMgmtPage() {
 
   if (loading) {
     return (
-      <DashboardLayout role="hr" userName="Sinchana K">
+      <DashboardLayout role="hr" userName={currentUserName}>
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-pulse flex flex-col items-center">
             <div className="h-8 w-8 bg-blue-600 rounded-full mb-4"></div>

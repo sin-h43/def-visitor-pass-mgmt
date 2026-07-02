@@ -1,13 +1,17 @@
-// File: src/pages/security/visitor_verification.tsx
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { Camera, Upload, MessageSquare, CheckCircle, Clock, FileText, Users, ExternalLink, ShieldAlert, AlertOctagon, X } from 'lucide-react';
 
 export default function VisitorVerification() {
   const { visitorId } = useParams<{ visitorId: string }>();
   const navigate = useNavigate();
+  
+  // Scoped Security Guard State
+  const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: 'Loading...', role: '' });
+  
   const [visitor, setVisitor] = useState<any>(null); 
   const [loading, setLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
@@ -31,6 +35,27 @@ export default function VisitorVerification() {
     { id: 'escorts', title: 'Verify Accompanying Persons', completed: false, required: false },
     { id: 'badge', title: 'Issue Access Badge', completed: false, required: true },
   ]);
+
+  useEffect(() => {
+    const initSecurityScope = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.email) {
+          const emp = await fetchAndVerifyEmployee(user.email);
+          setCurrentUser({
+            id: emp.id,
+            empId: emp.employee_id,
+            name: emp.name,
+            role: emp.role || 'security'
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load guard profile', err);
+        setCurrentUser(prev => ({ ...prev, name: 'Gate Console' }));
+      }
+    };
+    initSecurityScope();
+  }, []);
 
   useEffect(() => { fetchVisitor(); }, [visitorId]);
 
@@ -140,19 +165,10 @@ export default function VisitorVerification() {
     else setSteps(s => s.map(step => step.id === 'escorts' ? { ...step, completed: false } : step));
   };
 
-const completeCheckin = async () => {
+  const completeCheckin = async () => {
     if (!visitor) return;
     setUploading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      // FIX: Look up the actual employee ID
-      let empId = null;
-      if (user?.email) {
-        const { data: empData } = await supabase.from('employees').select('id').eq('email', user.email).single();
-        empId = empData?.id;
-      }
-
       const checkInStamp = new Date().toISOString();
       const updates = { 
         status: 'Active', 
@@ -160,53 +176,75 @@ const completeCheckin = async () => {
         security_remarks: securityNote || null 
       };
 
+      // 1. Mark visitor Active
       await supabase.from('visits').update(updates).eq('visit_id', visitor.visit_id); 
       await supabase.from('visitors').update({ checked_in_time: checkInStamp }).eq('visitor_id', visitor.id); 
       
+      // 2. Initialize Time Tracking Forensics DB Log
+      await supabase.from('time_tracking_logs').insert([{
+        visit_id: visitor.visit_id,
+        visitor_id: visitor.id,
+        check_in_time: checkInStamp,
+        expected_out_time: visitor.expiry,
+        time_exceeded: false,
+        logged_to_forensic: false
+      }]);
+
+      // 3. Fire highly detailed log to HR Dashboard
       await supabase.from('audit_logs').insert([{
         visitor_id: visitor.id, 
         action: 'checked_in', 
-        performed_by_id: empId, // <--- NOW INSERTS THE CORRECT EMPLOYEE ID
-        performed_by: user?.email || 'Gate Security',
+        performed_by_id: currentUser.empId || currentUser.id,
+        performed_by: currentUser.name,
         performed_by_role: 'security', 
-        remarks: `Checked in at Desk ${deskNumber}. ${securityNote ? `Note: ${securityNote}` : ''}`
+        remarks: `[ENTRY GRANTED] Desk ${deskNumber} by Guard ${currentUser.name}. ${securityNote ? `Guard Note: ${securityNote}` : ''}`
       }]);
       
-      alert('Access Granted. Monitoring initiated.');
+      alert('Access Granted. Real-time forensic monitoring initiated.');
       navigate('/security');
-    } catch (error) { alert('Check-in failed.'); } finally { setUploading(false); }
+    } catch (error) { 
+      alert('Check-in sequence failed to communicate with central DB.'); 
+    } finally { 
+      setUploading(false); 
+    }
   };
 
-const handleDenyEntry = async () => {
+  const handleDenyEntry = async () => {
     if (!visitor || !denyReason) return;
     setUploading(true);
     try {
-      // FIX: Now writing safely to the dedicated security_remarks column
       await supabase.from('visits').update({ 
         status: 'Denied', 
         security_remarks: `[DENIED AT GATE]: ${denyReason}` 
       }).eq('visit_id', visitor.visit_id); 
       
+      // Strict alert directly to HR Audit Log
       await supabase.from('audit_logs').insert([{
         visitor_id: visitor.id, 
         action: 'rejected', 
-        performed_by: 'Gate Security', 
+        performed_by_id: currentUser.empId || currentUser.id,
+        performed_by: currentUser.name, 
         performed_by_role: 'security', 
-        remarks: `Entry denied at gate: ${denyReason}`
+        severity: 'High',
+        remarks: `[ENTRY DENIED] Security blocked facility access at Gate ${deskNumber}. Reason: ${denyReason}`
       }]);
       
-      alert('Visitor denied. HR has been notified.');
+      alert('Visitor denied. HR has been explicitly notified.');
       navigate('/security');
-    } catch (error) { alert('Failed to process denial.'); } finally { setUploading(false); }
+    } catch (error) { 
+      alert('Failed to process denial.'); 
+    } finally { 
+      setUploading(false); 
+    }
   };
 
-  if (loading) return <DashboardLayout role="security" userName="Gate Console"><div className="flex h-screen items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-slate-900"></div></div></DashboardLayout>;
+  if (loading) return <DashboardLayout role="security" userName={currentUser.name}><div className="flex h-screen items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-slate-900"></div></div></DashboardLayout>;
   if (!visitor) return null;
 
   const allDone = steps.filter(s => s.required).every(s => s.completed);
 
   return (
-    <DashboardLayout role="security" userName="Gate Console">
+    <DashboardLayout role="security" userName={currentUser.name}>
       <div className="max-w-7xl mx-auto space-y-4">
         
         <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
@@ -224,7 +262,6 @@ const handleDenyEntry = async () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           
           <div className="lg:col-span-2 space-y-4">
-            {/* Compact Identity Card */}
             <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
               <h2 className="text-2xl font-black text-slate-900 mb-3">{visitor.name}</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm bg-slate-50 p-4 rounded-lg border border-slate-100">
@@ -351,7 +388,7 @@ const handleDenyEntry = async () => {
                 <button onClick={completeCheckin} disabled={!allDone || uploading} className={`w-full py-3.5 rounded-lg font-black text-xs tracking-widest shadow-sm transition-all ${allDone ? 'bg-slate-900 text-white hover:bg-slate-800 hover:shadow-md' : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'}`}>
                   {uploading ? 'Processing Secure Entry...' : 'Authorize Facility Access'}
                 </button>
-                <button onClick={() => setDenyModal(true)} disabled={uploading} className="w-full py-3.5 rounded-lg font-black text-xs tracking-widest bg-red-40 text-red-600 border border-red-200 hover:bg-red-100 transition-colors">
+                <button onClick={() => setDenyModal(true)} disabled={uploading} className="w-full py-3.5 rounded-lg font-black text-xs tracking-widest bg-red-50 text-rose-600 border border-rose-200 hover:bg-rose-100 transition-colors">
                   Deny Entry
                 </button>
               </div>
@@ -363,20 +400,20 @@ const handleDenyEntry = async () => {
         {/* Security Deny Modal */}
         {denyModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-red-100 transform scale-100 transition-all">
-              <div className="p-5 bg-red-50 border-b border-red-100 flex justify-between items-center">
-                <h3 className="font-black text-red-800 flex items-center"><AlertOctagon className="w-5 h-5 mr-2"/> Deny Access</h3>
-                <button onClick={() => setDenyModal(false)} className="text-red-400 hover:text-red-700 transition-colors"><X size={20}/></button>
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden border border-rose-100 transform scale-100 transition-all">
+              <div className="p-5 bg-rose-50 border-b border-rose-100 flex justify-between items-center">
+                <h3 className="font-black text-rose-800 flex items-center"><AlertOctagon className="w-5 h-5 mr-2"/> Deny Access</h3>
+                <button onClick={() => setDenyModal(false)} className="text-rose-400 hover:text-rose-700 transition-colors"><X size={20}/></button>
               </div>
               <div className="p-6 space-y-4">
                 <p className="text-sm font-medium text-slate-600">This will reject the visitor at the gate. The reason will be immediately sent to HR for review.</p>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Reason for Denial (Required)</label>
-                  <textarea autoFocus value={denyReason} onChange={e => setDenyReason(e.target.value)} rows={3} placeholder="e.g. Identity mismatch, aggressive behavior, unverified escort..." className="w-full border-2 border-red-100 rounded-xl p-3 text-sm focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400 bg-red-50/30 resize-none transition-shadow"/>
+                  <textarea autoFocus value={denyReason} onChange={e => setDenyReason(e.target.value)} rows={3} placeholder="e.g. Identity mismatch, aggressive behavior, unverified escort..." className="w-full border-2 border-rose-100 rounded-xl p-3 text-sm focus:outline-none focus:border-rose-400 focus:ring-1 focus:ring-rose-400 bg-rose-50/30 resize-none transition-shadow"/>
                 </div>
                 <div className="flex gap-3 pt-3">
                   <button onClick={() => setDenyModal(false)} className="flex-1 py-3 font-bold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors text-sm">Cancel</button>
-                  <button onClick={handleDenyEntry} disabled={!denyReason || uploading} className="flex-1 py-3 font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 shadow-sm disabled:opacity-50 transition-colors text-sm">
+                  <button onClick={handleDenyEntry} disabled={!denyReason || uploading} className="flex-1 py-3 font-bold text-white bg-rose-600 rounded-xl hover:bg-rose-700 shadow-sm disabled:opacity-50 transition-colors text-sm">
                     {uploading ? 'Processing...' : 'Confirm Denial'}
                   </button>
                 </div>

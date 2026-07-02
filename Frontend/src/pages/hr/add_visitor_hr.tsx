@@ -29,8 +29,12 @@ export default function AddVisitorHRPage() {
 
   // Operational Fields
   const [pipeline, setPipeline] = useState('New Visitor / Urgent Access');
-  const [scheduledDate, setScheduledDate] = useState('');
+  const [passType, setPassType] = useState('One_day');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [department, setDepartment] = useState('HR Department');
+
+  const [existingVisitorId, setExistingVisitorId] = useState<string | null>(null);
 
   // Auth/HR State
   const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: '', dept: '' });
@@ -54,7 +58,12 @@ export default function AddVisitorHRPage() {
 
   // Accompanying Contingent State
   const [headCount, setHeadCount] = useState<number>(0);
-  const [escorts, setEscorts] = useState<{name: string, govId: string, email:string, nationality:string, phone: string, gender:string}[]>([]);
+  const [escorts, setEscorts] = useState<{name: string, govId: string, email:string, nationality:string, phone: string, gender:string, idType:string}[]>([]);
+
+  // Autofill / Search State
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   // File Upload State
   const [file, setFile] = useState<File | null>(null);
@@ -78,6 +87,70 @@ export default function AddVisitorHRPage() {
   const maxAllowedDate = new Date();
   maxAllowedDate.setFullYear(maxAllowedDate.getFullYear() - 12);
   const maxDob = maxAllowedDate.toISOString().split('T')[0];
+
+  // Debounced search for existing visitors
+  useEffect(() => {
+    const searchVisitors = async () => {
+      if (existingVisitorId) {
+        setSearchResults([]);
+        setShowDropdown(false);
+        return;
+      }
+      if (visitorName.length < 3) {
+        setSearchResults([]);
+        setShowDropdown(false);
+        return;
+      }
+
+      setIsSearching(true);
+      try {
+        const { data, error } = await supabase
+          .from('visitors')
+          .select('*')
+          .ilike('name', `%${visitorName}%`) // Case-insensitive search
+          .limit(5);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          setSearchResults(data);
+          setShowDropdown(true);
+        } else {
+          setSearchResults([]);
+          setShowDropdown(false);
+        }
+      } catch (err) {
+        console.error('Failed to search visitors:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    // Wait 500ms after the user stops typing before querying
+    const timeoutId = setTimeout(searchVisitors, 500);
+    return () => clearTimeout(timeoutId);
+  }, [visitorName]);
+
+  // Autofill the form when a visitor is selected
+  const handleSelectVisitor = (visitor: any) => {
+    setExistingVisitorId(visitor.visitor_id);
+    setVisitorName(visitor.name);
+    setGender(visitor.gender || 'Others');
+    setDob(visitor.dob || '');
+    setEmail(visitor.email || '');
+    setPhone(visitor.phone || '+91 ');
+    setNationality(visitor.nationality || 'Indian');
+    setAddress(visitor.address || '');
+    setOrganization(visitor.organization || '');
+    setIdType(visitor.id_type || 'Aadhaar');
+    setIdNumber(visitor.id_number || '');
+    
+    // Switch pipeline to repeated automatically
+    setPipeline('Repeated Visitor');
+    
+    // Hide dropdown
+    setShowDropdown(false);
+  };
 
   // Fetch Current HR User
   useEffect(() => {
@@ -107,7 +180,7 @@ export default function AddVisitorHRPage() {
       const newEscorts = [...prev];
       if (count > prev.length) {
         for (let i = prev.length; i < count; i++) {
-          newEscorts.push({ name: '', govId: '', email:'', phone:'', nationality: 'Indian', gender:'Others' });
+          newEscorts.push({ name: '', govId: '', email:'', phone:'', nationality: 'Indian', gender:'Others',idType:'Aadhaar' });
         }
       } else {
         newEscorts.length = count;
@@ -116,7 +189,7 @@ export default function AddVisitorHRPage() {
     });
   }, [headCount]);
 
-  const handleEscortChange = (index: number, field: 'name' | 'govId' | 'phone' | 'nationality' | 'gender'| 'email', value: string) => {
+  const handleEscortChange = (index: number, field: 'name' | 'govId' | 'phone' | 'nationality' | 'gender'| 'email' | 'idType', value: string) => {
     const updatedEscorts = [...escorts];
     
     if (field === 'nationality') {
@@ -156,6 +229,7 @@ export default function AddVisitorHRPage() {
 
     try {
       const timestamp = Date.now().toString().slice(-6);
+      const finalVisitorId = existingVisitorId || `VIS${timestamp}`;
       const newVisitorId = `VIS${timestamp}`;
       const newVisitId = `VST${timestamp}`;
 
@@ -173,8 +247,9 @@ export default function AddVisitorHRPage() {
       
       setUploadingText('Saving secure HR registries...');
 
-      const { error: visitorError } = await supabase.from('visitors').insert({
-        visitor_id: newVisitorId,
+// ✅ Changed to .upsert and added the onConflict rule at the bottom
+      const { error: visitorError } = await supabase.from('visitors').upsert({
+        visitor_id: finalVisitorId,
         name: visitorName,
         email: email || null,
         phone: phone,
@@ -186,8 +261,12 @@ export default function AddVisitorHRPage() {
         nationality: nationality,
         organization: organization || 'Internal HR Evaluation',
         designation: hrOnboardingTrack,
-        department: department
+        document_url: documentUrl,
+      }, {
+        onConflict: 'visitor_id' // This tells the database to UPDATE if the ID already exists
       });
+
+      if (visitorError) throw visitorError;
 
       if (visitorError) throw visitorError;
 
@@ -197,24 +276,45 @@ export default function AddVisitorHRPage() {
         finalPurpose += ` | Accompanying Guest Manifest: ${guestList}`;
       }
 
-      const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
-
+      // const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
+const finalStartDate = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
+      // Default end date to start date + 1 hour if not provided, or map to user input
+      const finalEndDate = endDate ? new Date(endDate).toISOString() : finalStartDate;
       const { error: visitError } = await supabase.from('visits').insert({
         visit_id: newVisitId,
         visitor_id: newVisitorId,
         host_employee_id: hostId,
-        created_by_employee_id: currentUser.empId,
-        visit_type: 'HR', 
-        pass_type: 'One_day',
+        visit_type: pipeline === 'Pre-Scheduled Visit' ? 'Scheduled' : 'immediate', // Dynamically matching your DB
+        pass_type: passType,
         purpose: finalPurpose,
-        start_date: startDate,
-        end_date: startDate,
-        status: 'Pending',
-        document_url: documentUrl
+        start_date: finalStartDate, 
+        end_date: finalEndDate,    
+        status: 'Approved',
+        department: department
       });
 
       if (visitError) throw visitError;
 
+      // 3. Bulk Insert into ESCORTS Table
+      if (escorts.length > 0) {
+        // Map the React state array to match your Supabase escorts table schema
+        const escortsData = escorts.map((esc, index) => ({
+          escort_id: `ESC${timestamp}${index}`, // Generate unique ID appended with index
+          visit_id: newVisitId,
+          name: esc.name,
+          phone: esc.phone,
+          department: department, // Inherit department from the primary visit
+          id_type: 'Government ID', // Defaulting since the UI doesn't specify escort ID type
+          id_number: esc.govId,
+          nationality: esc.nationality,
+          email: esc.email || null,
+          gender: esc.gender
+        }));
+
+        const { error: escortsError } = await supabase.from('escorts').insert(escortsData);
+        
+        if (escortsError) throw escortsError;
+      }
       setSuccess(true);
       setTimeout(() => navigate('/hr/visitormgmt'), 2000);
 
@@ -283,19 +383,67 @@ export default function AddVisitorHRPage() {
               </div>
             </div>
 
-            {pipeline === 'Pre-Scheduled Visit' && (
-              <div className="p-4 bg-purple-50/30 border border-purple-100 rounded-xl animate-fade-in">
-                <label className="block text-xs font-bold text-purple-900 uppercase tracking-wider mb-1.5">Scheduled Evaluation Timestamp Target *</label>
-                <input required type="datetime-local" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} className="w-full p-2.5 border border-purple-200 rounded-lg bg-white text-xs font-bold font-mono text-slate-700 outline-none" />
+{/* Pass Type & Scheduling Grid - Always visible for precise time tracking */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-purple-50/30 border border-purple-100 rounded-xl animate-fade-in">
+              <div>
+                <label className="block text-xs font-bold text-purple-900 uppercase tracking-wider mb-1.5">Pass Type *</label>
+                <select required value={passType} onChange={(e) => setPassType(e.target.value)} className="w-full p-2.5 border border-purple-200 rounded-lg bg-white text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-purple-500">
+                  <option value="One_day">One Day Pass</option>
+                  <option value="Multi_day">Multi-Day Pass</option>
+                  <option value="Contractor">Extended Contractor</option>
+                </select>
               </div>
-            )}
+
+              <div>
+                <label className="block text-xs font-bold text-purple-900 uppercase tracking-wider mb-1.5">Start Date & Time *</label>
+                <input required type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-2.5 border border-purple-200 rounded-lg bg-white text-xs font-bold font-mono text-slate-700 outline-none" />
+              </div>
+              
+              <div>
+                <label className="block text-xs font-bold text-purple-900 uppercase tracking-wider mb-1.5">End Date & Time *</label>
+                <input required type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-2.5 border border-purple-200 rounded-lg bg-white text-xs font-bold font-mono text-slate-700 outline-none" />
+              </div>
+            </div>
 
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pt-2 border-b border-slate-50 pb-1">Primary Base Identity</h4>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1">Full Name *</label>
-                <input required type="text" value={visitorName} onChange={(e) => setVisitorName(e.target.value)} placeholder="Appointee Full Name" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-purple-500" />
+<div className="relative">
+                <label className="block text-xs font-semibold text-slate-500 mb-1 flex justify-between">
+                  <span>Full Name *</span>
+                  {isSearching && <span className="text-[10px] text-purple-500 animate-pulse">Searching...</span>}
+                </label>
+              <input 
+                  required 
+                  type="text" 
+                  value={visitorName} 
+                  onChange={(e) => {
+                    setVisitorName(e.target.value);
+                    setExistingVisitorId(null); // ✅ ADD THIS LINE: Reset ID if they type manually
+                    setShowDropdown(true);
+                  }} 
+                  placeholder="Appointee Full Name" 
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-purple-500" 
+                  autoComplete="off"
+                />
+                
+                {/* Autocomplete Dropdown */}
+                {showDropdown && searchResults.length > 0 && (
+                  <ul className="absolute z-10 w-full bg-white border border-slate-200 rounded-xl mt-1 shadow-lg max-h-48 overflow-y-auto overflow-x-hidden">
+                    {searchResults.map((v) => (
+                      <li 
+                        key={v.visitor_id} 
+                        onClick={() => handleSelectVisitor(v)}
+                        className="p-3 border-b border-slate-50 hover:bg-purple-50 cursor-pointer flex flex-col transition-colors"
+                      >
+                        <span className="text-xs font-bold text-slate-800">{v.name}</span>
+                        <div className="flex justify-between items-center mt-1">
+                          <span className="text-[10px] text-slate-500 font-mono">{v.phone}</span>
+                          <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">{v.id_type}: {v.id_number}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               
               <div className="grid grid-cols-3 gap-2">
@@ -328,8 +476,7 @@ export default function AddVisitorHRPage() {
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">Secure Email Address *</label>
                 <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="candidate@domain.com" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-purple-500" />
-              </div>
-            </div>
+              </div>          
 
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pt-2 border-b border-slate-50 pb-1">Security & Track Verification</h4>
             
@@ -393,43 +540,32 @@ export default function AddVisitorHRPage() {
                       <div className="absolute -left-2 -top-2 w-5 h-5 bg-purple-800 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white shadow-sm">
                         {index + 1}
                       </div>
-                      <div className="flex flex-col gap-3 w-full">
-                        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
-                          <div className='sm:col-span-2'>
-                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Member Full Name *</label>
-                            <input required type="text" value={escort.name} onChange={(e) => handleEscortChange(index, 'name', e.target.value)} placeholder="Enter name" className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" />
-                          </div>
+{/* BOTTOM ROW: ID Type, ID Number, Email */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                          
+                          {/* 1. ID Type Select */}
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Gender *</label>
-                            <select value={escort.gender} onChange={(e) => handleEscortChange(index, 'gender', e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
-                              <option value="Male">Male</option>
-                              <option value="Female">Female</option>
-                              <option value="Non-binary">Non-binary</option>
-                              <option value="Others">Others</option>
-                            </select>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Identification Type *</label>
+                            <select value={escort.idType} onChange={(e) => handleEscortChange(index, 'idType', e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500">
+                              <option value="PAN">PAN Clearance Card</option>
+                              <option value="Passport">Passport Document</option>
+                              <option value="Aadhaar">Aadhaar National ID</option>
+                            </select> 
                           </div>
+
+                          {/* 2. Serial ID Input */}
                           <div>
-                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Nationality *</label>
-                            <select value={escort.nationality} onChange={(e) => handleEscortChange(index, 'nationality', e.target.value)} className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
-                              {NATIONALITIES.map(nat => <option key={nat.label} value={nat.label}>{nat.label}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Contact Phone *</label>
-                            <input required type="tel" value={escort.phone} onChange={(e) => handleEscortChange(index, 'phone', e.target.value)} placeholder="+91 98765 43210" className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500 disabled:bg-slate-50" />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Identification Serial ID *</label>
+                            <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">{escort.idType} Serial ID *</label>
                             <input required type="text" value={escort.govId} onChange={(e) => handleEscortChange(index, 'govId', e.target.value)} placeholder="Enter Serial ID" className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500" />
                           </div>
+
+                          {/* 3. Email Input */}
                           <div>
                             <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Email Address</label>
                             <input type="email" value={escort.email || ''} onChange={(e) => handleEscortChange(index, 'email', e.target.value)} placeholder="e.g. name@domain.com" className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" />
                           </div>
+
                         </div>
-                      </div>
                     </div>
                   ))}
                 </div>

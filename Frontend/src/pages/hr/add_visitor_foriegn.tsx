@@ -266,9 +266,9 @@ export default function AddVisitorForeignPage() {
           nationality: nationality,
           organization: organization || 'Global Delegation',
           designation: designation || 'International Delegate',
-          department: department,
-          visit_type: 'foreign',
-          pass_type: 'One_day',
+          // department: department,
+          // visit_type: 'foreign',
+          // pass_type: 'One_day',
         });
 
         if (visitorError) throw visitorError;
@@ -285,15 +285,16 @@ export default function AddVisitorForeignPage() {
       const { error: visitError } = await supabase.from('visits').insert({
         visit_id: newVisitId,
         visitor_id: activeVisitorId,
-        host_employee_id: hostId, // Explicitly using manual form input
-        created_by_employee_id: currentUser.empId, // Dynamically linked creator
+        host_employee_id: hostId, 
+        created_by_employee_id: currentUser.empId, 
         visit_type: 'Foreign',
         pass_type: 'One_day',
         purpose: finalPurpose,
         start_date: startDate,
         end_date: startDate,
         status: 'Pending',
-        document_url: documentUrl
+        document_url: documentUrl,
+        department: department,
       });
 
       if (visitError) throw visitError;

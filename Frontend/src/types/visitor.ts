@@ -40,6 +40,8 @@ export interface VisitorRecord {
   designation?: string;
   category?: string;
   hostId?: string;
+  actual_out?:string;
+  checked_in_time?: string;
 }
 
 // Support for the Security Verification Module

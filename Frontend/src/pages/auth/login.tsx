@@ -42,7 +42,7 @@ export default function Login() {
       // 3. Route to the correct dashboard
       switch (roleData.role) {
         case 'hr':
-          navigate('/hr');
+          navigate('/hod');
           break;
         case 'security':
           navigate('/security');

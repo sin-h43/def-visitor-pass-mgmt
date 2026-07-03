@@ -156,13 +156,13 @@ export default function App() {
         <Route path="/hod" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><HRDashboard /></ProtectedRoute>} />
         <Route path="/hod/visitormgmt" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><VisitorMgmtPage /></ProtectedRoute>} />
         <Route path="/hod/add_visitor" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><HRAddVisitorPage /></ProtectedRoute>} />
-        <Route path="/hod/hrrep" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><HRRepeatedVisitorLogPage /></ProtectedRoute>} />
+        <Route path="/hod/hodrep" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><HRRepeatedVisitorLogPage /></ProtectedRoute>} />
         <Route path="/hod/add_visitor_general" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><AddVisitorGeneralPage /></ProtectedRoute>} />
         <Route path="/hod/add_visitor_govt" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><AddVisitorGovtPage /></ProtectedRoute>} />
         <Route path="/hod/add_visitor_hr" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><AddVisitorHRPage /></ProtectedRoute>} />
         <Route path="/hod/add_visitor_service" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><AddVisitorServicePage /></ProtectedRoute>} />
         <Route path="/hod/add_visitor_foreign" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><AddVisitorForeignPage /></ProtectedRoute>} />
-        <Route path="/hod/hrrep/:id" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><EnterpriseVisitorProfile /></ProtectedRoute>} />
+        <Route path="/hod/hodrep/:id" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><EnterpriseVisitorProfile /></ProtectedRoute>} />
         <Route path="/hod/analytics" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><AnalyticsPage /></ProtectedRoute>} />
         <Route path="/hod/audit" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><AuditPage /></ProtectedRoute>} />
         <Route path="/hod/settings" element={<ProtectedRoute requiredRole="hr" userRole={userRole} isLoading={isLoading}><HRSettingsPage /></ProtectedRoute>} />

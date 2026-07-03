@@ -29,12 +29,12 @@ export default function DashboardLayout({ children, role, userName, headerAction
     ];
   } else if (role === 'hr') {
     menuItems = [
-      { label: 'Dashboard', icon: LayoutDashboard, path: '/hr' },
-      { label: 'Visitor Management', icon: Users, path: '/hr/visitormgmt' },
-      { label: 'Repeated Visitor Logs', icon: Repeat, path: '/hr/hrrep' },
-      // { label: 'Analytics', icon: BarChart3, path: '/hr/analytics' },
-      { label: 'Audit Logs', icon: FileText, path: '/hr/audit' },
-      { label: 'Settings', icon: Settings, path: '/hr/settings' },
+      { label: 'Dashboard', icon: LayoutDashboard, path: '/hod' },
+      { label: 'Visitor Management', icon: Users, path: '/hod/visitormgmt' },
+      { label: 'Repeated Visitor Logs', icon: Repeat, path: '/hod/hodrep' },
+      // { label: 'Analytics', icon: BarChart3, path: '/hod/analytics' },
+      { label: 'Audit Logs', icon: FileText, path: '/hod/audit' },
+      { label: 'Settings', icon: Settings, path: '/hod/settings' },
     ];
   } else if (role === 'security') {
     menuItems = [

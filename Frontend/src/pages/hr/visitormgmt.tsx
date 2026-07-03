@@ -13,7 +13,7 @@ import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
 
 
 export interface ExtendedVisitorRecord extends VisitorRecord {
-  visitorId: string; // ✅ Capture for emergency action
+  visitorId: string; 
   requestedAt: string;
   visitDate: string;
   passType: string;
@@ -42,12 +42,10 @@ export default function VisitorMgmtPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<ExtendedVisitorRecord | null>(null);
 
-  // ✅ Emergency Revocation State
   const [emergencyModal, setEmergencyModal] = useState<{isOpen: boolean, visitId: string, visitorId: string, name: string} | null>(null);
   const [emergencyReason, setEmergencyReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Unified State for User + Avatar
   const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: 'Loading...', dept: '', avatarUrl: '' });
 
   useEffect(() => {
@@ -138,7 +136,7 @@ export default function VisitorMgmtPage() {
           }
           return {
             id: row.visit_id, 
-            visitorId: row.visitors?.visitor_id || 'N/A', // ✅ Capture for emergency action
+            visitorId: row.visitors?.visitor_id || 'N/A', 
             visitorName: row.visitors?.name || 'Unknown',
             gender: row.visitors?.gender || 'Others',
             phone: row.visitors?.phone || 'N/A',
@@ -151,7 +149,10 @@ export default function VisitorMgmtPage() {
             requestedAt: row.created_at ? new Date(row.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
             visitDate: row.start_date ? new Date(row.start_date).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
             checkoutTime: row.actual_out ? new Date(row.actual_out).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
-            approvedAt: row.updated_at ? new Date(row.updated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
+            
+            // ✅ FIX: Map exactly to approved_at instead of updated_at
+            approvedAt: row.approved_at ? new Date(row.approved_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
+            
             status: row.status || 'Pending',
             passType: row.pass_type ? row.pass_type.replace('_', ' ') : 'One Day',
             expectedOut: endD ? endD.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A',
@@ -188,17 +189,26 @@ export default function VisitorMgmtPage() {
   const handleConfirmAction = async (visitId: string | null, newStatus: 'Approved' | 'Denied' | null, remarkText: string) => {
     if (!visitId || !newStatus) return;
     try {
+      const nowIso = new Date().toISOString();
       const updatePayload: any = { status: newStatus, hr_remarks: remarkText };
       if (newStatus === 'Approved') {
-        updatePayload.approved_at = new Date().toISOString();
+        updatePayload.approved_at = nowIso;
       }
-      const { error } = await supabase
-        .from('visits')
-        .update(updatePayload)
-        .eq('visit_id', visitId);
 
-      if (error) throw error;
+      // ✅ FIX: Optimistic UI - Update array instantly
+      setVisitorLogs(prev => prev.map(log => log.id === visitId ? { 
+        ...log, 
+        status: newStatus, 
+        hr_remarks: remarkText, 
+        approvedAt: newStatus === 'Approved' ? new Date(nowIso).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : log.approvedAt 
+      } : log));
       
+      setRemarkModal({ isOpen: false, visitId: null, action: null, text: '' });
+      setIsDrawerOpen(false); // ✅ Close drawer instantly
+      addNotification('success', `Visitor request has been ${newStatus.toLowerCase()} successfully!`);
+
+      await supabase.from('visits').update(updatePayload).eq('visit_id', visitId);
+
       const targetVisitor = visitorLogs.find(v => v.id === visitId);
       if (targetVisitor) {
         await supabase.from('audit_logs').insert([{
@@ -209,27 +219,23 @@ export default function VisitorMgmtPage() {
           remarks: remarkText ? `HR Decision: ${remarkText}` : `Request ${newStatus} by HR`
         }]);
       }
-      
-      setVisitorLogs(prev => prev.map(log => log.id === visitId ? { ...log, status: newStatus, hr_remarks: remarkText, approvedAt: new Date().toLocaleString('en-GB') } : log));
-      if (selectedVisitor?.id === visitId) {
-        setSelectedVisitor(prev => prev ? { ...prev, status: newStatus, hr_remarks: remarkText, approvedAt: new Date().toLocaleString('en-GB') } : null);
-      }
-      
-      setRemarkModal({ isOpen: false, visitId: null, action: null, text: '' });
-      setIsDrawerOpen(false);
-      addNotification('success', `Visitor request has been ${newStatus.toLowerCase()} successfully!`);
     } catch (err) {
       addNotification('error', "Failed to process status change.");
     }
   };
 
-  // ✅ Emergency Revoke Function
   const handleEmergencyRevoke = async () => {
     if (!emergencyModal || !emergencyReason) return;
     setIsProcessing(true);
     try {
       const now = new Date().toISOString();
       
+      // ✅ Optimistic Update
+      setVisitorLogs(prev => prev.map(log => log.id === emergencyModal.visitId ? { ...log, status: 'Revoked', checkoutTime: new Date(now).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) } : log));
+      setEmergencyModal(null); 
+      setEmergencyReason('');
+      addNotification('success', 'Security alerted! Emergency revocation initiated.');
+
       await supabase.from('visits').update({ status: 'Revoked', actual_out: now }).eq('visit_id', emergencyModal.visitId);
       await supabase.from('visitors').update({ checked_out_time: now }).eq('visitor_id', emergencyModal.visitorId);
       
@@ -254,10 +260,6 @@ export default function VisitorMgmtPage() {
         remarks: `[EMERGENCY REVOCATION BY HR]: ${emergencyReason}`
       }]);
 
-      setEmergencyModal(null); 
-      setEmergencyReason(''); 
-      fetchVisitorLogs(); 
-      addNotification('success', 'Security alerted! Emergency revocation initiated.');
     } catch (error) { 
       console.error(error);
       addNotification('error', 'Failed to process emergency removal.'); 
@@ -268,11 +270,11 @@ export default function VisitorMgmtPage() {
 
   const handleUpdateRemarkOnly = async (visitId: string, remarkText: string) => {
     try {
-      const { error } = await supabase.from('visits').update({ hr_remarks: remarkText }).eq('visit_id', visitId);
-      if (error) throw error;
-      
       setVisitorLogs(prev => prev.map(log => log.id === visitId ? { ...log, hr_remarks: remarkText } : log));
       if (selectedVisitor?.id === visitId) setSelectedVisitor(prev => prev ? { ...prev, hr_remarks: remarkText } : null);
+      
+      const { error } = await supabase.from('visits').update({ hr_remarks: remarkText }).eq('visit_id', visitId);
+      if (error) throw error;
       addNotification('success', "Internal note updated successfully!");
     } catch (error) {
       addNotification('error', "Failed to save note.");
@@ -434,7 +436,6 @@ export default function VisitorMgmtPage() {
               </button>
             </>
           )}
-          {/* ✅ The Emergency Kick-out Button */}
           {row.status === 'Active' && (
             <button onClick={() => setEmergencyModal({isOpen: true, visitId: row.id, visitorId: row.visitorId, name: row.visitorName})} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Emergency Revoke Access">
               <AlertOctagon className="w-4 h-4" />
@@ -674,7 +675,7 @@ export default function VisitorMgmtPage() {
                 })()}
               </div>
 
-              {/* BOTTOM PANEL */}
+              {/* RESTORED BOTTOM PANEL */}
               <div className="p-6 border-t border-slate-100 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                 <div className="flex justify-between items-end mb-2">
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">

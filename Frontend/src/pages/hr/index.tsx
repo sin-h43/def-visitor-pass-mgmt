@@ -10,11 +10,12 @@ import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
 import HRNotificationCenter from './HRNotificationCenter';
 
 export interface ExtendedVisitorRecord extends VisitorRecord {
-  visitorId: string; // ✅ Required for emergency kick-out
+  visitorId: string; 
   requestedAt: string;
   visitDate: string;
   passType: string;
   checkoutTime?: string;
+  approvedAt?: string;
 }
 
 export default function HRDashboard() {
@@ -25,7 +26,6 @@ export default function HRDashboard() {
   
   const [liveAuditLogs, setLiveAuditLogs] = useState<any[]>([]);
 
-  // Modal & Drawer States
   const [panelRemark, setPanelRemark] = useState('');
   const [remarkModal, setRemarkModal] = useState<{ isOpen: boolean; visitId: string | null; action: 'Approved' | 'Denied' | null; text: string; }>({
     isOpen: false, visitId: null, action: null, text: '',
@@ -33,7 +33,6 @@ export default function HRDashboard() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<ExtendedVisitorRecord | null>(null);
 
-  // ✅ Emergency Revocation State
   const [emergencyModal, setEmergencyModal] = useState<{isOpen: boolean, visitId: string, visitorId: string, name: string} | null>(null);
   const [emergencyReason, setEmergencyReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -44,7 +43,6 @@ export default function HRDashboard() {
     status: ['Pending', 'Approved', 'Denied', 'Cleared', 'Active']
   });
   
-  // Dynamic User State
   const [currentUser, setCurrentUser] = useState({ userName: 'Loading...', avatarUrl: '', empId: '' });
 
   useEffect(() => {
@@ -61,10 +59,6 @@ export default function HRDashboard() {
     };
     loadUserProfile();
   }, []);
-
-  // ==========================================
-  // DATA FETCHING & REAL-TIME POLLING
-  // ==========================================
 
   const fetchLiveAuditLogs = async () => {
     try {
@@ -86,8 +80,9 @@ export default function HRDashboard() {
       if (isInitialLoad) setLoading(true);
       const { data, error } = await supabase
         .from('visits')
+        // ✅ FIX: Explicitly request approved_at and actual_out
         .select(`
-          visit_id, visit_type, pass_type, purpose, status, start_date, created_at, hr_remarks,
+          visit_id, visit_type, pass_type, purpose, status, start_date, end_date, created_at, hr_remarks, approved_at, actual_out,
           visitors (visitor_id, name, gender, phone, email, nationality, organization, designation, document_url, dob, id_type, id_number, address),
           host:employees!visits_host_employee_id_fkey (name, role, employee_id), department
         `);
@@ -115,7 +110,7 @@ export default function HRDashboard() {
 
           return {
             id: row.visit_id || '',
-            visitorId: row.visitors?.visitor_id || 'N/A', // ✅ Capture for kick-outs
+            visitorId: row.visitors?.visitor_id || 'N/A', 
             visitorName: row.visitors?.name || 'Unknown',
             gender: row.visitors?.gender || 'Others',
             phone: row.visitors?.phone || '',
@@ -127,6 +122,11 @@ export default function HRDashboard() {
             hostId: row.host?.employee_id || '',
             requestedAt: row.created_at ? new Date(row.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
             visitDate: row.start_date ? new Date(row.start_date).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
+            
+            // ✅ FIX: Map exactly to approved_at
+            approvedAt: row.approved_at ? new Date(row.approved_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
+            checkoutTime: row.actual_out ? new Date(row.actual_out).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
+            
             status: row.status || 'Pending',
             passType: row.pass_type || 'One_day',
             pipeline: uiPipeline,
@@ -171,33 +171,35 @@ export default function HRDashboard() {
     }
   }, [selectedVisitor]);
 
-  // ==========================================
-  // ACTION HANDLERS
-  // ==========================================
-
   const handleUpdateStatus = async (visitId: string | null, newStatus: 'Approved' | 'Denied' | null, remarkText: string) => {
     if (!visitId || !newStatus) return;
     try {
+      const nowIso = new Date().toISOString();
       const updatePayload: any = { status: newStatus, hr_remarks: remarkText };
       if (newStatus === 'Approved') {
-        updatePayload.approved_at = new Date().toISOString();
+        updatePayload.approved_at = nowIso;
       }
+
+      // ✅ FIX: Optimistic UI - Immediately update local state so it vanishes from the tab!
+      setDataList(prev => prev.map(log => log.id === visitId ? { 
+        ...log, 
+        status: newStatus, 
+        hr_remarks: remarkText,
+        approvedAt: newStatus === 'Approved' ? new Date(nowIso).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : log.approvedAt
+      } : log));
       
-      const { error } = await supabase.from('visits').update(updatePayload).eq('visit_id', visitId);
-      if (error) throw error;
+      setRemarkModal({ isOpen: false, visitId: null, action: null, text: '' });
+      setIsDrawerOpen(false); // ✅ Close drawer instantly
+      
+      await supabase.from('visits').update(updatePayload).eq('visit_id', visitId);
       
       await supabase.from('audit_logs').insert([{
         action: newStatus === 'Approved' ? 'approved' : 'rejected',
-        remarks: `HOD${newStatus} visitor pass ${visitId}. Note: ${remarkText || 'No remarks provided.'}`,
+        remarks: `HOD ${newStatus} visitor pass ${visitId}. Note: ${remarkText || 'No remarks provided.'}`,
         performed_by: currentUser.userName, 
         performed_by_role: 'hr'
       }]);
 
-      setDataList(prev => prev.map(log => log.id === visitId ? { ...log, status: newStatus, hr_remarks: remarkText } : log));
-      if (selectedVisitor?.id === visitId) setSelectedVisitor(prev => prev ? { ...prev, status: newStatus, hr_remarks: remarkText } : null);
-      
-      setRemarkModal({ isOpen: false, visitId: null, action: null, text: '' });
-      setIsDrawerOpen(false);
       fetchLiveAuditLogs();
     } catch (err) {
       console.error("Failed to update status", err);
@@ -205,13 +207,17 @@ export default function HRDashboard() {
     }
   };
 
-  // ✅ Emergency Revoke Function
   const handleEmergencyRevoke = async () => {
     if (!emergencyModal || !emergencyReason) return;
     setIsProcessing(true);
     try {
       const now = new Date().toISOString();
       
+      // ✅ Optimistic UI - Vanish from Active Passes Tab
+      setDataList(prev => prev.map(log => log.id === emergencyModal.visitId ? { ...log, status: 'Revoked', checkoutTime: new Date(now).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) } : log));
+      setEmergencyModal(null); 
+      setEmergencyReason('');
+
       await supabase.from('visits').update({ status: 'Revoked', actual_out: now }).eq('visit_id', emergencyModal.visitId);
       await supabase.from('visitors').update({ checked_out_time: now }).eq('visitor_id', emergencyModal.visitorId);
       
@@ -236,11 +242,8 @@ export default function HRDashboard() {
         remarks: `[EMERGENCY REVOCATION BY HOD]: ${emergencyReason}`
       }]);
 
-      setEmergencyModal(null); 
-      setEmergencyReason(''); 
-      fetchVisits(); 
+      fetchVisits(false); 
       fetchLiveAuditLogs();
-      alert('Security alerted! Emergency revocation initiated.');
     } catch (error) { 
       console.error(error);
       alert('Failed to process emergency removal.'); 
@@ -251,11 +254,9 @@ export default function HRDashboard() {
 
   const handleUpdateRemarkOnly = async (visitId: string, remarkText: string) => {
     try {
+      setDataList(prev => prev.map(log => log.id === visitId ? { ...log, hr_remarks: remarkText } : log));
       const { error } = await supabase.from('visits').update({ hr_remarks: remarkText }).eq('visit_id', visitId);
       if (error) throw error;
-      
-      setDataList(prev => prev.map(log => log.id === visitId ? { ...log, hr_remarks: remarkText } : log));
-      if (selectedVisitor?.id === visitId) setSelectedVisitor(prev => prev ? { ...prev, hr_remarks: remarkText } : null);
       alert("Internal note updated successfully!");
     } catch (error) {
       console.error('Error updating remark:', error);
@@ -322,7 +323,6 @@ export default function HRDashboard() {
               <button onClick={() => setRemarkModal({ isOpen: true, visitId: row.id, action: 'Denied', text: row.hr_remarks || '' })} className="p-1 text-rose-600 hover:bg-rose-50 rounded" title="Deny"><X className="w-4 h-4" /></button>
             </>
           )}
-          {/* ✅ The Emergency Kick-out Button */}
           {row.status === 'Active' && (
             <button onClick={() => setEmergencyModal({isOpen: true, visitId: row.id, visitorId: row.visitorId, name: row.visitorName})} className="p-1 text-rose-600 hover:bg-rose-50 rounded transition-colors" title="Emergency Revoke Access">
               <AlertOctagon className="w-4 h-4" />
@@ -620,7 +620,7 @@ export default function HRDashboard() {
             <div className="p-6 border-t border-slate-100 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
               <div className="flex justify-between items-end mb-2">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Internal HR Remarks
+                  Internal HOD Remarks
                 </label>
                 <button 
                   onClick={() => handleUpdateRemarkOnly(selectedVisitor.id, panelRemark)}

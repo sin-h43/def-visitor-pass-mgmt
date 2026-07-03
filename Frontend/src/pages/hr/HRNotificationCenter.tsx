@@ -1,7 +1,6 @@
-// src/components/hr/HRNotificationCenter.tsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, CheckCircle } from 'lucide-react';
+import { Bell, CheckCircle, MailOpen, Check, CheckSquare } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useNotification } from '../../hooks/useNotification';
 
@@ -75,7 +74,9 @@ export default function HRNotificationCenter() {
   // ==========================================
   const handleApproveEmployee = async (user: PendingUser) => {
     try {
+      const generatedEmpId = `EMP-${Math.floor(10000 + Math.random() * 90000)}`;
       const { error: insertError } = await supabase.from('employees').insert([{
+        employee_id: generatedEmpId,
         auth_id: user.auth_id,
         name: user.full_name,
         email: user.email,
@@ -134,14 +135,17 @@ export default function HRNotificationCenter() {
     }
   };
 
-  const handleAuditClick = (logId: string) => {
-    if (!readLogs.includes(logId)) {
-      const newReadLogs = [...readLogs, logId];
-      setReadLogs(newReadLogs);
-      localStorage.setItem('readLogs', JSON.stringify(newReadLogs));
+  // ✅ Toggle Read Status
+  const toggleReadStatus = (e: React.MouseEvent, logId: string) => {
+    e.stopPropagation();
+    let newReadLogs;
+    if (readLogs.includes(logId)) {
+        newReadLogs = readLogs.filter(id => id !== logId);
+    } else {
+        newReadLogs = [...readLogs, logId];
     }
-    setShowNotifications(false);
-    navigate('/hr/audit');
+    setReadLogs(newReadLogs);
+    localStorage.setItem('readLogs', JSON.stringify(newReadLogs));
   };
 
   const markAllAsRead = () => {
@@ -153,6 +157,15 @@ export default function HRNotificationCenter() {
 
   const unreadAuditCount = liveAuditLogs.filter(log => !readLogs.includes(log.id)).length;
   const totalUnread = pendingUsers.length + unreadAuditCount;
+
+  // Sort logs: unread first
+  const sortedAuditLogs = [...liveAuditLogs].sort((a, b) => {
+      const aRead = readLogs.includes(a.id);
+      const bRead = readLogs.includes(b.id);
+      if (aRead && !bRead) return 1;
+      if (!aRead && bRead) return -1;
+      return 0;
+  });
 
   return (
     <div className="relative">
@@ -186,9 +199,9 @@ export default function HRNotificationCenter() {
               {unreadAuditCount > 0 && (
                 <button 
                   onClick={markAllAsRead}
-                  className="text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors"
+                  className="text-[10px] font-bold text-slate-500 hover:text-blue-600 flex items-center transition-colors bg-slate-50 hover:bg-blue-50 px-2 py-1 rounded-md border border-slate-100 hover:border-blue-100"
                 >
-                  Mark all as read
+                  <CheckSquare className="w-3 h-3 mr-1" /> Mark all read
                 </button>
               )}
             </div>
@@ -232,38 +245,48 @@ export default function HRNotificationCenter() {
               )}
 
               {/* 2. SYSTEM AUDIT LOGS */}
-              {liveAuditLogs.length > 0 && (
+              {sortedAuditLogs.length > 0 && (
                 <div className="p-3">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">
                     System Activity
                   </div>
-                  <div className="space-y-1">
-                    {liveAuditLogs.map(log => {
+                  <div className="space-y-2">
+                    {sortedAuditLogs.map(log => {
                       const isRead = readLogs.includes(log.id);
                       return (
                         <div 
                           key={log.id} 
-                          onClick={() => handleAuditClick(log.id)}
-                          className={`group cursor-pointer rounded-xl p-3 transition-all flex items-start gap-3 border ${
+                          className={`relative group rounded-xl p-3 transition-all flex items-start gap-3 border ${
                             isRead 
-                              ? 'bg-transparent border-transparent hover:bg-slate-100' 
-                              : 'bg-white border-slate-200 shadow-sm hover:border-blue-300'
+                              ? 'bg-transparent border-transparent opacity-60 hover:opacity-100 hover:bg-slate-100' 
+                              : 'bg-white border-slate-200 shadow-sm'
                           }`}
                         >
-                          <div className="pt-1.5 shrink-0">
-                            <div className={`w-2 h-2 rounded-full transition-colors ${isRead ? 'bg-slate-300' : 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]'}`} />
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
+                          {/* Unread Dot Indicator */}
+                          {!isRead && (
+                             <div className="absolute top-3 left-3 w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_4px_rgba(59,130,246,0.5)]"></div>
+                          )}
+
+                          <div className="flex-1 min-w-0 pl-3">
                             <div className="flex justify-between items-start mb-1">
                               <span className={`font-bold text-[11px] uppercase tracking-wider transition-colors ${isRead ? 'text-slate-500' : 'text-slate-800'}`}>
                                 {log.action.replace(/_/g, ' ')}
                               </span>
-                              <span className={`text-[10px] font-mono shrink-0 ml-2 ${isRead ? 'text-slate-400' : 'text-blue-500'}`}>
-                                {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
+                              
+                              {/* Read/Unread Toggle Button */}
+                              <div className="flex gap-2">
+                                 <span className={`text-[10px] font-mono shrink-0 mr-1 mt-1 ${isRead ? 'text-slate-400' : 'text-blue-500'}`}>
+                                    {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                 </span>
+                                 <button 
+                                   onClick={(e) => toggleReadStatus(e, log.id)} 
+                                   className={`text-[10px] font-bold px-2 py-1 rounded transition-colors flex items-center opacity-0 group-hover:opacity-100 ${isRead ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-200' : 'text-blue-600 bg-white/50 hover:bg-white border border-blue-100'}`}
+                                 >
+                                   {isRead ? <><MailOpen className="w-3 h-3 mr-1"/> Unread</> : <><Check className="w-3 h-3 mr-1"/> Mark Read</>}
+                                 </button>
+                              </div>
                             </div>
-                            <p className={`text-xs leading-relaxed line-clamp-2 transition-colors ${isRead ? 'text-slate-500' : 'text-slate-700'}`}>
+                            <p className={`text-xs leading-relaxed transition-colors ${isRead ? 'text-slate-500 line-clamp-2' : 'text-slate-700'}`}>
                               {log.remarks}
                             </p>
                           </div>

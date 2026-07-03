@@ -1,4 +1,4 @@
-// pages/hr/repeated_visitors.tsx
+// pages/hod/repeated_visitors.tsx
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RefreshCw, Search } from 'lucide-react';
@@ -151,20 +151,20 @@ export default function HRRepeatedVisitorLogPage() {
   // --- RE-REGISTER LOGIC ---
   const handleReRegister = (profile: VisitorProfile) => {
     let category = 'general';
-    let targetPath = '/hr/add_visitor_general';
+    let targetPath = '/hod/add_visitor_general';
 
     const natLower = (profile.nationality || '').toLowerCase();
     const orgLower = (profile.organization || '').toLowerCase();
 
     if (natLower && natLower !== 'indian') {
       category = 'foreign';
-      targetPath = '/hr/add_visitor_foreign';
+      targetPath = '/hod/add_visitor_foreign';
     } else if (orgLower.includes('govt') || orgLower.includes('defence') || orgLower.includes('ministry') || orgLower.includes('armed')) {
       category = 'govt';
-      targetPath = '/hr/add_visitor_govt';
+      targetPath = '/hod/add_visitor_govt';
     } else if (orgLower.includes('service') || orgLower.includes('vendor')) {
       category = 'service';
-      targetPath = '/hr/add_visitor_service';
+      targetPath = '/hod/add_visitor_service';
     }
 
     const cleanAutofill = {
@@ -256,7 +256,7 @@ export default function HRRepeatedVisitorLogPage() {
             <RefreshCw className="w-3 h-3 mr-1.5" /> Re-Register
           </button>
           <button 
-            onClick={() => navigate(`/hr/hrrep/${row.id}`, { state: { profile: row } })} 
+            onClick={() => navigate(`/hod/hrrep/${row.id}`, { state: { profile: row } })} 
             className="px-3 py-1.5 bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-indigo-100 transition-all border border-indigo-200"
           >
             Full Profile

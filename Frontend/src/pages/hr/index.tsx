@@ -430,21 +430,21 @@ export default function HRDashboard() {
             <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
               <h3 className="font-bold text-slate-800 text-base mb-4">Command Quick Actions</h3>
               <div className="grid grid-cols-1 gap-2">
-                <Link to="/hr/visitormgmt" className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-blue-500 hover:bg-slate-50/50 transition-all group">
+                <Link to="/hod/visitormgmt" className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-blue-500 hover:bg-slate-50/50 transition-all group">
                   <div className="flex items-center text-sm font-medium text-slate-700">
                     <UserPlus className="w-4 h-4 mr-3 text-slate-400 group-hover:text-blue-500" />
                     Launch Visitor Onboarding
                   </div>
                   <span className="text-xs text-slate-400">Go →</span>
                 </Link>
-                <Link to="/hr/hrrep" className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-amber-500 hover:bg-slate-50/50 transition-all group">
+                <Link to="/hod/hrrep" className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-amber-500 hover:bg-slate-50/50 transition-all group">
                   <div className="flex items-center text-sm font-medium text-slate-700">
                     <History className="w-4 h-4 mr-3 text-slate-400 group-hover:text-amber-500" />
                     Review Repeated Manifests
                   </div>
                   <span className="text-xs text-slate-400">View →</span>
                 </Link>
-                <Link to="/hr/audit" className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-purple-500 hover:bg-slate-50/50 transition-all cursor-pointer group">
+                <Link to="/hod/audit" className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-purple-500 hover:bg-slate-50/50 transition-all cursor-pointer group">
                   <div className="flex items-center text-sm font-medium text-slate-700">
                     <Shield className="w-4 h-4 mr-3 text-slate-400 group-hover:text-purple-500" />
                     Full Security Audit Trail

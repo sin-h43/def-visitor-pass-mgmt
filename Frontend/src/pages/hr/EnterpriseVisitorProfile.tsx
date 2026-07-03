@@ -534,7 +534,7 @@ export default function EnterpriseVisitorProfile() {
             </div>
 
             <div className="pt-4 border-t border-slate-100 mt-4">
-              <button onClick={() => navigate('/hr/audit')} className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center">
+              <button onClick={() => navigate('/hod/audit')} className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center">
                 Query Security Ledgers <ChevronRight className="w-4 h-4 ml-1" />
               </button>
             </div>

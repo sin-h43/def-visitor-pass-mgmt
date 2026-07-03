@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, LogOut, Mail, IdCard, Building2, ShieldCheck, Clock } from 'lucide-react';
+import { Camera, LogOut, Mail, IdCard, Building2, ShieldCheck, Clock, Badge } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { fetchAndVerifyEmployee, type EmployeeRecord } from '../../lib/employeeUtils';
 import DashboardLayout from '../layout/DashboardLayout';
@@ -110,7 +110,7 @@ export default function AccountSettings({ role, headerAction }: AccountSettingsP
   }
 
   return (
-    <DashboardLayout role={role} userName={employee?.name || 'User'} headerAction={headerAction}>
+    <DashboardLayout role={role} userName={employee?.name || 'User'} headerAction={headerAction} avatarUrl={employee?.avatar_url}>
       <div className="max-w-3xl mx-auto space-y-6">
 
         <div>
@@ -163,6 +163,10 @@ export default function AccountSettings({ role, headerAction }: AccountSettingsP
             <IdCard className="w-4 h-4 mr-2 text-blue-600" /> Account Information
           </h3>
           <div className="space-y-2 text-sm">
+            <div className="grid grid-cols-3 gap-2">
+              <span className="text-slate-500 flex items-center"><Badge className="w-3.5 h-3.5 mr-1.5" /> Employee ID</span>
+              <span className="col-span-2 font-medium text-slate-900">{employee?.employee_id || 'N/A'}</span>
+            </div>            
             <div className="grid grid-cols-3 gap-2">
               <span className="text-slate-500 flex items-center"><Mail className="w-3.5 h-3.5 mr-1.5" /> Email</span>
               <span className="col-span-2 font-medium text-slate-900">{employee?.email || 'N/A'}</span>

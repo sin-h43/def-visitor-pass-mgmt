@@ -1,17 +1,17 @@
 // components/layout/DashboardLayout.tsx
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Calendar, Bell, LayoutDashboard, UserPlus, FileText, Settings, Shield, BarChart3, Users, PanelLeftClose, PanelLeftOpen, Repeat } from 'lucide-react';
+import { Calendar, Bell, LayoutDashboard, UserPlus, FileText, Settings, Shield, Users, PanelLeftClose, PanelLeftOpen, Repeat } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
   role: 'emp' | 'hr' | 'security';
   userName: string;
   headerAction?: React.ReactNode;
+  avatarUrl?: string;
 }
 
-// 1. ADDED headerAction TO THE DESTRUCTURING HERE
-export default function DashboardLayout({ children, role, userName, headerAction }: LayoutProps) {
+export default function DashboardLayout({ children, role, userName, headerAction, avatarUrl }: LayoutProps) {
   const location = useLocation();
   
   // Managed state for expanding/collapsing navigation bar text
@@ -34,6 +34,7 @@ export default function DashboardLayout({ children, role, userName, headerAction
       { label: 'Repeated Visitor Logs', icon: Repeat, path: '/hr/hrrep' },
       // { label: 'Analytics', icon: BarChart3, path: '/hr/analytics' },
       { label: 'Audit Logs', icon: FileText, path: '/hr/audit' },
+      { label: 'Settings', icon: Settings, path: '/hr/settings' },
     ];
   } else if (role === 'security') {
     menuItems = [
@@ -43,7 +44,7 @@ export default function DashboardLayout({ children, role, userName, headerAction
   }
 
   // Dynamic role title for the top right profile block
-  const roleLabel = role === 'hr' ? 'HR Officer' : role === 'security' ? 'Security Operations' : 'Core Entry Console';
+  // const roleLabel = role === 'hr' ? 'HR Officer' : role === 'security' ? 'Security Operations' : 'Core Entry Console';
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans overflow-hidden relative">
@@ -127,15 +128,25 @@ export default function DashboardLayout({ children, role, userName, headerAction
             {headerAction ? headerAction : <Bell className="w-5 h-5 cursor-pointer hover:text-slate-800" />}
             
             {/* Profile Avatar Context Box */}
-            <div className="flex items-center pl-4 border-l border-slate-200">
-              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs mr-3">
-                {userName.charAt(0)}
-              </div>
-              <div className="text-sm">
-                <p className="font-semibold text-slate-800 leading-none">{userName}</p>
-                <p className="text-xs text-slate-500 mt-1">{roleLabel}</p>
-              </div>
-            </div>
+<div className="flex items-center gap-3">
+  <div className="text-right hidden sm:block">
+    <div className="text-sm font-bold text-slate-900">{userName}</div>
+    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{role}</div>
+  </div>
+  
+  {/* NEW: Render the image if it exists, otherwise fallback to initials */}
+  {avatarUrl ? (
+    <img 
+      src={avatarUrl} 
+      alt={userName} 
+      className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm" 
+    />
+  ) : (
+    <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold shadow-sm">
+      {userName.charAt(0).toUpperCase()}
+    </div>
+  )}
+</div>
 
           </div>
         </header>

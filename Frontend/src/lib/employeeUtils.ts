@@ -10,6 +10,7 @@ export interface EmployeeRecord {
   department: string;
   role: string;
   status?: string;
+  avatar_url?: string;
 }
 
 /**
@@ -28,8 +29,7 @@ export async function fetchAndVerifyEmployee(email: string): Promise<EmployeeRec
   try {
     const { data, error } = await supabase
       .from('employees')
-      // FIX: Removed 'status' from the select query
-      .select('id, auth_id, employee_id, name, email, department, role')
+      .select('id, auth_id, employee_id, name, email, department, role, avatar_url')
       .eq('email', email)
       .single();
 
@@ -144,8 +144,7 @@ export async function getEmployeeById(employeeId: string): Promise<EmployeeRecor
   try {
     const { data, error } = await supabase
       .from('employees')
-      // FIX: Removed 'status' from the select query
-      .select('id, auth_id, employee_id, name, email, department, role')
+      .select('id, auth_id, employee_id, name, email, department, role, avatar_url')
       .eq('id', employeeId)
       .single();
 
@@ -178,8 +177,6 @@ export async function validateEmployeeForVisitorRegistration(email: string): Pro
 
   try {
     const employee = await fetchAndVerifyEmployee(email);
-
-    // FIX: Removed the status check entirely since the column doesn't exist
 
     // Check role if needed (customize based on your business logic)
     // You can restrict registration to specific roles if needed

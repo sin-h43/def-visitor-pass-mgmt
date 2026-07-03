@@ -27,7 +27,7 @@ const PRIORITY_ORDER = { high: 1, medium: 2, low: 3 };
 export default function SecurityDashboard() {
   const navigate = useNavigate();
   
-  const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: 'Loading...', role: '' });
+  const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: 'Loading...', role: '', avatar_url: '' });
   
   const [queue, setQueue] = useState<QueueItemWithDetails[]>([]);
   const [activeCampus, setActiveCampus] = useState<QueueItemWithDetails[]>([]);
@@ -54,7 +54,7 @@ export default function SecurityDashboard() {
         const { data: { user } } = await supabase.auth.getUser();
         if (user?.email) {
           const emp = await fetchAndVerifyEmployee(user.email);
-          setCurrentUser({ id: emp.id, empId: emp.employee_id, name: emp.name, role: emp.role || 'security' });
+          setCurrentUser({ id: emp.id, empId: emp.employee_id, name: emp.name, role: emp.role , avatar_url: emp.avatar_url || '' });
         }
       } catch (err) {
         console.error('Failed to load guard profile', err);
@@ -269,7 +269,7 @@ export default function SecurityDashboard() {
   }
 
   return (
-    <DashboardLayout role="security" userName={currentUser.name} headerAction={<SecurityNotificationCenter />}>
+    <DashboardLayout role="security" userName={currentUser.name} headerAction={<SecurityNotificationCenter />} avatarUrl={currentUser.avatar_url}>
       <div className="max-w-7xl mx-auto space-y-4">
         <div className="flex items-center space-x-3">
           <div className="p-2 bg-slate-900 text-white rounded-lg shadow-sm"><ShieldAlert className="w-6 h-6" /></div>
@@ -286,7 +286,7 @@ export default function SecurityDashboard() {
             <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600"><ShieldAlert size={20} /></div>
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm flex items-center justify-between">
-            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Forensic Alerts</p><p className={`text-2xl font-black mt-1 ${activeCampus.some(v => calculateOverage(v.expected_out).exceeded) ? 'text-rose-600' : 'text-slate-300'}`}>Monitor</p></div>
+            <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Forensic Alerts</p><p className={`text-2xl font-bold mt-1 ${activeCampus.some(v => calculateOverage(v.expected_out).exceeded) ? 'text-rose-800' : 'text-slate-300'}`}>Monitor</p></div>
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${activeCampus.some(v => calculateOverage(v.expected_out).exceeded) ? 'bg-rose-50 text-rose-600 animate-pulse' : 'bg-slate-50 text-slate-400'}`}><AlertOctagon size={20} /></div>
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm flex items-center justify-between">

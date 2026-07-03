@@ -10,7 +10,7 @@ export default function VisitorVerification() {
   const { visitorId } = useParams<{ visitorId: string }>();
   const navigate = useNavigate();
   
-  const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: 'Loading...', role: '' });
+  const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: 'Loading...', role: '' , avatar_url: '' });
   
   const [visitor, setVisitor] = useState<Record<string, any> | null>(null); 
   const [loading, setLoading] = useState(true);
@@ -45,7 +45,8 @@ export default function VisitorVerification() {
             id: emp.id,
             empId: emp.employee_id,
             name: emp.name,
-            role: emp.role || 'security'
+            role: emp.role || 'security',
+            avatar_url: emp.avatar_url || ''
           });
         }
       } catch (err) {
@@ -262,7 +263,7 @@ export default function VisitorVerification() {
   const allDone = steps.filter(s => s.required).every(s => s.completed) && !visitor.is_banned;
 
   return (
-    <DashboardLayout role="security" userName={currentUser.name} headerAction={<SecurityNotificationCenter />}>
+    <DashboardLayout role="security" userName={currentUser.name} headerAction={<SecurityNotificationCenter />} avatarUrl={currentUser.avatar_url}>
       <div className="max-w-7xl mx-auto space-y-4">
         
         <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">

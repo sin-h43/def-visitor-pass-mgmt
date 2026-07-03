@@ -1,5 +1,5 @@
 // components/common/DetailDrawer.tsx
-import { X, FileText, CheckCircle, Activity, ShieldAlert, Cpu, User, Shield, Calendar, Globe, Target } from 'lucide-react';
+import { X, FileText, CheckCircle, Activity, Cpu, User, Target } from 'lucide-react';
 
 interface DetailDrawerProps {
   isOpen: boolean;
@@ -9,7 +9,7 @@ interface DetailDrawerProps {
   onAutofill?: (name: string) => void;
 }
 
-export default function DetailDrawer({ isOpen, onClose, title = "Access Registry Profile", data, onAutofill }: DetailDrawerProps) {
+export default function DetailDrawer({ isOpen, onClose, title = "Access Registry Profile", data }: DetailDrawerProps) {
   if (!isOpen || !data) return null;
 
   // Accurately check if it's an audit log trace vs a standard visitor pass record

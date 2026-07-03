@@ -16,7 +16,7 @@ export default function EnterpriseVisitorProfile() {
   const navigate = useNavigate();
 
   // Current HR User Data
-  const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: 'Loading...' });
+  const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: 'Loading...' , avatarUrl: ''});
 
   const [loading, setLoading] = useState(true);
   const [visitor, setVisitor] = useState<any>(null);
@@ -43,7 +43,7 @@ export default function EnterpriseVisitorProfile() {
         const { data: { user } } = await supabase.auth.getUser();
         if (user?.email) {
           const emp = await fetchAndVerifyEmployee(user.email);
-          setCurrentUser({ id: emp.id, empId: emp.employee_id, name: emp.name });
+          setCurrentUser({ id: emp.id, empId: emp.employee_id, name: emp.name , avatarUrl: emp.avatar_url || ''});
         }
       } catch (err) {
         console.error('Failed to load HR profile', err);
@@ -230,7 +230,7 @@ export default function EnterpriseVisitorProfile() {
   ].sort((a, b) => b.timestamp - a.timestamp);
 
   return (
-    <DashboardLayout role="hr" userName={currentUser.name}>
+    <DashboardLayout role="hr" userName={currentUser.name} avatarUrl={currentUser.avatarUrl || ''}>
       
       {/* 🖨️ PRINT-ONLY BADGE LAYOUT (Hidden on screen) */}
       <div className="hidden print:flex fixed inset-0 bg-white items-center justify-center z-[9999]">

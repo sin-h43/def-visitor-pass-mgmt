@@ -39,7 +39,7 @@ export default function HRDashboard() {
   });
   
   // Dynamic User State
-  const [currentUserName, setCurrentUserName] = useState('Loading...');
+  const [currentUser, setCurrentUser] = useState({ userName: 'Loading...', avatarUrl: '' });
 
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -47,9 +47,9 @@ export default function HRDashboard() {
       if (user?.email) {
         try {
           const emp = await fetchAndVerifyEmployee(user.email);
-          setCurrentUserName(emp.name);
+          setCurrentUser({ userName: emp.name, avatarUrl: emp.avatar_url || '' });
         } catch(e) {
-          setCurrentUserName('HR Admin');
+          setCurrentUser({ userName: 'HR Admin', avatarUrl: '' });
         }
       }
     };
@@ -287,7 +287,7 @@ export default function HRDashboard() {
 
   if (loading) {
     return (
-    <DashboardLayout role="hr" userName={currentUserName}>
+    <DashboardLayout role="hr" userName={currentUser.userName} headerAction={<HRNotificationCenter />} avatarUrl={currentUser.avatarUrl}>
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-pulse flex flex-col items-center">
             <div className="h-8 w-8 bg-blue-600 rounded-full mb-4"></div>
@@ -301,8 +301,10 @@ export default function HRDashboard() {
   return (
     <DashboardLayout 
       role="hr" 
-      userName={currentUserName}
-     headerAction={<HRNotificationCenter />}>
+      userName={currentUser.userName}
+      headerAction={<HRNotificationCenter />}
+      avatarUrl={currentUser.avatarUrl}  
+    >
 
       <div className="max-w-7xl mx-auto space-y-6">
 

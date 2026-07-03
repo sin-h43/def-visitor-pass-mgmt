@@ -2,12 +2,37 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import RegistrationForm from '../../components/common/RegistrationForm';
+import { supabase } from '../../lib/supabase';
+import { useEffect, useState } from 'react';
+import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
 
 export default function AddVisitorGeneralPage() {
   const navigate = useNavigate();
 
+  const [currentUser, setCurrentUser] = useState({ name: 'Loading...', avatarUrl: '' });
+
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.email) return;
+        const employee = await fetchAndVerifyEmployee(user.email);
+        if (employee) {
+          setCurrentUser({
+            name: employee.name,
+            avatarUrl: employee.avatar_url || ''
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load HR profile:', err);
+        setCurrentUser({ name: 'HR Admin', avatarUrl: '' });
+      }
+    };
+    loadUserProfile();
+  }, []);
+
   return (
-    <DashboardLayout role="hr" userName="Sinchana K">
+    <DashboardLayout role="hr" userName={currentUser.name || 'HR Admin'} avatarUrl={currentUser.avatarUrl || ''}>
       <div className="max-w-4xl mx-auto pb-12 font-sans">
         
         {/* Navigation Breadcrumb Row */}

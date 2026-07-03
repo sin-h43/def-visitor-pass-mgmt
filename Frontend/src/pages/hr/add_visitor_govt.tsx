@@ -5,6 +5,8 @@ import { ArrowLeft, Users, UploadCloud, CheckCircle2, Landmark, Search, X } from
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { supabase } from '../../lib/supabase';
 import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
+import HRNotificationCenter from './HRNotificationCenter';
+
 
 const NATIONALITIES = [
   { label: 'Indian', code: '+91' },
@@ -53,9 +55,6 @@ export default function AddVisitorGovtPage() {
 
   const [visitorId, setVisitorId] = useState<string | null>(null);
 
-  // Auth/HR State
-  const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: '', dept: '' });
-
   // Visitor Profile Metadata
   const [visitorName, setVisitorName] = useState(prefillData?.visitorName || '');
   const [gender, setGender] = useState(prefillData?.gender && prefillData.gender !== 'Others' ? prefillData.gender : 'Others');
@@ -81,7 +80,8 @@ export default function AddVisitorGovtPage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploadingText, setUploadingText] = useState('');
 
-  const [currentUserName, setCurrentUserName] = useState('Loading...');
+// ✅ Unified State for User + Avatar
+  const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: 'Loading...', dept: '', avatarUrl: '' });
 
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -90,17 +90,17 @@ export default function AddVisitorGovtPage() {
         if (!user?.email) return;
         const employee = await fetchAndVerifyEmployee(user.email);
         if (employee) {
-          setCurrentUserName(employee.name);
           setCurrentUser({
             uuid: employee.auth_id || employee.id,
             empId: employee.employee_id,
             name: employee.name,
-            dept: employee.department || 'General Unit'
+            dept: employee.department || 'General Unit',
+            avatarUrl: employee.avatar_url || '' // ✅ Capture Avatar
           });
         }
       } catch (err) {
         console.error('Failed to load HR profile:', err);
-        setCurrentUserName('HR Admin');
+        setCurrentUser(prev => ({ ...prev, name: 'HR Admin' }));
       }
     };
     loadUserProfile();
@@ -305,7 +305,7 @@ export default function AddVisitorGovtPage() {
 
   if (success) {
     return (
-      <DashboardLayout role="hr" userName={currentUserName}>
+      <DashboardLayout role="hr" userName={currentUser.name} headerAction={<HRNotificationCenter />} avatarUrl={currentUser.avatarUrl || ''}>
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-8 max-w-4xl shadow-sm text-center animate-fade-in mx-auto mt-10">
           <CheckCircle2 className="w-16 h-16 text-emerald-600 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-emerald-800 mb-2">Government Manifest Authorized Successfully</h2>
@@ -316,7 +316,7 @@ export default function AddVisitorGovtPage() {
   }
 
   return (
-    <DashboardLayout role="hr" userName={currentUserName}>
+    <DashboardLayout role="hr" userName={currentUser.name} headerAction={<HRNotificationCenter />} avatarUrl={currentUser.avatarUrl || ''}>
       <div className="max-w-4xl mx-auto pb-12 font-sans text-slate-800">
         <div className="mb-6">
           <button type="button" onClick={() => navigate(-1)} className="flex items-center text-xs font-bold text-slate-400 hover:text-slate-800 transition-colors">

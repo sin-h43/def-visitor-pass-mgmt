@@ -43,22 +43,32 @@ export default function VisitorMgmtPage() {
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<ExtendedVisitorRecord | null>(null);
-  const [currentUserName, setCurrentUserName] = useState('Loading...');
+// ✅ Unified State for User + Avatar
+  const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: 'Loading...', dept: '', avatarUrl: '' });
 
   useEffect(() => {
     const loadUserProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        try {
-          const emp = await fetchAndVerifyEmployee(user.email);
-          setCurrentUserName(emp.name);
-        } catch(e) {
-          setCurrentUserName('HR Admin');
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.email) return;
+        const employee = await fetchAndVerifyEmployee(user.email);
+        if (employee) {
+          setCurrentUser({
+            uuid: employee.auth_id || employee.id,
+            empId: employee.employee_id,
+            name: employee.name,
+            dept: employee.department || 'General Unit',
+            avatarUrl: employee.avatar_url || '' // ✅ Capture Avatar
+          });
         }
+      } catch (err) {
+        console.error('Failed to load HR profile:', err);
+        setCurrentUser(prev => ({ ...prev, name: 'HR Admin' }));
       }
     };
     loadUserProfile();
   }, []);
+
   const [panelRemark, setPanelRemark] = useState('');
   const [remarkModal, setRemarkModal] = useState<{
     isOpen: boolean;
@@ -386,7 +396,7 @@ export default function VisitorMgmtPage() {
 
   if (loading) {
     return (
-      <DashboardLayout role="hr" userName={currentUserName}>
+      <DashboardLayout role="hr" userName={currentUser.name} avatarUrl={currentUser.avatarUrl || ''}>
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-pulse flex flex-col items-center">
             <div className="h-8 w-8 bg-blue-600 rounded-full mb-4"></div>
@@ -398,7 +408,7 @@ export default function VisitorMgmtPage() {
   }
 
   return (
-    <DashboardLayout role="hr" userName={currentUserName} headerAction={<HRNotificationCenter />}>
+    <DashboardLayout role="hr" userName={currentUser.name} headerAction={<HRNotificationCenter />} avatarUrl={currentUser.avatarUrl || ''}>
       <div className="max-w-7xl mx-auto space-y-8">
         
         <div className="flex items-center space-x-3">

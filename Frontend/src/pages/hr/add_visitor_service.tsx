@@ -5,6 +5,7 @@ import { ArrowLeft, Users, UploadCloud, CheckCircle2, Wrench, Search, X } from '
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { supabase } from '../../lib/supabase';
 import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
+import HRNotificationCenter from './HRNotificationCenter';
 
 const NATIONALITIES = [
   { label: 'Indian', code: '+91' },
@@ -51,9 +52,6 @@ export default function AddVisitorServicePage() {
 
   const [visitorId, setVisitorId] = useState<string | null>(null);
 
-  // Auth/HR State
-  const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: '', dept: '' });
-
   // Visitor Profile Metadata
   const [visitorName, setVisitorName] = useState('');
   const [gender, setGender] = useState('Others');
@@ -78,30 +76,30 @@ export default function AddVisitorServicePage() {
 
   const [file, setFile] = useState<File | null>(null);
   const [uploadingText, setUploadingText] = useState('');
-  const [currentUserName, setCurrentUserName] = useState('Loading...');
 
+const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: 'Loading...', dept: '', avatarUrl: '' });
   const maxAllowedDate = new Date();
   maxAllowedDate.setFullYear(maxAllowedDate.getFullYear() - 12);
   const maxDob = maxAllowedDate.toISOString().split('T')[0];
 
-  useEffect(() => {
+useEffect(() => {
     const loadUserProfile = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user?.email) return;
         const employee = await fetchAndVerifyEmployee(user.email);
         if (employee) {
-          setCurrentUserName(employee.name);
           setCurrentUser({
             uuid: employee.auth_id || employee.id,
             empId: employee.employee_id,
             name: employee.name,
-            dept: employee.department || 'General Unit'
+            dept: employee.department || 'General Unit',
+            avatarUrl: employee.avatar_url || '' // ✅ Capture Avatar
           });
         }
       } catch (err) {
         console.error('Failed to load HR profile:', err);
-        setCurrentUserName('HR Admin');
+        setCurrentUser(prev => ({ ...prev, name: 'HR Admin' }));
       }
     };
     loadUserProfile();
@@ -309,7 +307,7 @@ export default function AddVisitorServicePage() {
 
   if (success) {
       return (
-        <DashboardLayout role="hr" userName={currentUserName}>
+        <DashboardLayout role="hr" userName={currentUser.name} headerAction={<HRNotificationCenter />} avatarUrl={currentUser.avatarUrl}>
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-8 max-w-4xl shadow-sm text-center animate-fade-in mx-auto mt-10">
             <CheckCircle2 className="w-16 h-16 text-amber-600 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-amber-800 mb-2">Service Entry Logged Successfully</h2>
@@ -320,7 +318,7 @@ export default function AddVisitorServicePage() {
     }
 
   return (
-    <DashboardLayout role="hr" userName={currentUserName}>
+    <DashboardLayout role="hr" userName={currentUser.name} headerAction={<HRNotificationCenter />} avatarUrl={currentUser.avatarUrl || ''}>
       <div className="max-w-4xl mx-auto pb-12 font-sans text-slate-800">
         <div className="mb-6">
           <button type="button" onClick={() => navigate(-1)} className="flex items-center text-xs font-bold text-slate-400 hover:text-slate-800 transition-colors">

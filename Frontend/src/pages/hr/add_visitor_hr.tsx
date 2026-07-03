@@ -5,6 +5,7 @@ import { ArrowLeft, Shield, Users, UploadCloud, CheckCircle2 } from 'lucide-reac
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import { supabase } from '../../lib/supabase';
 import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
+import HRNotificationCenter from './HRNotificationCenter';
 
 const NATIONALITIES = [
   { label: 'Indian', code: '+91' },
@@ -36,9 +37,6 @@ export default function AddVisitorHRPage() {
 
   const [existingVisitorId, setExistingVisitorId] = useState<string | null>(null);
 
-  // Auth/HR State
-  const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: '', dept: '' });
-
   // Visitor Profile Metadata
   const [visitorName, setVisitorName] = useState('');
   const [gender, setGender] = useState('Others');
@@ -68,22 +66,32 @@ export default function AddVisitorHRPage() {
   // File Upload State
   const [file, setFile] = useState<File | null>(null);
   const [uploadingText, setUploadingText] = useState('');
-  const [currentUserName, setCurrentUserName] = useState('Loading...');
+
+  const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: 'Loading...', dept: '', avatarUrl: '' });
 
   useEffect(() => {
     const loadUserProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        try {
-          const emp = await fetchAndVerifyEmployee(user.email);
-          setCurrentUserName(emp.name);
-        } catch(e) {
-          setCurrentUserName('HR Admin');
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.email) return;
+        const employee = await fetchAndVerifyEmployee(user.email);
+        if (employee) {
+          setCurrentUser({
+            uuid: employee.auth_id || employee.id,
+            empId: employee.employee_id,
+            name: employee.name,
+            dept: employee.department || 'General Unit',
+            avatarUrl: employee.avatar_url || '' // ✅ Capture Avatar
+          });
         }
+      } catch (err) {
+        console.error('Failed to load HR profile:', err);
+        setCurrentUser(prev => ({ ...prev, name: 'HR Admin' }));
       }
     };
     loadUserProfile();
   }, []);
+
   const maxAllowedDate = new Date();
   maxAllowedDate.setFullYear(maxAllowedDate.getFullYear() - 12);
   const maxDob = maxAllowedDate.toISOString().split('T')[0];
@@ -152,27 +160,6 @@ export default function AddVisitorHRPage() {
     setShowDropdown(false);
   };
 
-  // Fetch Current HR User
-  useEffect(() => {
-    const loadUserProfile = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user?.email) return;
-        const employee = await fetchAndVerifyEmployee(user.email);
-        if (employee) {
-          setCurrentUser({
-            uuid: employee.auth_id || employee.id,
-            empId: employee.employee_id,
-            name: employee.name,
-            dept: employee.department || 'General Unit'
-          });
-        }
-      } catch (err) {
-        console.error('Failed to load HR profile:', err);
-      }
-    };
-    loadUserProfile();
-  }, []);
 
   useEffect(() => {
     const count = Math.max(0, Math.min(headCount, 10));
@@ -333,7 +320,7 @@ export default function AddVisitorHRPage() {
 
   if (success) {
     return (
-      <DashboardLayout role="hr" userName={currentUserName}>
+      <DashboardLayout role="hr" userName={currentUser.name} headerAction={<HRNotificationCenter />} avatarUrl={currentUser.avatarUrl || ''}>
         <div className="bg-purple-50 border border-purple-200 rounded-xl p-8 max-w-4xl shadow-sm text-center animate-fade-in mx-auto mt-10">
           <CheckCircle2 className="w-16 h-16 text-purple-600 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-purple-800 mb-2">HR Registration Committed Successfully</h2>
@@ -344,7 +331,7 @@ export default function AddVisitorHRPage() {
   }
 
   return (
-    <DashboardLayout role="hr" userName={currentUserName}>
+    <DashboardLayout role="hr" userName={currentUser.name} headerAction={<HRNotificationCenter />} avatarUrl={currentUser.avatarUrl || ''}>
       <div className="max-w-4xl mx-auto pb-12 font-sans text-slate-800">
         <div className="mb-6">
           <button type="button" onClick={() => navigate(-1)} className="flex items-center text-xs font-bold text-slate-400 hover:text-slate-800 transition-colors">

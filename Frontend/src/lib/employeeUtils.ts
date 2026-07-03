@@ -11,6 +11,7 @@ export interface EmployeeRecord {
   role: string;
   status?: string;
   avatar_url?: string;
+  avatarUrl?: string; // For backward compatibility with older code
 }
 
 /**

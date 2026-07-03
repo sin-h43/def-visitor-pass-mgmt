@@ -38,7 +38,7 @@ export default function AuditLogsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
     // Dynamic User State
-  const [currentUserName, setCurrentUserName] = useState('Loading...');
+  const [currentUser, setCurrentUser] = useState({ userName: 'Loading...', avatarUrl: '' }  );
 
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -46,9 +46,9 @@ export default function AuditLogsPage() {
       if (user?.email) {
         try {
           const emp = await fetchAndVerifyEmployee(user.email);
-          setCurrentUserName(emp.name);
+          setCurrentUser({ userName: emp.name, avatarUrl: emp.avatar_url || '' });
         } catch(e) {
-          setCurrentUserName('HR Admin');
+          setCurrentUser({ userName: 'HR Admin', avatarUrl: '' });
         }
       }
     };
@@ -338,7 +338,7 @@ const handleApproveEmployee = async (user: any) => {
   ];
 
   return (
-    <DashboardLayout role="hr" userName={currentUserName} headerAction={<HRNotificationCenter/>}>
+    <DashboardLayout role="hr" userName={currentUser.userName} headerAction={<HRNotificationCenter/>} avatarUrl={currentUser.avatarUrl}>
       <div className="max-w-7xl mx-auto space-y-6">
         
         <div className="flex items-center space-x-3">

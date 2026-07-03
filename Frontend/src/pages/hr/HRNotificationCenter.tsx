@@ -1,321 +1,236 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Bell, CheckCircle, MailOpen, Check, CheckSquare } from 'lucide-react';
+import { Bell, CheckCircle, XCircle} from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { useNotification } from '../../hooks/useNotification';
+import { Link } from 'react-router-dom';
 
-interface PendingUser {
+interface PendingRequest {
   id: string;
-  auth_id: string;
   full_name: string;
   email: string;
-  phone: string;
   department: string;
-  status: string;
-  created_at: string;
+  auth_id: string;
+  phone?: string;
+}
+
+interface RecentActivity {
+  id: string;
+  action: string;
+  remarks: string;
+  timestamp: string;
 }
 
 export default function HRNotificationCenter() {
-  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
-  const [liveAuditLogs, setLiveAuditLogs] = useState<any[]>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [readLogs, setReadLogs] = useState<string[]>(JSON.parse(localStorage.getItem('readLogs') || '[]'));
-  
-  const navigate = useNavigate();
-  const { addNotification } = useNotification();
+  const [isOpen, setIsOpen] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // ==========================================
-  // DATA FETCHING & POLLING
-  // ==========================================
-  const fetchPendingUsers = async () => {
+  const fetchData = async () => {
     try {
-      const { data, error } = await supabase
+      // 1. Fetch strictly PENDING requests
+      const { data: requests } = await supabase
         .from('employee_registrations')
         .select('*')
-        .eq('status', 'Pending')
+        .eq('status', 'pending') // <-- This stops approved ghost cards!
         .order('created_at', { ascending: false });
- 
-      if (error) return;
-      if (data) setPendingUsers(data);
-    } catch (err) {
-      console.error('Exception fetching pending users:', err);
-    }
-  };
 
-  const fetchLiveAuditLogs = async () => {
-    try {
-      const { data, error } = await supabase
+      if (requests) setPendingRequests(requests);
+
+      // 2. Fetch Recent Audit Logs
+      const { data: logs } = await supabase
         .from('audit_logs')
         .select('*')
         .order('timestamp', { ascending: false })
-        .limit(15);
-      
-      if (error) throw error;
-      if (data) setLiveAuditLogs(data);
-    } catch (err) {
-      console.error("Error fetching live audit logs:", err);
+        .limit(5);
+
+      if (logs) setRecentActivity(logs);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
     }
   };
 
   useEffect(() => {
-    fetchPendingUsers();
-    fetchLiveAuditLogs();
-
-    const interval = setInterval(() => {
-      fetchPendingUsers();
-      fetchLiveAuditLogs();
-    }, 10000);
-    
+    fetchData();
+    // Silent polling every 30 seconds to keep sync
+    const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  // ==========================================
-  // ACTION HANDLERS
-  // ==========================================
-  const handleApproveEmployee = async (user: PendingUser) => {
+  const handleApprove = async (req: PendingRequest) => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+
+    // 🔥 OPTIMISTIC UI: Instantly vanish the card from the screen!
+    setPendingRequests(prev => prev.filter(r => r.id !== req.id));
+
     try {
       const generatedEmpId = `EMP-${Math.floor(10000 + Math.random() * 90000)}`;
-      const { error: insertError } = await supabase.from('employees').insert([{
+
+      // 1. Create the employee
+      await supabase.from('employees').insert([{
         employee_id: generatedEmpId,
-        auth_id: user.auth_id,
-        name: user.full_name,
-        email: user.email,
-        phone: user.phone,
-        department: user.department,
-        role: 'employee' 
+        auth_id: req.auth_id,
+        name: req.full_name,
+        email: req.email,
+        phone: req.phone || '',
+        department: req.department,
+        role: 'employee'
       }]);
-  
-      if (insertError) throw insertError;
-  
-      const { error: updateError } = await supabase
-        .from('employee_registrations')
-        .update({ status: 'approved' })
-        .eq('id', user.id);
-  
-      if (updateError) throw updateError;
-  
+
+      // 2. Mark as approved in DB
+      await supabase.from('employee_registrations').update({ status: 'approved' }).eq('id', req.id);
+
+      // 3. Log activity
       await supabase.from('audit_logs').insert([{
         action: 'account_approved',
-        remarks: `HOD authorized portal access for ${user.full_name} (${user.department})`,
-        performed_by: 'HOD Admin', 
+        remarks: `HOD authorized portal access for ${req.full_name} (${req.department})`,
+        performed_by: 'HR/HOD Admin',
         performed_by_role: 'hr'
       }]);
-  
-      addNotification('success', `Access approved for ${user.full_name}`);
-      fetchPendingUsers(); 
-      fetchLiveAuditLogs(); 
+
+      // Refresh activity list silently
+      fetchData();
     } catch (error) {
-      addNotification('error', "Failed to approve user. Check console for details.");
+      console.error('Failed to approve:', error);
+      // If it fails, we fetch data to bring the card back
+      fetchData();
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const handleRejectEmployee = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to decline access for ${name}?`)) return;
-    
+  const handleDecline = async (req: PendingRequest) => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+
+    // 🔥 OPTIMISTIC UI: Instantly vanish the card
+    setPendingRequests(prev => prev.filter(r => r.id !== req.id));
+
     try {
-      const { error: updateError } = await supabase
-        .from('employee_registrations')
-        .update({ status: 'rejected' })
-        .eq('id', id);
-  
-      if (updateError) throw updateError;
-  
+      await supabase.from('employee_registrations').update({ status: 'rejected' }).eq('id', req.id);
+
       await supabase.from('audit_logs').insert([{
         action: 'account_rejected',
-        remarks: `HOD declined portal access request for ${name}.`,
-        performed_by: 'HOD Admin', 
+        remarks: `HR declined portal access request for ${req.full_name}.`,
+        performed_by: 'HR Admin',
         performed_by_role: 'hr'
       }]);
-  
-      addNotification('success', `Access declined for ${name}`);
-      fetchPendingUsers();
-      fetchLiveAuditLogs();
+
+      fetchData();
     } catch (error) {
-      addNotification('error', "Failed to reject user. Check console for details.");
+      console.error('Failed to decline:', error);
+      fetchData();
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  // ✅ Toggle Read Status
-  const toggleReadStatus = (e: React.MouseEvent, logId: string) => {
-    e.stopPropagation();
-    let newReadLogs;
-    if (readLogs.includes(logId)) {
-        newReadLogs = readLogs.filter(id => id !== logId);
-    } else {
-        newReadLogs = [...readLogs, logId];
-    }
-    setReadLogs(newReadLogs);
-    localStorage.setItem('readLogs', JSON.stringify(newReadLogs));
+  const formatAction = (action: string) => {
+    if (action.includes('reject') || action.includes('denied')) return { label: 'REJECTED', color: 'text-rose-600' };
+    if (action.includes('approve')) return { label: 'ACCOUNT APPROVED', color: 'text-emerald-600' };
+    if (action.includes('create') || action.includes('pending')) return { label: 'PENDING', color: 'text-amber-600' };
+    return { label: action.replace(/_/g, ' ').toUpperCase(), color: 'text-slate-600' };
   };
-
-  const markAllAsRead = () => {
-    const allLogIds = liveAuditLogs.map(log => log.id);
-    const combined = Array.from(new Set([...readLogs, ...allLogIds]));
-    setReadLogs(combined);
-    localStorage.setItem('readLogs', JSON.stringify(combined));
-  };
-
-  const unreadAuditCount = liveAuditLogs.filter(log => !readLogs.includes(log.id)).length;
-  const totalUnread = pendingUsers.length + unreadAuditCount;
-
-  // Sort logs: unread first
-  const sortedAuditLogs = [...liveAuditLogs].sort((a, b) => {
-      const aRead = readLogs.includes(a.id);
-      const bRead = readLogs.includes(b.id);
-      if (aRead && !bRead) return 1;
-      if (!aRead && bRead) return -1;
-      return 0;
-  });
 
   return (
     <div className="relative">
-      <button 
-        onClick={() => setShowNotifications(!showNotifications)}
-        className="relative p-2 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="relative p-2 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition-colors shadow-sm focus:outline-none"
       >
         <Bell className="w-5 h-5 text-slate-700" />
-        {totalUnread > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white border-2 border-white shadow-sm animate-pulse">
-            {totalUnread > 9 ? '9+' : totalUnread}
+        {pendingRequests.length > 0 && (
+          <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white border-2 border-white shadow-sm">
+            {pendingRequests.length}
           </span>
         )}
       </button>
 
-      {showNotifications && (
+      {isOpen && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-          <div className="absolute right-0 mt-3 w-[420px] bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden origin-top-right animate-fade-in text-left flex flex-col max-h-[85vh]">
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute right-0 mt-3 w-96 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[80vh]">
             
-            {/* Header Panel */}
-            <div className="p-4 border-b border-slate-100 bg-white flex justify-between items-center shrink-0 shadow-[0_4px_15px_-10px_rgba(0,0,0,0.05)] z-10">
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-slate-900 text-sm">Notifications</h3>
-                {totalUnread > 0 && (
-                  <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">
-                    {totalUnread} New
-                  </span>
-                )}
-              </div>
-              {unreadAuditCount > 0 && (
-                <button 
-                  onClick={markAllAsRead}
-                  className="text-[10px] font-bold text-slate-500 hover:text-blue-600 flex items-center transition-colors bg-slate-50 hover:bg-blue-50 px-2 py-1 rounded-md border border-slate-100 hover:border-blue-100"
-                >
-                  <CheckSquare className="w-3 h-3 mr-1" /> Mark all read
-                </button>
-              )}
+            <div className="p-4 border-b border-slate-100 bg-white shadow-sm z-10">
+              <h3 className="font-bold text-slate-900 text-sm">Notifications</h3>
             </div>
-            
-            <div className="overflow-y-auto custom-scrollbar bg-slate-50/50 flex-1">
+
+            <div className="overflow-y-auto bg-slate-50/50 flex-1 p-4 space-y-6">
               
-              {/* 1. CRITICAL: PENDING APPROVALS */}
-              {pendingUsers.length > 0 && (
-                <div className="p-3 border-b border-slate-100 bg-blue-50/30">
-                  <div className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-3 px-1 flex items-center">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-2 animate-pulse" />
-                    Action Required ({pendingUsers.length})
-                  </div>
-                  <div className="space-y-2">
-                    {pendingUsers.map(user => (
-                      <div key={user.id} className="bg-white border border-blue-200/60 rounded-xl p-3 shadow-sm hover:shadow-md transition-all">
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <h4 className="font-bold text-slate-900 text-sm leading-tight">{user.full_name}</h4>
-                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">{user.email}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
+              {/* ACTION REQUIRED SECTION */}
+              <div>
+                <h4 className="text-[10px] font-bold text-blue-600 uppercase tracking-wider flex items-center mb-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mr-2"></span>
+                  Action Required ({pendingRequests.length})
+                </h4>
+                
+                <div className="space-y-3">
+                  {pendingRequests.length === 0 ? (
+                    <p className="text-xs text-slate-400 font-medium italic">No pending requests.</p>
+                  ) : (
+                    pendingRequests.map(req => (
+                      <div key={req.id} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+                        <h5 className="font-bold text-slate-900 text-sm">{req.full_name}</h5>
+                        <p className="text-xs text-slate-500 mb-0.5">{req.email}</p>
+                        <p className="text-xs text-slate-400 font-mono mb-3">Dept: {req.department}</p>
+                        
+                        <div className="flex gap-2">
                           <button 
-                            onClick={() => handleRejectEmployee(user.id, user.full_name)}
-                            className="flex-1 py-1.5 bg-white hover:bg-red-50 text-slate-600 hover:text-red-600 font-bold text-[11px] rounded-lg border border-slate-200 transition-colors"
+                            onClick={() => handleDecline(req)}
+                            disabled={isProcessing}
+                            className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold rounded-lg flex items-center justify-center transition-colors"
                           >
-                            Decline
+                            <XCircle className="w-3.5 h-3.5 mr-1" /> Decline
                           </button>
                           <button 
-                            onClick={() => handleApproveEmployee(user)}
-                            className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] rounded-lg shadow-sm transition-colors"
+                            onClick={() => handleApprove(req)}
+                            disabled={isProcessing}
+                            className="flex-1 py-2 bg-blue-600 text-white hover:bg-blue-700 text-xs font-bold rounded-lg flex items-center justify-center transition-colors shadow-sm"
                           >
-                            Approve Access
+                            <CheckCircle className="w-3.5 h-3.5 mr-1" /> Approve
                           </button>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    ))
+                  )}
                 </div>
-              )}
+              </div>
 
-              {/* 2. SYSTEM AUDIT LOGS */}
-              {sortedAuditLogs.length > 0 && (
-                <div className="p-3">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">
-                    System Activity
-                  </div>
-                  <div className="space-y-2">
-                    {sortedAuditLogs.map(log => {
-                      const isRead = readLogs.includes(log.id);
-                      return (
-                        <div 
-                          key={log.id} 
-                          className={`relative group rounded-xl p-3 transition-all flex items-start gap-3 border ${
-                            isRead 
-                              ? 'bg-transparent border-transparent opacity-60 hover:opacity-100 hover:bg-slate-100' 
-                              : 'bg-white border-slate-200 shadow-sm'
-                          }`}
-                        >
-                          {/* Unread Dot Indicator */}
-                          {!isRead && (
-                             <div className="absolute top-3 left-3 w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_4px_rgba(59,130,246,0.5)]"></div>
-                          )}
-
-                          <div className="flex-1 min-w-0 pl-3">
-                            <div className="flex justify-between items-start mb-1">
-                              <span className={`font-bold text-[11px] uppercase tracking-wider transition-colors ${isRead ? 'text-slate-500' : 'text-slate-800'}`}>
-                                {log.action.replace(/_/g, ' ')}
-                              </span>
-                              
-                              {/* Read/Unread Toggle Button */}
-                              <div className="flex gap-2">
-                                 <span className={`text-[10px] font-mono shrink-0 mr-1 mt-1 ${isRead ? 'text-slate-400' : 'text-blue-500'}`}>
-                                    {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                 </span>
-                                 <button 
-                                   onClick={(e) => toggleReadStatus(e, log.id)} 
-                                   className={`text-[10px] font-bold px-2 py-1 rounded transition-colors flex items-center opacity-0 group-hover:opacity-100 ${isRead ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-200' : 'text-blue-600 bg-white/50 hover:bg-white border border-blue-100'}`}
-                                 >
-                                   {isRead ? <><MailOpen className="w-3 h-3 mr-1"/> Unread</> : <><Check className="w-3 h-3 mr-1"/> Mark Read</>}
-                                 </button>
-                              </div>
-                            </div>
-                            <p className={`text-xs leading-relaxed transition-colors ${isRead ? 'text-slate-500 line-clamp-2' : 'text-slate-700'}`}>
-                              {log.remarks}
-                            </p>
-                          </div>
+              {/* RECENT ACTIVITY SECTION */}
+              <div>
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+                  Recent System Activity
+                </h4>
+                
+                <div className="space-y-2">
+                  {recentActivity.map(log => {
+                    const statusInfo = formatAction(log.action);
+                    return (
+                      <div key={log.id} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className={`text-[10px] font-bold uppercase ${statusInfo.color}`}>
+                            {statusInfo.label}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
                         </div>
-                      );
-                    })}
-                  </div>
+                        <p className="text-xs text-slate-600 font-medium line-clamp-2">
+                          {log.remarks}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
+            </div>
 
-              {pendingUsers.length === 0 && liveAuditLogs.length === 0 && (
-                <div className="py-12 text-center text-slate-400">
-                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
-                    <CheckCircle className="w-6 h-6 text-slate-300" />
-                  </div>
-                  <p className="text-sm font-semibold text-slate-600">You're all caught up</p>
-                  <p className="text-xs mt-1">No new activity to review.</p>
-                </div>
-              )}
+            <div className="p-3 border-t border-slate-100 bg-slate-50 text-center">
+              <Link to="/hr/audit" onClick={() => setIsOpen(false)} className="text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors">
+                View Full Audit History →
+              </Link>
             </div>
-            
-            <div className="p-3 border-t border-slate-100 bg-slate-50 text-center shrink-0">
-              <button 
-                onClick={() => { setShowNotifications(false); navigate('/hr/audit'); }}
-                className="text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors"
-              >
-                View All Audit History &rarr;
-              </button>
-            </div>
+
           </div>
         </>
       )}

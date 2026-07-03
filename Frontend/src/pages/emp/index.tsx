@@ -21,7 +21,7 @@ export default function EmployeeDashboard() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
 
-  const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: '', dept: '' });
+  const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: '', dept: '' , avatarUrl: ''});
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -33,7 +33,8 @@ export default function EmployeeDashboard() {
             id: emp.id,             
             empId: emp.employee_id, 
             name: emp.name, 
-            dept: emp.department || 'General Unit' 
+            dept: emp.department || 'General Unit',
+            avatarUrl: emp.avatar_url || '' 
           });
         } catch (error) {
           console.error("Failed to load employee identity", error);
@@ -169,7 +170,7 @@ export default function EmployeeDashboard() {
   const handleView = (visitor: VisitorRecord) => { setSelectedVisitor(visitor); setIsDrawerOpen(true); };
 
   return (
-    <DashboardLayout role="emp" userName={currentUser.name} headerAction={<EmpNotificationCenter />}>
+    <DashboardLayout role="emp" userName={currentUser.name} headerAction={<EmpNotificationCenter />} avatarUrl={currentUser.avatarUrl || ''}>
       <div className="max-w-7xl mx-auto">
         <div className="mb-6 flex justify-between items-center">
           <div>

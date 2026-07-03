@@ -19,7 +19,7 @@ export default function EmployeeRepeatedVisitorLogPage() {
   const [activeTab, setActiveTab] = useState('All Visitors');
   
   // ✅ FIX: Store both IDs
-  const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: '', dept: '' });
+  const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: '', dept: '', avatarUrl: '' });
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<VisitorProfile | null>(null);
 
@@ -29,7 +29,7 @@ export default function EmployeeRepeatedVisitorLogPage() {
       if (user?.email) {
         try {
           const emp = await fetchAndVerifyEmployee(user.email);
-          setCurrentUser({ id: emp.id, empId: emp.employee_id, name: emp.name, dept: emp.department || 'General Unit' });
+          setCurrentUser({ id: emp.id, empId: emp.employee_id, name: emp.name, dept: emp.department || 'General Unit', avatarUrl: emp.avatar_url || '' });
         } catch (e) {
           console.error("Failed to load emp profile", e);
         }
@@ -128,7 +128,7 @@ export default function EmployeeRepeatedVisitorLogPage() {
 
   if (loading) {
     return (
-      <DashboardLayout role="emp" userName={currentUser.name}>
+      <DashboardLayout role="emp" userName={currentUser.name} avatarUrl={currentUser.avatarUrl || ''}>
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-pulse flex flex-col items-center">
             <div className="h-8 w-8 bg-indigo-600 rounded-full mb-4"></div>
@@ -140,7 +140,7 @@ export default function EmployeeRepeatedVisitorLogPage() {
   }
 
   return (
-    <DashboardLayout role="emp" userName={currentUser.name} headerAction={<EmpNotificationCenter />}>
+    <DashboardLayout role="emp" userName={currentUser.name} headerAction={<EmpNotificationCenter />} avatarUrl={currentUser.avatarUrl || ''}>
       <div className="max-w-7xl mx-auto space-y-6 pb-12">
         <div className="flex items-center space-x-3">
           <div><h1 className="text-2xl font-bold text-slate-800 tracking-tight">My Visitor Directory</h1><p className="text-sm text-slate-500">History ledger tracking identities you have previously hosted.</p></div>

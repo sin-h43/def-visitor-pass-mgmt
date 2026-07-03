@@ -18,8 +18,7 @@ export default function DispatchedLogsPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorRecord | null>(null);
 
-  // ✅ FIX: Store both IDs
-  const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: '', dept: '' });
+  const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: '', dept: ''  , avatarUrl: '' });
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -27,7 +26,7 @@ export default function DispatchedLogsPage() {
       if (user?.email) {
         try {
           const emp = await fetchAndVerifyEmployee(user.email);
-          setCurrentUser({ id: emp.id, empId: emp.employee_id, name: emp.name, dept: emp.department || 'General Unit' });
+          setCurrentUser({ id: emp.id, empId: emp.employee_id, name: emp.name, dept: emp.department || 'General Unit', avatarUrl: emp.avatar_url || '' });
         } catch (e) {
           console.error("Failed to fetch EMP identity", e);
         }
@@ -153,7 +152,7 @@ export default function DispatchedLogsPage() {
   }, [logs, searchTerm, selectedFilters]);
 
   return (
-    <DashboardLayout role="emp" userName={currentUser.name} headerAction={<EmpNotificationCenter />}>
+    <DashboardLayout role="emp" userName={currentUser.name} headerAction={<EmpNotificationCenter />} avatarUrl={currentUser.avatarUrl || ''}>
       <div className="max-w-7xl mx-auto">
         
         <div className="mb-6">

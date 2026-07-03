@@ -10,7 +10,7 @@ import { supabase } from '../../lib/supabase';
 
 export default function AddVisitorPage() {
 
-  const [currentUser, setCurrentUser] = useState({ name: 'Loading...' });
+  const [currentUser, setCurrentUser] = useState({ name: 'Loading...', avatarUrl: '' });
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -18,10 +18,10 @@ export default function AddVisitorPage() {
       if (user?.email) {
         try {
           const emp = await  fetchAndVerifyEmployee(user.email);
-          setCurrentUser({ name: emp.name });
+          setCurrentUser({ name: emp.name, avatarUrl: emp.avatar_url || '' });
         } catch (error) {
           console.error("Failed to load employee identity", error);
-          setCurrentUser({ name: 'Employee' }); // Fallback if it fails
+          setCurrentUser({ name: 'Employee', avatarUrl: '' }); // Fallback if it fails
         }
       }
     };
@@ -29,7 +29,7 @@ export default function AddVisitorPage() {
   }, []);
   
   return (
-    <DashboardLayout role="emp" userName={currentUser.name} headerAction={<EmpNotificationCenter />}>
+    <DashboardLayout role="emp" userName={currentUser.name} headerAction={<EmpNotificationCenter />} avatarUrl={currentUser.avatarUrl || ''}>
       <div className="max-w-4xl mx-auto">
         
         {/* Page Navigation/Header */}

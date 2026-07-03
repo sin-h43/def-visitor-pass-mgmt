@@ -123,19 +123,15 @@ export default function SecurityNotificationCenter() {
     setReadAlerts(prev => Array.from(new Set([...prev, ...allIds])));
   };
 
-  // Filter out dismissed, apply read status, and sort
   const processedAlerts = useMemo(() => {
     return alerts
       .filter(a => !dismissedAlerts.includes(a.id))
       .map(a => ({ ...a, isRead: readAlerts.includes(a.id) }))
       .sort((a, b) => {
-        // 1. Unread always floats to the top
         if (a.isRead && !b.isRead) return 1;
         if (!a.isRead && b.isRead) return -1;
-        // 2. Sort by severity (Ban > Forensic > Approval)
         const severity = { ban: 1, forensic: 2, approval: 3 };
         if (severity[a.type] !== severity[b.type]) return severity[a.type] - severity[b.type];
-        // 3. Finally, sort by time
         return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
       });
   }, [alerts, readAlerts, dismissedAlerts]);
@@ -150,7 +146,7 @@ export default function SecurityNotificationCenter() {
       >
         <Bell className="w-5 h-5 text-slate-700" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white border-2 border-white shadow-sm animate-pulse">
+          <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white border-2 border-white shadow-sm animate-pulse">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -159,9 +155,9 @@ export default function SecurityNotificationCenter() {
       {showNotifications && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-          <div className="absolute right-0 mt-3 w-[380px] bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden origin-top-right animate-fade-in text-left flex flex-col max-h-[80vh]">
+          <div className="absolute right-0 mt-3 w-[420px] bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden origin-top-right animate-fade-in text-left flex flex-col max-h-[85vh]">
 
-            <div className="p-4 border-b border-slate-100 bg-white flex justify-between items-center shrink-0">
+            <div className="p-4 border-b border-slate-100 bg-white flex justify-between items-center shrink-0 shadow-[0_4px_15px_-10px_rgba(0,0,0,0.05)] z-10">
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-slate-900 text-sm">Security Feed</h3>
                 {unreadCount > 0 && (
@@ -179,73 +175,71 @@ export default function SecurityNotificationCenter() {
 
             <div className="overflow-y-auto custom-scrollbar bg-slate-50/50 flex-1">
               {processedAlerts.length > 0 ? (
-                <div className="p-3 space-y-2">
+                <div className="p-3 space-y-1">
                   {processedAlerts.map(alert => {
                     const isBan = alert.type === 'ban';
                     const isForensic = alert.type === 'forensic';
                     const isRead = alert.isRead;
                     
-                    let bgColor = 'bg-emerald-50';
-                    let borderColor = 'border-emerald-200';
                     let iconColor = 'text-emerald-500';
+                    let dotColor = 'bg-emerald-500';
                     let Icon = CheckCircle;
 
                     if (isBan) {
-                      bgColor = 'bg-rose-50'; borderColor = 'border-rose-200'; iconColor = 'text-rose-500'; Icon = ShieldAlert;
+                      iconColor = 'text-rose-500'; dotColor = 'bg-rose-500'; Icon = ShieldAlert;
                     } else if (isForensic) {
-                      bgColor = 'bg-amber-50'; borderColor = 'border-amber-200'; iconColor = 'text-amber-500'; Icon = AlertOctagon;
+                      iconColor = 'text-amber-500'; dotColor = 'bg-amber-500'; Icon = AlertOctagon;
                     }
 
                     return (
                       <div
                         key={alert.id}
-                        className={`relative group rounded-xl p-3 transition-all flex flex-col gap-2 border ${
-                          isRead ? 'bg-transparent border-transparent opacity-60 hover:opacity-100 hover:bg-slate-100' : `${bgColor} ${borderColor} shadow-sm`
+                        className={`relative group rounded-xl p-3 transition-all flex items-start gap-3 border ${
+                          isRead ? 'bg-transparent border-transparent opacity-60 hover:opacity-100 hover:bg-slate-100' : 'bg-white border-slate-200 shadow-sm hover:border-slate-300'
                         }`}
                       >
-                        {/* Unread Dot Indicator */}
-                        {!isRead && (
-                          <div className={`absolute top-3 left-3 w-1.5 h-1.5 rounded-full shadow-sm ${isBan ? 'bg-rose-500' : isForensic ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
-                        )}
-
-                        <div className="flex justify-between items-start pl-3">
-                          <div className="flex items-center gap-2">
-                            <Icon className={`w-3.5 h-3.5 ${isRead ? 'text-slate-400' : iconColor}`} />
-                            <span className={`font-bold text-[11px] uppercase tracking-wider ${isRead ? 'text-slate-500' : iconColor}`}>
+                        <div className="pt-1.5 shrink-0 relative">
+                          {!isRead && (
+                             <div className={`absolute -top-1 -left-1 w-2 h-2 rounded-full ${dotColor} shadow-[0_0_4px_rgba(0,0,0,0.2)]`}></div>
+                          )}
+                          <Icon className={`w-4 h-4 ${isRead ? 'text-slate-400' : iconColor}`} />
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start mb-1">
+                            <span className={`font-bold text-[11px] uppercase tracking-wider ${isRead ? 'text-slate-500' : 'text-slate-800'}`}>
                               {alert.title}
                             </span>
-                          </div>
-                          
-                          <div className="flex gap-2">
-                            <span className={`text-[10px] font-mono shrink-0 mr-1 mt-1 ${isRead ? 'text-slate-400' : iconColor}`}>
-                              {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                              <button 
-                                onClick={(e) => toggleReadStatus(e, alert.id)} 
-                                className={`text-[10px] font-bold px-2 py-1 rounded transition-colors flex items-center ${isRead ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-200' : 'text-slate-600 bg-white/50 hover:bg-white border border-slate-200'}`}
-                              >
-                                {isRead ? <><MailOpen className="w-3 h-3 mr-1"/> Unread</> : <><Check className="w-3 h-3 mr-1"/> Mark Read</>}
-                              </button>
-                              <button 
-                                onClick={(e) => handleDismiss(e, alert.id)} 
-                                className="text-[10px] font-bold px-2 py-1 rounded transition-colors flex items-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 bg-white/50 border border-slate-200"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
+                            <div className="flex gap-2 items-center">
+                              <span className={`text-[10px] font-mono shrink-0 ${isRead ? 'text-slate-400' : iconColor}`}>
+                                {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                                <button 
+                                  onClick={(e) => toggleReadStatus(e, alert.id)} 
+                                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-colors flex items-center ${isRead ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-200' : 'text-slate-500 bg-slate-50 hover:bg-slate-100 border border-slate-200'}`}
+                                >
+                                  {isRead ? <MailOpen className="w-3 h-3"/> : <Check className="w-3 h-3"/>}
+                                </button>
+                                <button 
+                                  onClick={(e) => handleDismiss(e, alert.id)} 
+                                  className="text-[10px] font-bold px-1.5 py-0.5 rounded transition-colors flex items-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 bg-slate-50 border border-slate-200"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-
-                        <div className="pl-3">
-                          {alert.visitor_name && (
-                            <div className={`font-bold text-sm ${isRead ? 'text-slate-600' : 'text-slate-900'}`}>
-                              {alert.visitor_name} <span className="text-[10px] font-mono text-slate-400 font-normal ml-1">({alert.visit_id})</span>
-                            </div>
-                          )}
-                          <p className={`text-xs mt-0.5 leading-relaxed ${isRead ? 'text-slate-500 line-clamp-2' : 'text-slate-800'}`}>
-                            {alert.remarks}
-                          </p>
+                          <div className="mt-1">
+                            {alert.visitor_name && (
+                              <div className={`font-bold text-xs ${isRead ? 'text-slate-500' : 'text-slate-900'}`}>
+                                {alert.visitor_name} <span className="text-[10px] font-mono text-slate-400 font-normal ml-1">({alert.visit_id})</span>
+                              </div>
+                            )}
+                            <p className={`text-xs mt-0.5 leading-relaxed ${isRead ? 'text-slate-400 line-clamp-1' : 'text-slate-600 line-clamp-2'}`}>
+                              {alert.remarks}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     );

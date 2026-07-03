@@ -1,7 +1,6 @@
-// File: src/pages/hr/visitormgmt.tsx
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, User, Landmark, Globe, ShieldAlert, Wrench, Eye, CheckCircle, XCircle, X, Shield, Building, FileText, Clock, ShieldCheck } from 'lucide-react';
+import { Users, User, Landmark, Globe, ShieldAlert, Wrench, Eye, CheckCircle, XCircle, X, Shield, Building, FileText, Clock, ShieldCheck, AlertOctagon } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
@@ -14,6 +13,7 @@ import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
 
 
 export interface ExtendedVisitorRecord extends VisitorRecord {
+  visitorId: string; // ✅ Capture for emergency action
   requestedAt: string;
   visitDate: string;
   passType: string;
@@ -21,7 +21,6 @@ export interface ExtendedVisitorRecord extends VisitorRecord {
   approvedAt?: string;
   expectedOut?: string;
   daysLeft?: string;
-
 }
 
 export default function VisitorMgmtPage() {
@@ -29,7 +28,6 @@ export default function VisitorMgmtPage() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   
-  // FIX: Updated to requested tab categories
   const [activeTab, setActiveTab] = useState('All Passes');
 
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
@@ -43,7 +41,13 @@ export default function VisitorMgmtPage() {
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<ExtendedVisitorRecord | null>(null);
-// ✅ Unified State for User + Avatar
+
+  // ✅ Emergency Revocation State
+  const [emergencyModal, setEmergencyModal] = useState<{isOpen: boolean, visitId: string, visitorId: string, name: string} | null>(null);
+  const [emergencyReason, setEmergencyReason] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Unified State for User + Avatar
   const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: 'Loading...', dept: '', avatarUrl: '' });
 
   useEffect(() => {
@@ -57,8 +61,8 @@ export default function VisitorMgmtPage() {
             uuid: employee.auth_id || employee.id,
             empId: employee.employee_id,
             name: employee.name,
-            dept: employee.department || 'General Unit',
-            avatarUrl: employee.avatar_url || '' // ✅ Capture Avatar
+            dept: employee.department || 'HR Department',
+            avatarUrl: employee.avatar_url || '' 
           });
         }
       } catch (err) {
@@ -122,7 +126,7 @@ export default function VisitorMgmtPage() {
             computedCategory = 'Foreign';
           }
           const escortsArray = Array.isArray(row.escorts) ? row.escorts : (row.escorts ? [row.escorts] : []);
-          //Calculate exact Pass Expiry and Days Remaining
+          
           const endD = row.end_date ? new Date(row.end_date) : null;
           let dLeft = 'N/A';
           if (endD) {
@@ -134,6 +138,7 @@ export default function VisitorMgmtPage() {
           }
           return {
             id: row.visit_id, 
+            visitorId: row.visitors?.visitor_id || 'N/A', // ✅ Capture for emergency action
             visitorName: row.visitors?.name || 'Unknown',
             gender: row.visitors?.gender || 'Others',
             phone: row.visitors?.phone || 'N/A',
@@ -150,7 +155,8 @@ export default function VisitorMgmtPage() {
             status: row.status || 'Pending',
             passType: row.pass_type ? row.pass_type.replace('_', ' ') : 'One Day',
             expectedOut: endD ? endD.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A',
-            daysLeft: dLeft,            pipeline: uiPipeline,
+            daysLeft: dLeft,            
+            pipeline: uiPipeline,
             nationality: row.visitors?.nationality || 'Indian',
             organization: row.visitors?.organization || 'N/A',
             designation: row.visitors?.designation || 'N/A',
@@ -196,9 +202,9 @@ export default function VisitorMgmtPage() {
       const targetVisitor = visitorLogs.find(v => v.id === visitId);
       if (targetVisitor) {
         await supabase.from('audit_logs').insert([{
-          visitor_id: targetVisitor.id,
+          visitor_id: targetVisitor.visitorId,
           action: newStatus === 'Approved' ? 'approved' : 'rejected',
-          performed_by: 'HR Officer',
+          performed_by: currentUser.name,
           performed_by_role: 'hr',
           remarks: remarkText ? `HR Decision: ${remarkText}` : `Request ${newStatus} by HR`
         }]);
@@ -214,6 +220,49 @@ export default function VisitorMgmtPage() {
       addNotification('success', `Visitor request has been ${newStatus.toLowerCase()} successfully!`);
     } catch (err) {
       addNotification('error', "Failed to process status change.");
+    }
+  };
+
+  // ✅ Emergency Revoke Function
+  const handleEmergencyRevoke = async () => {
+    if (!emergencyModal || !emergencyReason) return;
+    setIsProcessing(true);
+    try {
+      const now = new Date().toISOString();
+      
+      await supabase.from('visits').update({ status: 'Revoked', actual_out: now }).eq('visit_id', emergencyModal.visitId);
+      await supabase.from('visitors').update({ checked_out_time: now }).eq('visitor_id', emergencyModal.visitorId);
+      
+      await supabase.from('forensic_incidents').insert([{
+        visitor_id: emergencyModal.visitorId, 
+        visit_id: emergencyModal.visitId, 
+        incident_type: 'emergency_revocation', 
+        severity: 'Critical',
+        excess_minutes: 0,
+        reason: `HR INITIATED KICK-OUT: ${emergencyReason}`, 
+        reported_by: currentUser.name || 'HR Desk', 
+        status: 'open'
+      }]);
+
+      await supabase.from('audit_logs').insert([{
+        visitor_id: emergencyModal.visitorId, 
+        action: 'emergency_removal', 
+        performed_by_id: currentUser.empId || 'HR-000', 
+        performed_by: currentUser.name || 'HR Admin',
+        performed_by_role: 'hr', 
+        severity: 'Critical', 
+        remarks: `[EMERGENCY REVOCATION BY HR]: ${emergencyReason}`
+      }]);
+
+      setEmergencyModal(null); 
+      setEmergencyReason(''); 
+      fetchVisitorLogs(); 
+      addNotification('success', 'Security alerted! Emergency revocation initiated.');
+    } catch (error) { 
+      console.error(error);
+      addNotification('error', 'Failed to process emergency removal.'); 
+    } finally { 
+      setIsProcessing(false); 
     }
   };
 
@@ -277,7 +326,6 @@ export default function VisitorMgmtPage() {
       const matchesPipeline = (selectedFilters.pipeline.length === 0) || selectedFilters.pipeline.includes(row.pipeline);
       const matchesStatus = (selectedFilters.status.length === 0) || selectedFilters.status.includes(row.status);
 
-      // FIX: Implemented logic for new tabs
       let matchesTab = true;
       if (activeTab === 'Pending') matchesTab = row.status === 'Pending';
       if (activeTab === 'Active') matchesTab = row.status === 'Active';
@@ -385,6 +433,12 @@ export default function VisitorMgmtPage() {
                 <XCircle className="w-4 h-4" />
               </button>
             </>
+          )}
+          {/* ✅ The Emergency Kick-out Button */}
+          {row.status === 'Active' && (
+            <button onClick={() => setEmergencyModal({isOpen: true, visitId: row.id, visitorId: row.visitorId, name: row.visitorName})} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Emergency Revoke Access">
+              <AlertOctagon className="w-4 h-4" />
+            </button>
           )}
           <button onClick={() => { setSelectedVisitor(row); setIsDrawerOpen(true); }} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Review Full Details">
             <Eye className="w-4 h-4" />
@@ -536,7 +590,6 @@ export default function VisitorMgmtPage() {
                           {selectedVisitor.checkoutTime && (
                             <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Gate Check-Out</span><span className="col-span-2 font-medium text-slate-900 text-rose-600">{selectedVisitor.checkoutTime !== 'N/A' ? selectedVisitor.checkoutTime : 'Pending / NA'}</span></div>
                           )}
-                          {/* ✅ NEW: Pass Tracking Matrix */}
                           <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100"><span className="text-slate-500">Authorized Pass</span><span className="col-span-2 font-black text-slate-800 capitalize tracking-wide">{selectedVisitor.passType}</span></div>
                           <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Expiry Target</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.expectedOut}</span></div>
                           <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Validity Status</span><span className={`col-span-2 font-bold ${selectedVisitor.daysLeft === 'Expired' ? 'text-rose-600' : 'text-emerald-600'}`}>{selectedVisitor.daysLeft}</span></div>
@@ -621,19 +674,22 @@ export default function VisitorMgmtPage() {
                 })()}
               </div>
 
-              {/* RESTORED BOTTOM PANEL */}
+              {/* BOTTOM PANEL */}
               <div className="p-6 border-t border-slate-100 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                 <div className="flex justify-between items-end mb-2">
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
                     Internal HR Remarks
                   </label>
-                  <button onClick={() => handleUpdateRemarkOnly(selectedVisitor.id, panelRemark)} className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded transition-colors">
+                  <button 
+                    onClick={() => handleUpdateRemarkOnly(selectedVisitor.id, panelRemark)}
+                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded transition-colors"
+                  >
                     Save Note
                   </button>
                 </div>
                 
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={panelRemark}
                   onChange={(e) => setPanelRemark(e.target.value)}
                   placeholder="Add context, acceptance reasoning, or decline criteria..."
@@ -642,10 +698,16 @@ export default function VisitorMgmtPage() {
 
                 {selectedVisitor.status === 'Pending' && (
                   <div className="flex gap-3">
-                    <button onClick={() => handleConfirmAction(selectedVisitor.id, 'Denied', panelRemark)} className="flex-1 py-2.5 bg-red-50 text-red-700 font-bold text-xs rounded-xl hover:bg-red-100 border border-red-100 transition-colors">
+                    <button 
+                      onClick={() => handleConfirmAction(selectedVisitor.id, 'Denied', panelRemark)}
+                      className="flex-1 py-2.5 bg-red-50 text-red-700 font-bold text-xs rounded-xl hover:bg-red-100 border border-red-100 transition-colors"
+                    >
                       Decline Access
                     </button>
-                    <button onClick={() => handleConfirmAction(selectedVisitor.id, 'Approved', panelRemark)} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold text-xs rounded-xl hover:bg-emerald-700 shadow-sm transition-colors">
+                    <button 
+                      onClick={() => handleConfirmAction(selectedVisitor.id, 'Approved', panelRemark)}
+                      className="flex-1 py-2.5 bg-emerald-600 text-white font-bold text-xs rounded-xl hover:bg-emerald-700 shadow-sm transition-colors"
+                    >
                       Authorize Access
                     </button>
                   </div>
@@ -656,6 +718,7 @@ export default function VisitorMgmtPage() {
           </div>
         )}
 
+        {/* ✅ Security Remark Approve/Deny Modal */}
         {remarkModal.isOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in">
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform scale-100 transition-all">
@@ -678,11 +741,47 @@ export default function VisitorMgmtPage() {
                 />
 
                 <div className="flex gap-3 mt-5">
-                  <button onClick={() => setRemarkModal({ isOpen: false, visitId: null, action: null, text: '' })} className="flex-1 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors">
+                  <button 
+                    onClick={() => setRemarkModal({ isOpen: false, visitId: null, action: null, text: '' })}
+                    className="flex-1 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors"
+                  >
                     Cancel
                   </button>
-                  <button onClick={() => handleConfirmAction(remarkModal.visitId, remarkModal.action, remarkModal.text)} className={`flex-1 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm transition-all ${remarkModal.action === 'Approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}>
+                  <button 
+                    onClick={() => handleConfirmAction(remarkModal.visitId, remarkModal.action, remarkModal.text)}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm transition-all ${
+                      remarkModal.action === 'Approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
+                    }`}
+                  >
                     Confirm {remarkModal.action}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ✅ HR Emergency Revoke Modal */}
+        {emergencyModal?.isOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border border-rose-100 transform scale-100 transition-all">
+              <div className="p-5 bg-rose-50 border-b border-rose-100 flex justify-between items-center">
+                <div>
+                  <h3 className="font-black text-rose-800 flex items-center"><AlertOctagon className="w-5 h-5 mr-2"/> CRITICAL: Emergency Revocation</h3>
+                  <p className="text-xs text-rose-600 mt-0.5">{emergencyModal.name} ({emergencyModal.visitorId})</p>
+                </div>
+                <button onClick={() => setEmergencyModal(null)} className="text-rose-400 hover:text-rose-700"><X className="w-5 h-5"/></button>
+              </div>
+              <div className="p-5 space-y-4">
+                <p className="text-sm font-medium text-slate-600">This action immediately revokes access, creates a CRITICAL forensic log, and explicitly alerts Security for immediate removal. This cannot be undone.</p>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Reason for Removal (Required)</label>
+                  <textarea autoFocus value={emergencyReason} onChange={e => setEmergencyReason(e.target.value)} rows={3} placeholder="Describe security breach, policy violation, etc..." className="w-full border border-rose-200 rounded-lg p-3 text-sm focus:outline-none focus:border-rose-400 bg-rose-50/50 resize-none"/>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button onClick={() => setEmergencyModal(null)} className="flex-1 py-2.5 font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 border border-slate-200">Cancel</button>
+                  <button onClick={handleEmergencyRevoke} disabled={!emergencyReason || isProcessing} className="flex-1 py-2.5 font-bold text-white bg-rose-600 rounded-lg hover:bg-rose-700 shadow-sm disabled:opacity-50">
+                    {isProcessing ? 'Alerting Security...' : 'Confirm Revocation'}
                   </button>
                 </div>
               </div>

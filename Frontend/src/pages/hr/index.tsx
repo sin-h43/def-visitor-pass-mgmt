@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link  } from 'react-router-dom';
-import { User, Building,Bell, FileText, Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Eye, CheckCircle, X } from 'lucide-react';
+import { User, Building, Bell, FileText, Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Eye, CheckCircle, X, AlertOctagon } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import SearchFilterBar from '../../components/common/SearchFilterBar';
@@ -10,6 +10,7 @@ import { fetchAndVerifyEmployee } from '../../lib/employeeUtils';
 import HRNotificationCenter from './HRNotificationCenter';
 
 export interface ExtendedVisitorRecord extends VisitorRecord {
+  visitorId: string; // ✅ Required for emergency kick-out
   requestedAt: string;
   visitDate: string;
   passType: string;
@@ -32,6 +33,11 @@ export default function HRDashboard() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<ExtendedVisitorRecord | null>(null);
 
+  // ✅ Emergency Revocation State
+  const [emergencyModal, setEmergencyModal] = useState<{isOpen: boolean, visitId: string, visitorId: string, name: string} | null>(null);
+  const [emergencyReason, setEmergencyReason] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
     category: ['Govt', 'Foreign', 'Service', 'General', 'HR'],
     pipeline: ['immediate', 'scheduled', 'repeated'],
@@ -39,7 +45,7 @@ export default function HRDashboard() {
   });
   
   // Dynamic User State
-  const [currentUser, setCurrentUser] = useState({ userName: 'Loading...', avatarUrl: '' });
+  const [currentUser, setCurrentUser] = useState({ userName: 'Loading...', avatarUrl: '', empId: '' });
 
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -47,9 +53,9 @@ export default function HRDashboard() {
       if (user?.email) {
         try {
           const emp = await fetchAndVerifyEmployee(user.email);
-          setCurrentUser({ userName: emp.name, avatarUrl: emp.avatar_url || '' });
+          setCurrentUser({ userName: emp.name, avatarUrl: emp.avatar_url || '', empId: emp.employee_id });
         } catch(e) {
-          setCurrentUser({ userName: 'HR Admin', avatarUrl: '' });
+          setCurrentUser({ userName: 'HR Admin', avatarUrl: '', empId: 'HR-000' });
         }
       }
     };
@@ -75,9 +81,9 @@ export default function HRDashboard() {
     }
   };
 
-  async function fetchVisits() {
+  async function fetchVisits(isInitialLoad = false) {
     try {
-      setLoading(true);
+      if (isInitialLoad) setLoading(true);
       const { data, error } = await supabase
         .from('visits')
         .select(`
@@ -109,6 +115,7 @@ export default function HRDashboard() {
 
           return {
             id: row.visit_id || '',
+            visitorId: row.visitors?.visitor_id || 'N/A', // ✅ Capture for kick-outs
             visitorName: row.visitors?.name || 'Unknown',
             gender: row.visitors?.gender || 'Others',
             phone: row.visitors?.phone || '',
@@ -142,18 +149,18 @@ export default function HRDashboard() {
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
-      setLoading(false);
+      if (isInitialLoad) setLoading(false);
     }
   }
 
   useEffect(() => {
-    fetchVisits();
+    fetchVisits(true);
     fetchLiveAuditLogs();
 
     const interval = setInterval(() => {
-      fetchVisits();
+      fetchVisits(false);
       fetchLiveAuditLogs();
-    }, 10000);
+    }, 30000);
     
     return () => clearInterval(interval);
   }, []);
@@ -182,7 +189,7 @@ export default function HRDashboard() {
       await supabase.from('audit_logs').insert([{
         action: newStatus === 'Approved' ? 'approved' : 'rejected',
         remarks: `HR ${newStatus} visitor pass ${visitId}. Note: ${remarkText || 'No remarks provided.'}`,
-        performed_by: 'HR Admin', 
+        performed_by: currentUser.userName, 
         performed_by_role: 'hr'
       }]);
 
@@ -195,6 +202,50 @@ export default function HRDashboard() {
     } catch (err) {
       console.error("Failed to update status", err);
       alert("Failed to process status change.");
+    }
+  };
+
+  // ✅ Emergency Revoke Function
+  const handleEmergencyRevoke = async () => {
+    if (!emergencyModal || !emergencyReason) return;
+    setIsProcessing(true);
+    try {
+      const now = new Date().toISOString();
+      
+      await supabase.from('visits').update({ status: 'Revoked', actual_out: now }).eq('visit_id', emergencyModal.visitId);
+      await supabase.from('visitors').update({ checked_out_time: now }).eq('visitor_id', emergencyModal.visitorId);
+      
+      await supabase.from('forensic_incidents').insert([{
+        visitor_id: emergencyModal.visitorId, 
+        visit_id: emergencyModal.visitId, 
+        incident_type: 'emergency_revocation', 
+        severity: 'Critical',
+        excess_minutes: 0,
+        reason: `HR INITIATED KICK-OUT: ${emergencyReason}`, 
+        reported_by: currentUser.userName || 'HR Desk', 
+        status: 'open'
+      }]);
+
+      await supabase.from('audit_logs').insert([{
+        visitor_id: emergencyModal.visitorId, 
+        action: 'emergency_removal', 
+        performed_by_id: currentUser.empId || 'HR-000', 
+        performed_by: currentUser.userName || 'HR Admin',
+        performed_by_role: 'hr', 
+        severity: 'Critical', 
+        remarks: `[EMERGENCY REVOCATION BY HR]: ${emergencyReason}`
+      }]);
+
+      setEmergencyModal(null); 
+      setEmergencyReason(''); 
+      fetchVisits(); 
+      fetchLiveAuditLogs();
+      alert('Security alerted! Emergency revocation initiated.');
+    } catch (error) { 
+      console.error(error);
+      alert('Failed to process emergency removal.'); 
+    } finally { 
+      setIsProcessing(false); 
     }
   };
 
@@ -259,7 +310,7 @@ export default function HRDashboard() {
     { key: 'status', label: 'STATUS', render: (row) => {
         if (row.status === 'Approved' || row.status === 'Active') return <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-xs rounded font-medium border border-emerald-200">Active</span>;
         if (row.status === 'Pending') return <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded font-medium border border-amber-200">Pending</span>;
-        if (row.status === 'Denied') return <span className="px-2 py-0.5 bg-rose-100 text-rose-800 text-xs rounded font-medium border border-rose-200">Denied</span>;
+        if (row.status === 'Denied' || row.status === 'Revoked') return <span className="px-2 py-0.5 bg-rose-100 text-rose-800 text-xs rounded font-medium border border-rose-200">{row.status}</span>;
         return <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded border border-slate-200">{row.status}</span>;
       }
     },
@@ -270,6 +321,12 @@ export default function HRDashboard() {
               <button onClick={() => setRemarkModal({ isOpen: true, visitId: row.id, action: 'Approved', text: row.hr_remarks || '' })} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded" title="Approve"><CheckCircle className="w-4 h-4" /></button>
               <button onClick={() => setRemarkModal({ isOpen: true, visitId: row.id, action: 'Denied', text: row.hr_remarks || '' })} className="p-1 text-rose-600 hover:bg-rose-50 rounded" title="Deny"><X className="w-4 h-4" /></button>
             </>
+          )}
+          {/* ✅ The Emergency Kick-out Button */}
+          {row.status === 'Active' && (
+            <button onClick={() => setEmergencyModal({isOpen: true, visitId: row.id, visitorId: row.visitorId, name: row.visitorName})} className="p-1 text-rose-600 hover:bg-rose-50 rounded transition-colors" title="Emergency Revoke Access">
+              <AlertOctagon className="w-4 h-4" />
+            </button>
           )}
           <button onClick={() => handleOpenDrawer(row)} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Open Clearance Drawer"><Eye className="w-4 h-4" /></button>
         </div>
@@ -438,7 +495,7 @@ export default function HRDashboard() {
       </div>
 
       {/* REVIEW SLIDE-OUT DRAWER PORTAL */}
-{isDrawerOpen && selectedVisitor && (
+      {isDrawerOpen && selectedVisitor && (
         <div className="fixed inset-0 z-50 overflow-hidden">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setIsDrawerOpen(false)} />
           
@@ -603,6 +660,7 @@ export default function HRDashboard() {
         </div>
       )}
 
+      {/* ✅ Security Remark Approve/Deny Modal */}
       {remarkModal.isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden transform scale-100 transition-all">
@@ -645,18 +703,41 @@ export default function HRDashboard() {
         </div>
       )}
 
+      {/* ✅ HR Emergency Revoke Modal */}
+      {emergencyModal?.isOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border border-rose-100 transform scale-100 transition-all">
+            <div className="p-5 bg-rose-50 border-b border-rose-100 flex justify-between items-center">
+              <div>
+                <h3 className="font-black text-rose-800 flex items-center"><AlertOctagon className="w-5 h-5 mr-2"/> CRITICAL: Emergency Revocation</h3>
+                <p className="text-xs text-rose-600 mt-0.5">{emergencyModal.name} ({emergencyModal.visitorId})</p>
+              </div>
+              <button onClick={() => setEmergencyModal(null)} className="text-rose-400 hover:text-rose-700"><X className="w-5 h-5"/></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm font-medium text-slate-600">This action immediately revokes access, creates a CRITICAL forensic log, and explicitly alerts Security for immediate removal. This cannot be undone.</p>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Reason for Removal (Required)</label>
+                <textarea autoFocus value={emergencyReason} onChange={e => setEmergencyReason(e.target.value)} rows={3} placeholder="Describe security breach, policy violation, etc..." className="w-full border border-rose-200 rounded-lg p-3 text-sm focus:outline-none focus:border-rose-400 bg-rose-50/50 resize-none"/>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setEmergencyModal(null)} className="flex-1 py-2.5 font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 border border-slate-200">Cancel</button>
+                <button onClick={handleEmergencyRevoke} disabled={!emergencyReason || isProcessing} className="flex-1 py-2.5 font-bold text-white bg-rose-600 rounded-lg hover:bg-rose-700 shadow-sm disabled:opacity-50">
+                  {isProcessing ? 'Alerting Security...' : 'Confirm Revocation'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes slide-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
         .animate-slide-in-right { animation: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         @keyframes fade-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         .animate-fade-in { animation: fade-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        
-        /* Custom scrollbar for the live activity feed */
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: #94a3b8; }
       `}} />
+
     </DashboardLayout>
   );
 }

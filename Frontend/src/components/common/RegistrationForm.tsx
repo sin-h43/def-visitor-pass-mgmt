@@ -1,275 +1,777 @@
-import { useState, useMemo, useEffect } from 'react';
-import { AlertCircle, User, Bell, Send, CheckCircle, Clock, LogOut, Check, MailOpen, CheckSquare, X } from 'lucide-react'; 
-import { useNavigate } from 'react-router-dom';
+// src/components/common/RegistrationForm.tsx
+import { useState, useEffect } from 'react';
+import type {SyntheticEvent} from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { UploadCloud, Users, AlertCircle, CheckCircle2, Search, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { fetchAndVerifyEmployee } from '../../lib/employeeUtils'; 
+import { fetchAndVerifyEmployee, employeeIdExists } from '../../lib/employeeUtils';
 
-export default function EmpNotificationCenter() {
+const NATIONALITIES = [
+  { label: 'Indian', code: '+91' },
+  { label: 'American', code: '+1' },
+  { label: 'British', code: '+44' },
+  { label: 'Canadian', code: '+1' },
+  { label: 'Australian', code: '+61' },
+  { label: 'Singaporean', code: '+65' },
+  { label: 'Japanese', code: '+81' },
+  { label: 'German', code: '+49' },
+  { label: 'French', code: '+33' },
+  { label: 'Other', code: '' }
+];
+
+interface ExistingVisitor {
+  visitor_id: string;
+  name: string;
+  gender: string;
+  dob: string;
+  email: string;
+  phone: string;
+  id_type: string;
+  id_number: string;
+  address: string;
+  organization: string;
+  designation: string;
+  nationality: string;
+}
+
+interface EscortPersonnel {
+  name: string;
+  idType: string;
+  govId: string;
+  email: string;
+  nationality: string;
+  phone: string;
+  gender: string;
+}
+
+export default function RegistrationForm() {
   const navigate = useNavigate();
-  const [shiftData, setShiftData] = useState<any[]>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [currentUser, setCurrentUser] = useState({ id: '', empId: '', name: '', dept: '' });
+  const location = useLocation();
+  const prefillData = location.state?.autofill;
+  
+  const isEdit = location.state?.isEdit; 
+  const existingVisitId = prefillData?.id;
 
-  // Track "Read" status
-  const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('emp_read_notifs');
-    return saved ? JSON.parse(saved) : [];
+  // Form Process States
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  // Field Target Operations
+  const [pipeline, setPipeline] = useState(prefillData?.pipeline === 'Pre-Scheduled' ? 'Pre-Scheduled Visit' : (prefillData?.pipeline === 'Repeated' ? 'Repeated Visitor' : 'New Visitor / Urgent Access'));
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [department, setDepartment] = useState(prefillData?.department || 'Research Wing');
+
+  const [visitorId, setVisitorId] = useState<string | null>(prefillData?.visitorId || null); 
+  const [visitorName, setVisitorName] = useState(prefillData?.visitorName || '');
+  const [gender, setGender] = useState(prefillData?.gender && prefillData.gender !== 'Others' ? prefillData.gender : 'Others');
+  const [dob, setDob] = useState(prefillData?.dob !== 'N/A' ? (prefillData?.dob || '') : '');
+  const [email, setEmail] = useState(prefillData?.email !== 'N/A' ? (prefillData?.email || '') : '');
+  const [phone, setPhone] = useState(prefillData?.phone !== 'N/A' ? (prefillData?.phone || '+91 ') : '+91 ');
+  const [idType, setIdType] = useState(prefillData?.id_type || 'Aadhaar');
+  const [idNumber, setIdNumber] = useState(prefillData?.id_number !== 'N/A' ? (prefillData?.id_number || '') : '');
+  const [address, setAddress] = useState(prefillData?.address !== 'N/A' ? (prefillData?.address || '') : '');
+  const [passType, setPassType] = useState(prefillData?.passType || 'One_day');
+  
+  const [purpose, setPurpose] = useState(() => {
+    if (prefillData?.purpose) return prefillData.purpose.split(' | Accompanying:')[0];
+    return '';
   });
 
-  // ✅ RESTORED: Track "Ignored/Dismissed" status to permanently hide them
-  const [ignoredNotificationIds, setIgnoredNotificationIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('emp_ignored_notifs');
-    return saved ? JSON.parse(saved) : [];
-  });
+  // DYNAMIC USER STATE (Updated to hold UUID)
+  const [currentUser, setCurrentUser] = useState({ uuid: '', empId: '', name: '', dept: '' });
 
+  // UPDATED HOOK: Load user profile with robust error handling
   useEffect(() => {
-    localStorage.setItem('emp_read_notifs', JSON.stringify(readNotificationIds));
-  }, [readNotificationIds]);
-
-  useEffect(() => {
-    localStorage.setItem('emp_ignored_notifs', JSON.stringify(ignoredNotificationIds));
-  }, [ignoredNotificationIds]);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        try {
-          const emp = await fetchAndVerifyEmployee(user.email);
-          setCurrentUser({ id: emp.id, empId: emp.employee_id, name: emp.name, dept: emp.department || 'General Unit' });
-        } catch (error) {
-          console.error("Failed to load employee identity", error);
-        }
-      }
-    };
-    fetchUser();
-  }, []);
-
-  useEffect(() => {
-    if (!currentUser.empId) return;
-    const fetchMyVisits = async () => {
+    const loadUserProfile = async () => {
       try {
-        const { data, error } = await supabase
-          .from('visits')
-          .select(`
-            visit_id, visit_type, department, purpose, status, hr_remarks, start_date, end_date, created_at, actual_out,
-            visitors (visitor_id, gender, name, phone, document_url, address, email, dob, organization, designation, id_type, id_number, nationality, checked_in_time, checked_out_time),
-            escorts(name,phone,id_number,id_type,email,gender)
-          `)
-          .eq('host_employee_id', currentUser.empId)
-          .order('created_at', { ascending: false })
-          .limit(30);
-
-        if (error) throw error;
-        if (data) {
-          const transformed = data.map((row: any) => {
-            let uiPipeline = 'Walk-in';
-            if (row.visit_type === 'PRESCHEDULED' || row.visit_type?.toLowerCase() === 'scheduled') uiPipeline = 'Pre-Scheduled';
-            if (row.visit_type === 'REPEATED' || row.visit_type?.toLowerCase() === 'repeated') uiPipeline = 'Repeated';
-
-            const rawStatus = (row.status || 'Pending').toLowerCase();
-            let currentStatus = 'Pending';
-            if (rawStatus === 'approved') currentStatus = 'Cleared'; 
-            else if (rawStatus === 'denied') currentStatus = 'Denied';
-            else if (rawStatus === 'active') currentStatus = 'Active';
-            else if (rawStatus === 'completed') currentStatus = 'Completed';
-            
-            if ((currentStatus === 'Cleared' || currentStatus === 'Pending') && row.end_date) {
-              if (new Date() > new Date(row.end_date)) currentStatus = 'Expired';
-            }
-            
-            return {
-              id: row.visit_id, visitorName: row.visitors?.name || 'Unknown', gender: row.visitors?.gender || 'N/A',
-              phone: row.visitors?.phone || 'N/A', email: row.visitors?.email || 'N/A', dob: row.visitors?.dob || 'N/A',
-              id_type: row.visitors?.id_type || 'Govt ID', id_number: row.visitors?.id_number || 'N/A', address: row.visitors?.address || 'N/A',
-              pipeline: uiPipeline, department: row.department || "General Unit", purpose: row.purpose || 'General Entry',
-              documentUrl: row.visitors?.document_url || null, hostName: currentUser.name, hostDept: currentUser.dept,
-              escorts: Array.isArray(row.escorts) ? row.escorts : (row.escorts ? [row.escorts] : []),
-              requestDate: new Date(row.start_date || row.created_at).toLocaleString('en-GB'),
-              status: currentStatus, organization: row.visitors?.organization || 'N/A',
-              created_at: row.created_at, hr_remarks: row.hr_remarks || '', actual_out: row.actual_out, checked_in_time: row.visitors?.checked_in_time
-            };
-          });
-          setShiftData(transformed);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.email) {
+          setError('❌ You must be logged in to register a visitor.');
+          return;
         }
-      } catch (err) { console.error("Error fetching notifications:", err); }
-    };
-    
-    fetchMyVisits();
-    const interval = setInterval(fetchMyVisits, 30000); 
-    return () => clearInterval(interval);
-  }, [currentUser.empId]);
 
-  // ✅ Toggle Read/Unread State
-  const toggleReadStatus = (id: string) => {
-    setReadNotificationIds(prev => 
-      prev.includes(id) ? prev.filter(nid => nid !== id) : [...prev, id]
-    );
-  };
+        const employee = await fetchAndVerifyEmployee(user.email);
+        
+        if (!employee.id) {
+          throw new Error('Employee record has no ID. Contact HR.');
+        }
 
-  // ✅ RESTORED: Completely hide from the panel
-  const handleIgnoreNotification = (id: string) => {
-    setIgnoredNotificationIds(prev => [...prev, id]);
-  };
-
-  const markAllAsRead = () => {
-    const allIds = activeNotifications.map(n => n.id);
-    setReadNotificationIds(prev => Array.from(new Set([...prev, ...allIds])));
-  };
-
-  const activeNotifications = useMemo(() => {
-    return shiftData.filter(v => {
-      // Safely filter out the ones the user explicitly dismissed
-      if (ignoredNotificationIds.includes(v.id)) return false;
-
-      const notifyStatuses = ['Denied', 'Cleared', 'Active', 'Completed'];
-      if (!notifyStatuses.includes(v.status)) return false;
-      
-      if (v.status === 'Completed' && v.actual_out) {
-        const outTime = new Date(v.actual_out).getTime();
-        const twelveHoursAgo = new Date().getTime() - (12 * 60 * 60 * 1000);
-        if (outTime < twelveHoursAgo) return false;
+        setCurrentUser({ 
+          uuid: employee.id,
+          empId: employee.employee_id,         
+          name: employee.name, 
+          dept: employee.department || 'General Unit' 
+        });
+        
+        setError(null);
+        
+      } catch (err: any) {
+        setError(err.message || 'Failed to load your employee profile');
       }
-      return true;
-    })
-    .map(v => ({ ...v, isRead: readNotificationIds.includes(v.id) }))
-    .sort((a, b) => {
-      if (a.isRead && !b.isRead) return 1;
-      if (!a.isRead && b.isRead) return -1;
-      if (a.status === 'Denied') return -1;
-      if (b.status === 'Denied') return 1;
-      if (a.status === 'Active') return -1;
-      if (b.status === 'Active') return 1;
-      return 0;
-    });
-  }, [shiftData, readNotificationIds, ignoredNotificationIds]);
+    };
 
-  const unreadCount = activeNotifications.filter(n => !n.isRead).length;
+    loadUserProfile();
+  }, []);
+  
+  const [organization, setOrganization] = useState(prefillData?.organization !== 'N/A' ? (prefillData?.organization || '') : '');
+  const [designation, setDesignation] = useState('');
+  const [nationality, setNationality] = useState(prefillData?.nationality || 'Indian');
+
+  useEffect(() => {
+    if (prefillData) {
+      if (prefillData.designation && prefillData.designation !== 'N/A') {
+        setDesignation(prefillData.designation);
+      }
+      
+      if (prefillData.requestDate && prefillData.pipeline === 'Pre-Scheduled') {
+        try {
+          const [datePart, timePart] = prefillData.requestDate.split(', ');
+          const [day, month, year] = datePart.split('/');
+          const formattedIso = `${year}-${month}-${day}T${timePart.substring(0, 5)}`;
+          setStartDate(formattedIso);
+        } catch (e) {
+          console.error("Failed to format pre-scheduled entry date parameter", e);
+        }
+      }
+    }
+  }, [prefillData]);
+  
+  const [searchResults, setSearchResults] = useState<ExistingVisitor[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const [headCount, setHeadCount] = useState<number>(prefillData?.escorts?.length || 0);
+  const [escorts, setEscorts] = useState<EscortPersonnel[]>(
+    prefillData?.escorts?.map((e: any) => ({ 
+      name: e.name || '', 
+      idType: e.idType || e.id_type || 'Aadhaar',
+      govId: e.govId || e.id_number || e.gov_id || '',  
+      email: e.email || '', 
+      nationality: e.nationality || 'Indian', 
+      phone: e.phone || '', 
+      gender: e.gender || 'Others' 
+    })) || []
+  );
+
+  const [file, setFile] = useState<File | null>(null);
+  const [uploadingText, setUploadingText] = useState('');
+
+  const maxAllowedDate = new Date();
+  maxAllowedDate.setFullYear(maxAllowedDate.getFullYear() - 12);
+  const maxDob = maxAllowedDate.toISOString().split('T')[0];
+
+  useEffect(() => {
+    if (visitorName.trim().length < 2 || visitorId || isEdit) {
+      setSearchResults([]);
+      return;
+    }
+
+    const searchVisitors = async () => {
+      const { data, error } = await supabase
+        .from('visitors')
+        .select('*')
+        .ilike('name', `%${visitorName}%`)
+        .limit(5);
+
+      if (!error && data) {
+        setSearchResults(data as ExistingVisitor[]);
+      }
+    };
+
+    const debounceTimer = setTimeout(searchVisitors, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [visitorName, visitorId, isEdit]);
+
+  const handleSelectVisitor = (visitor: ExistingVisitor) => {
+    setVisitorId(visitor.visitor_id);
+    setVisitorName(visitor.name);
+    setGender(visitor.gender || 'Others');
+    setDob(visitor.dob || '');
+    setEmail(visitor.email || '');
+    setPhone(visitor.phone || '+91 ');
+    setIdType(visitor.id_type || 'Aadhaar');
+    setIdNumber(visitor.id_number || '');
+    setAddress(visitor.address || '');
+    setOrganization(visitor.organization || '');
+    setDesignation(visitor.designation || '');
+    setNationality(visitor.nationality || 'Indian');
+    setShowDropdown(false);
+    
+    if (pipeline !== 'Pre-Scheduled Visit') {
+      setPipeline('Repeated Visitor');
+    }
+  };
+
+  const handleClearSelectedVisitor = () => {
+    setVisitorId(null);
+    setVisitorName('');
+    setGender('Others');
+    setDob('');
+    setEmail('');
+    setPhone('+91 ');
+    setIdType('Aadhaar');
+    setIdNumber('');
+    setAddress('');
+    setOrganization('');
+    setDesignation('');
+    setNationality('Indian');
+    setPipeline('New Visitor / Urgent Access');
+  };
+
+  useEffect(() => {
+    const count = Math.max(0, Math.min(headCount, 10));
+    setEscorts(prev => {
+      const newEscorts = [...prev];
+      if (count > prev.length) {
+        for (let i = prev.length; i < count; i++) {
+          newEscorts.push({ 
+            name: '', 
+            idType: 'Aadhaar', 
+            govId: '', 
+            email: '', 
+            phone: '', 
+            nationality: 'Indian', 
+            gender: 'Others' 
+          });
+        }
+      } else {
+        newEscorts.length = count;
+      }
+      return newEscorts;
+    });
+  }, [headCount]);
+
+  const handleEscortChange = (index: number, field: keyof EscortPersonnel, value: string) => {
+    const updatedEscorts = [...escorts];
+    
+    if (field === 'nationality') {
+      const natData = NATIONALITIES.find(n => n.label === value);
+      updatedEscorts[index] = {
+        ...updatedEscorts[index],
+        nationality: value,
+        phone: natData?.code ? `${natData.code} ` : '' 
+      };
+    } else {
+      updatedEscorts[index] = {
+        ...updatedEscorts[index],
+        [field]: value
+      };
+    }
+    
+    setEscorts(updatedEscorts);
+  };
+
+  const handleNationalityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedNat = e.target.value;
+    setNationality(selectedNat);
+    const natData = NATIONALITIES.find(n => n.label === selectedNat);
+    if (natData && natData.code) {
+      setPhone(`${natData.code} `);
+    }
+  };
+
+  const handleSubmit = async (e: SyntheticEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    
+    if (!currentUser.uuid) {
+      setError('❌ Your employee profile failed to load. Please refresh the page and try again.');
+      return;
+    }
+
+    if (!currentUser.uuid.match(/^[0-9a-f\-]{36}$/)) {
+      setError('❌ Invalid employee ID format. Contact HR.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const empExists = await employeeIdExists(currentUser.uuid);
+      
+      if (!empExists) {
+        setError(`❌ Your employee record does not exist in the system. ID: ${currentUser.uuid}. Please contact HR to activate your account.`);
+        setLoading(false);
+        return;
+      }
+
+      const timestamp = Date.now().toString().slice(-6);
+      const activeVisitId = isEdit ? existingVisitId : `VST${timestamp}`;
+      let activeVisitorId = visitorId;
+
+      let documentUrl = prefillData?.documentUrl || null;
+      if (file) {
+        setUploadingText('Uploading document binary...');
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${activeVisitId}_doc_${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage.from('visitor-documents').upload(fileName, file);
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage.from('visitor-documents').getPublicUrl(fileName);
+        documentUrl = publicUrlData.publicUrl;
+      }
+      
+      setUploadingText(isEdit ? 'Updating corrected records...' : 'Committing secure records...');
+
+      if (isEdit && !activeVisitorId) {
+        const { data: vData } = await supabase.from('visits').select('visitor_id').eq('visit_id', existingVisitId).single();
+        if (vData) activeVisitorId = vData.visitor_id;
+      }
+
+      let finalPurpose = purpose;
+      if (escorts.length > 0) {
+        const guestList = escorts.map(esc => `${esc.name} (${esc.idType}: ${esc.govId})`).join(', ');
+        finalPurpose += ` | Accompanying: ${guestList}`;
+      }
+      
+      const dbVisitType = pipeline === 'Pre-Scheduled Visit' ? 'scheduled' : (pipeline === 'Repeated Visitor' ? 'repeated' : 'immediate');      
+      
+      // ✅ Handle the Dates properly
+      const startDateIso = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
+      const endDateIso = endDate ? new Date(endDate).toISOString() : startDateIso;
+
+      if (isEdit) {
+        if (activeVisitorId) {
+          await supabase.from('visitors').update({
+            name: visitorName, email: email || null, phone: phone, gender: gender || 'Others',
+            dob: dob || null, address: address || null, id_type: idType, id_number: idNumber || 'Pending',
+            nationality: nationality, organization: organization || null, designation: designation || null, department: department || null,
+            ...(documentUrl && { document_url: documentUrl }) 
+          }).eq('visitor_id', activeVisitorId);
+        }
+
+        const { error: updateError } = await supabase.from('visits').update({
+          visit_type: dbVisitType, 
+          purpose: finalPurpose, 
+          start_date: startDateIso, 
+          end_date: endDateIso,
+          pass_type: passType,
+          status: 'Pending',       
+          hr_remarks: null,        
+          department: department
+        }).eq('visit_id', activeVisitId);
+
+        if (updateError) throw updateError;
+
+      } else {
+        if (!activeVisitorId) {
+          const standardGeneratedId = `VIS${timestamp}`;
+          activeVisitorId = standardGeneratedId;
+          const { error: visitorError } = await supabase.from('visitors').insert({
+            visitor_id: standardGeneratedId, name: visitorName, email: email || null, phone: phone,
+            gender: gender || 'Others', dob: dob || null, address: address || null, id_type: idType,
+            id_number: idNumber || 'Pending', nationality: nationality, organization: organization || null,
+            designation: designation || null,
+            document_url: documentUrl
+          });
+          if (visitorError) throw visitorError;
+        } else if (documentUrl) {
+          await supabase.from('visitors').update({ document_url: documentUrl }).eq('visitor_id', activeVisitorId);
+        }
+        
+        if (!currentUser.uuid) throw new Error('Employee ID is missing. Cannot create visit without host employee.');
+        if (!activeVisitorId) throw new Error('Visitor ID is missing. Cannot create visit without visitor.');
+
+        const { error: visitError } = await supabase.from('visits').insert({
+          visit_id: activeVisitId,
+          visitor_id: activeVisitorId,
+          host_employee_id: currentUser.empId,       
+          visit_type: dbVisitType, 
+          pass_type: passType,
+          purpose: finalPurpose, 
+          start_date: startDateIso,
+          end_date: endDateIso,
+          status: 'Pending',
+          department: department,
+          hr_remarks: null,
+        });
+
+        if (visitError) {
+          if (visitError.code === '23503') {
+            if (visitError.message.includes('host_employee_id_fkey')) {
+              throw new Error(`❌ Your employee record does not exist in the system. Employee ID: ${currentUser.uuid}. Please ask HR to verify your account is activated.`);
+            }
+          }
+          throw visitError;
+        }
+      }
+
+      setSuccess(true);
+      setTimeout(() => {
+        navigate('/emp');
+      }, 2000);
+
+    } catch (err: any) {
+      if (err.code === '23503' || err.message.includes('foreign key')) {
+        if (err.message.includes('host_employee_id_fkey')) {
+          setError(`❌ Employee record validation failed. Your ID (${currentUser.uuid}) could not be found in the system. Please contact HR to resolve this issue.`);
+        } else {
+          setError(`❌ Database constraint violation: ${err.message}. Contact HR for assistance.`);
+        }
+      } else {
+        setError(err.message || 'System failed to securely process core entry clearance.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-8 max-w-4xl shadow-sm text-center animate-fade-in mx-auto mt-10">
+        <CheckCircle2 className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold text-emerald-800 mb-2">
+          {isEdit ? 'Request Successfully Resent' : 'Clearance Registration Successful'}
+        </h2>
+        <p className="text-emerald-600 font-medium">The identity matrix and entry pass have been securely routed.</p>
+        <p className="text-xs text-emerald-400 mt-4 font-mono">Routing back to Terminal Dashboard...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative z-50">
-      <button 
-        onClick={() => setShowNotifications(!showNotifications)} 
-        className="relative p-2 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        <Bell className="w-5 h-5 text-slate-700" />
-        {unreadCount > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-[10px] font-bold text-white border-2 border-white shadow-sm animate-pulse">
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </span>
-        )}
-      </button>
-      
-      {showNotifications && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-          <div className="absolute right-0 mt-3 w-[360px] sm:w-[420px] bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in text-left flex flex-col max-h-[85vh]">
-            
-            <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-              <div>
-                <h3 className="font-bold text-slate-800 text-sm">Shift Notifications</h3>
-                <p className="text-[10px] text-slate-500 font-medium">{unreadCount} Unread Alerts</p>
-              </div>
-              {unreadCount > 0 && (
-                <button onClick={markAllAsRead} className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center transition-colors bg-blue-50 px-2 py-1 rounded-md border border-blue-100">
-                  <CheckSquare className="w-3 h-3 mr-1" /> Mark all read
+    <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-4xl shadow-sm font-sans text-slate-800">
+      <div className="border-b border-slate-100 pb-4 mb-5">
+        <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+          {isEdit ? 'Correct & Resend Application' : 'Security Access Registry Form'}
+        </h2>
+        <p className="text-xs text-slate-400 mt-0.5">
+          {isEdit ? 'Fix any errors flagged by HR and resubmit this request for review.' : 'Complete all required deployment identity fields to formulate access pass authorizations.'}
+        </p>
+      </div>
+
+      {error && (
+        <div className="mb-5 bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-xl flex items-center shadow-inner">
+          <AlertCircle className="w-4 h-4 mr-2 shrink-0" />
+          <span className="text-xs font-semibold">{error}</span>
+        </div>
+      )}
+
+      <form className="space-y-5" onSubmit={handleSubmit}>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 border border-slate-200 rounded-xl">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Pass Processing Pipeline *</label>
+            <select 
+              required value={pipeline} onChange={(e) => setPipeline(e.target.value)}
+              className="w-full p-2.5 border border-slate-200 rounded-xl bg-white text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option>New Visitor / Urgent Access</option>
+              <option>Pre-Scheduled Visit</option>
+              <option>Repeated Visitor</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Target Destination Unit *</label>
+            <select 
+              required value={department} onChange={(e) => setDepartment(e.target.value)}
+              className="w-full p-2.5 border border-slate-200 rounded-xl bg-white text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="Research Wing">Research Wing</option>
+              <option value="IT Department">IT Department</option>
+              <option value="Operations">Operations</option>
+              <option value="Logistics">Logistics</option>
+              <option value="HR Department">HR Department</option>
+            </select>
+          </div>
+        </div>
+
+        {/* ✅ ADDED: Pass Type, Start Date, and End Date Block */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-blue-50/30 border border-blue-100 rounded-xl animate-fade-in">
+          <div>
+            <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider mb-1.5">Pass Type *</label>
+            <select required value={passType} onChange={(e) => setPassType(e.target.value)} className="w-full p-2.5 border border-blue-200 rounded-lg bg-white text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="One_day">One Day Pass</option>
+              <option value="Multi_day">Multi-Day Pass</option>
+              <option value="Contractor">Extended Contractor</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider mb-1.5">Start Date & Time *</label>
+            <input required type="datetime-local" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-2.5 border border-blue-200 rounded-lg bg-white text-xs font-bold font-mono text-slate-700 outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          
+          <div>
+            <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider mb-1.5">End Date & Time *</label>
+            <input required type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-2.5 border border-blue-200 rounded-lg bg-white text-xs font-bold font-mono text-slate-700 outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+        </div>
+
+        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pt-2 border-b border-slate-50 pb-1">Primary Base Identity</h4>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          <div className="relative">
+            <label className="block text-xs font-semibold text-slate-500 mb-1">Full Name *</label>
+            <div className="relative flex items-center">
+              <input 
+                required type="text" value={visitorName} disabled={!!visitorId || isEdit}
+                onChange={(e) => { setVisitorName(e.target.value); setShowDropdown(true); }} 
+                onFocus={() => setShowDropdown(true)} placeholder="Type name to lookup profiles..." 
+                className="w-full p-2.5 pr-8 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-600 font-semibold" 
+              />
+              {visitorId && !isEdit ? (
+                <button type="button" onClick={handleClearSelectedVisitor} className="absolute right-2.5 text-slate-400 hover:text-red-500 transition-colors" title="Clear profile layout">
+                  <X className="w-4 h-4" />
                 </button>
+              ) : (
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 pointer-events-none" />
               )}
             </div>
 
-            <div className="overflow-y-auto bg-white flex-1 p-3 space-y-3 custom-scrollbar">
-              {activeNotifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <CheckCircle className="w-10 h-10 text-slate-200 mb-3" />
-                  <p className="text-sm font-semibold text-slate-500">You're all caught up!</p>
-                  <p className="text-xs text-slate-400 mt-1">No active visitor updates in this shift.</p>
-                </div>
-              ) : (
-                activeNotifications.map(visit => {
-                  let nIcon = <Clock className="w-4 h-4" />;
-                  let nColor = 'bg-slate-50 text-slate-600 border-slate-200';
-                  let nTitle = 'Update Pending';
-                  let nDesc = '';
-
-                  if (visit.status === 'Denied') {
-                    nIcon = <AlertCircle className="w-4 h-4 text-rose-600" />;
-                    nColor = 'bg-rose-50 border-rose-200';
-                    nTitle = 'Request Rejected';
-                    nDesc = `Feedback: "${visit.hr_remarks || 'Policy conflict or identity mismatch.'}"`;
-                  } else if (visit.status === 'Cleared') {
-                    nIcon = <CheckCircle className="w-4 h-4 text-emerald-600" />;
-                    nColor = 'bg-emerald-50 border-emerald-200';
-                    nTitle = 'HR Clearance Granted';
-                    nDesc = 'Pass generated. Awaiting visitor arrival.';
-                  } else if (visit.status === 'Active') {
-                    nIcon = <User className="w-4 h-4 text-blue-600" />;
-                    nColor = 'bg-blue-50 border-blue-200';
-                    nTitle = 'Visitor Arrived';
-                    nDesc = `Checked in at ${visit.checked_in_time ? new Date(visit.checked_in_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'the gate'}.`;
-                  } else if (visit.status === 'Completed') {
-                    nIcon = <LogOut className="w-4 h-4 text-slate-600" />;
-                    nColor = 'bg-slate-100 border-slate-300';
-                    nTitle = 'Visitor Departed';
-                    nDesc = `Checked out at ${visit.actual_out ? new Date(visit.actual_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'the gate'}.`;
-                  }
-
-                  return (
-                    <div key={visit.id} className={`border rounded-xl p-3 flex flex-col gap-2 relative overflow-hidden transition-all duration-300 ${visit.isRead ? 'bg-slate-50/50 border-slate-100 opacity-60 hover:opacity-100' : nColor}`}>
-                      
-                      {!visit.isRead && <div className="absolute top-3 left-3 w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_4px_rgba(59,130,246,0.5)]"></div>}
-
-                      <div className="flex justify-between items-start pl-3">
-                        <div className="flex items-center gap-2">
-                          {nIcon}
-                          <span className={`font-bold text-xs uppercase tracking-wider ${visit.isRead ? 'text-slate-500' : 'text-slate-800'}`}>{nTitle}</span>
-                        </div>
-                        <div className="flex gap-1.5">
-                          {visit.status !== 'Denied' && (
-                            <button 
-                              onClick={() => handleIgnoreNotification(visit.id)} 
-                              className={`text-[10px] font-bold px-2 py-1 rounded transition-colors flex items-center ${visit.isRead ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100' : 'text-slate-500 bg-white/50 hover:bg-white border border-slate-200'}`}
-                            >
-                              <X className="w-3 h-3 mr-1"/> Dismiss
-                            </button>
-                          )}
-                          <button 
-                            onClick={() => toggleReadStatus(visit.id)} 
-                            className={`text-[10px] font-bold px-2 py-1 rounded transition-colors flex items-center ${visit.isRead ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100' : 'text-blue-600 bg-white/50 hover:bg-white border border-blue-100'}`}
-                          >
-                            {visit.isRead ? <><MailOpen className="w-3 h-3 mr-1"/> Unread</> : <><Check className="w-3 h-3 mr-1"/> Mark Read</>}
-                          </button>
-                        </div>
-                      </div>
-                      <div className="pl-3">
-                        <div className={`font-bold text-sm ${visit.isRead ? 'text-slate-600' : 'text-slate-900'}`}>{visit.visitorName} <span className="text-[10px] font-mono text-slate-400 font-normal ml-1">({visit.id})</span></div>
-                        <p className={`text-xs mt-1 leading-snug ${visit.isRead ? 'text-slate-500' : 'text-slate-700'}`}>{nDesc}</p>
-                      </div>
-                      
-                      {/* ✅ FIX: Action buttons are now permanently visible for Denied passes! */}
-                      {visit.status === 'Denied' && (
-                        <div className="mt-2 ml-3 mr-1 flex gap-2">
-                          <button 
-                            onClick={() => handleIgnoreNotification(visit.id)}
-                            className="w-1/3 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-1"
-                          >
-                            <X className="w-3 h-3" /> Dismiss
-                          </button>
-                          <button 
-                            onClick={() => { setShowNotifications(false); navigate('/emp/add_visitor', { state: { autofill: visit, isEdit: true } }); }} 
-                            className="w-2/3 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-                          >
-                            <Send className="w-3.5 h-3.5" /> Fix & Resend
-                          </button>
-                        </div>
-                      )}
+            {showDropdown && searchResults.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-slate-100">
+                {searchResults.map((visitor) => (
+                  <div key={visitor.visitor_id} onClick={() => handleSelectVisitor(visitor)} className="px-4 py-2.5 text-xs text-slate-700 hover:bg-blue-50/70 cursor-pointer flex justify-between items-center transition-colors">
+                    <div>
+                      <span className="font-bold text-slate-900 block">{visitor.name}</span>
+                      <span className="text-[10px] text-slate-400 font-mono block">{visitor.email || 'No email registered'}</span>
                     </div>
-                  );
-                })
-              )}
+                    <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold font-mono">
+                      {visitor.id_type}: {visitor.id_number}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Gender *</label>
+              <select value={gender} disabled={!!visitorId && !isEdit} onChange={(e) => setGender(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Non-binary">Non-binary</option>
+                <option value="Others">Others</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Nationality *</label>
+              <select value={nationality} disabled={!!visitorId && !isEdit} onChange={handleNationalityChange} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
+                {NATIONALITIES.map(nat => (
+                  <option key={nat.label} value={nat.label}>{nat.label}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Contact Phone *</label>
+              <input required type="tel" value={phone} disabled={!!visitorId && !isEdit} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-blue-500 disabled:bg-slate-50" />
             </div>
           </div>
-        </>
-      )}
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1">Date of Birth</label>
+            <input 
+              type="date" 
+              value={dob} 
+              disabled={!!visitorId && !isEdit} 
+              max={maxDob}
+              onChange={(e) => setDob(e.target.value)} 
+              className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono text-slate-700 outline-none focus:border-blue-500 disabled:bg-slate-50" 
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1">Email Address</label>
+            <input type="email" value={email} disabled={!!visitorId && !isEdit} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. name@domain.com" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50" />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 md:col-span-2">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1">ID Type *</label>
+              <select value={idType} disabled={!!visitorId && !isEdit} onChange={(e) => setIdType(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium bg-white outline-none focus:border-blue-500 disabled:bg-slate-50">
+                <option value="Aadhar">Aadhar Card</option>
+                <option value="PAN">PAN Card</option>
+                <option value="Passport">Passport</option>
+                <option value="Driving License">Driving License</option>
+                <option value="Voter ID">Voter ID</option>
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-slate-500 mb-1">Govt Issued ID Number *</label>
+              <input required type="text" value={idNumber} disabled={!!visitorId && !isEdit} onChange={(e) => setIdNumber(e.target.value)} placeholder="Enter Document ID Number" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold font-mono uppercase tracking-wider outline-none focus:border-blue-500 disabled:bg-slate-50" />
+            </div>
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-xs font-semibold text-slate-500 mb-1">Permanent Address</label>
+            <input type="text" value={address} disabled={!!visitorId && !isEdit} onChange={(e) => setAddress(e.target.value)} placeholder="House/Office No, Street, City, State, Pincode" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1">Organization / Employer</label>
+            <input type="text" value={organization} disabled={!!visitorId && !isEdit} onChange={(e) => setOrganization(e.target.value)} placeholder="e.g. Acme Corp Operations" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1">Designation</label>
+            <input type="text" value={designation} disabled={!!visitorId && !isEdit} onChange={(e) => setDesignation(e.target.value)} placeholder="e.g. Technical Director" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 disabled:bg-slate-50" />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-xs font-semibold text-slate-500 mb-1">Detailed Purpose of Entry *</label>
+            <input required type="text" value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="e.g. Scheduled Corporate Infrastructure Support Sync" className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500" />
+          </div>
+        </div>
+
+        <div className="border border-slate-200 rounded-xl bg-slate-50/40 overflow-hidden mt-2">
+          <div className="p-4 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 flex items-center uppercase tracking-wide">
+                <Users className="w-4 h-4 mr-1.5 text-slate-500" />
+                Accompanying Contingent Head Count
+              </label>
+            </div>
+            <input 
+              type="number" min="0" max="10" value={headCount || ''} onChange={(e) => setHeadCount(parseInt(e.target.value) || 0)}
+              placeholder="0 (Single Personnel)" className="w-full sm:w-40 p-2 text-xs border border-slate-200 rounded-xl bg-white outline-none font-bold text-center focus:border-blue-500" 
+            />
+          </div>
+
+          {escorts.length > 0 && (
+            <div className="p-4 bg-white space-y-3.5">
+              {escorts.map((escort, index) => (
+                <div key={index} className="flex flex-col gap-3 p-3.5 border border-slate-200 rounded-xl bg-slate-50/50 relative">
+                  <div className="absolute -left-2 -top-2 w-5 h-5 bg-slate-800 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white shadow-sm">
+                    {index + 1}
+                  </div>
+                  
+                  <div className="flex flex-col gap-3 w-full">
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+                      <div className='sm:col-span-2'>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Member Full Name *</label>
+                        <input 
+                          required
+                          type="text" 
+                          value={escort.name}
+                          onChange={(e) => handleEscortChange(index, 'name', e.target.value)}
+                          placeholder="Enter name" 
+                          className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" 
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Gender *</label>
+                        <select 
+                          value={escort.gender} 
+                          onChange={(e) => handleEscortChange(index, 'gender', e.target.value)} 
+                          className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500"
+                        >
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Non-binary">Non-binary</option>
+                          <option value="Others">Others</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Nationality *</label>
+                        <select 
+                          value={escort.nationality} 
+                          onChange={(e) => handleEscortChange(index, 'nationality', e.target.value)} 
+                          className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500"
+                        >
+                          {NATIONALITIES.map(nat => (
+                            <option key={nat.label} value={nat.label}>{nat.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Contact Phone *</label>
+                        <input 
+                          required 
+                          type="tel" 
+                          value={escort.phone} 
+                          onChange={(e) => handleEscortChange(index, 'phone', e.target.value)} 
+                          placeholder="+91 98765 43210" 
+                          className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono outline-none focus:border-blue-500" 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">ID Type *</label>
+                        <select 
+                          value={escort.idType} 
+                          onChange={(e) => handleEscortChange(index, 'idType', e.target.value)} 
+                          className="w-full p-2 border border-slate-200 rounded-lg text-xs font-medium bg-white outline-none focus:border-blue-500"
+                        >
+                          <option value="Aadhar">Aadhar</option>
+                          <option value="PAN">PAN Card</option>
+                          <option value="Passport">Passport</option>
+                          <option value="Driving License">Driving License</option>
+                          <option value="Voter ID">Voter ID</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">
+                          {escort.idType} Serial ID *
+                        </label>
+                        <input 
+                          required
+                          type="text" 
+                          value={escort.govId}
+                          onChange={(e) => handleEscortChange(index, 'govId', e.target.value)}
+                          placeholder={`Enter ${escort.idType} Number`} 
+                          className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold font-mono uppercase tracking-wider outline-none focus:border-blue-500" 
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Email Address</label>
+                        <input 
+                          type="email" 
+                          value={escort.email}
+                          onChange={(e) => handleEscortChange(index, 'email', e.target.value)}
+                          placeholder="e.g. name@domain.com" 
+                          className="w-full p-2 text-xs border border-slate-200 rounded-lg bg-white font-medium outline-none focus:border-blue-500" 
+                        />
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="pt-4 border-t border-slate-100">
+          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5">Verification Document Scans</label>
+          
+          <label className="border-2 border-dashed border-slate-200 rounded-xl p-6 bg-slate-50/60 flex flex-col items-center justify-center text-slate-400 hover:bg-slate-100/50 transition-colors cursor-pointer relative">
+            <UploadCloud className="w-7 h-7 mb-1.5 text-blue-500" />
+            <span className="font-bold text-slate-700 text-xs">
+              {file ? (file as File).name : 'Upload Authorization Credentials'}
+            </span>
+            {prefillData?.documentUrl && !file && (
+              <span className="text-[10px] text-blue-500 mt-1 font-bold">Existing document attached. Click to replace.</span>
+            )}
+            <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+          </label>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-50 mt-4">
+            <button type="button" onClick={() => navigate('/emp')} className="px-5 py-2 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-colors text-xs">
+              Cancel
+            </button>
+            <button type="submit" disabled={loading} className="px-6 py-2 rounded-xl font-bold bg-slate-950 text-white hover:bg-slate-900 shadow-sm transition-all text-xs disabled:opacity-50 flex items-center">
+              {loading ? (uploadingText || 'Processing...') : (isEdit ? 'Update & Resend Application' : 'Commit Application')}
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes fade-in { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: scale(1); } }
+        .animate-fade-in { animation: fade-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      `}} />
     </div>
   );
 }

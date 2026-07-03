@@ -43,8 +43,9 @@ export default function AddVisitorPage() {
           </div>
         </div>
 
-        {/* The Reusable Form */}
-        <RegistrationForm />
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <RegistrationForm />
+        </div>
         
       </div>
     </DashboardLayout>

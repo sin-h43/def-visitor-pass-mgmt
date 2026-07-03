@@ -261,14 +261,14 @@ export default function VisitorTable({
               
               {selectedVisitor.hr_remarks ? (
                 <div className="w-full">
-                  <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">HR Review Note</span>
+                  <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">HOD Review Note</span>
                   <div className="bg-white p-3 border border-slate-200 rounded-lg text-sm text-slate-700 italic shadow-sm">
                     "{selectedVisitor.hr_remarks}"
                   </div>
                 </div>
               ) : (
                 <div className="w-full">
-                  <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">HR Review Note</span>
+                  <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">HOD Review Note</span>
                   <div className="text-xs text-slate-400 italic">No notes provided.</div>
                 </div>
               )}

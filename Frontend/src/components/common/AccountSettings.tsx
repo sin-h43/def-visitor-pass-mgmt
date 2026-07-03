@@ -14,7 +14,7 @@ interface AccountSettingsProps {
 
 const ROLE_LABELS: Record<AccountSettingsProps['role'], string> = {
   emp: 'Core Entry Console',
-  hr: 'HR Officer',
+  hr: 'HOD Officer',
   security: 'Security Operations',
 };
 

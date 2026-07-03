@@ -46,8 +46,8 @@ export default function EnterpriseVisitorProfile() {
           setCurrentUser({ id: emp.id, empId: emp.employee_id, name: emp.name , avatarUrl: emp.avatar_url || ''});
         }
       } catch (err) {
-        console.error('Failed to load HR profile', err);
-        setCurrentUser(prev => ({ ...prev, name: 'HR Admin' }));
+        console.error('Failed to load HOD profile', err);
+        setCurrentUser(prev => ({ ...prev, name: 'HOD Admin' }));
       }
     };
     initHRUser();
@@ -146,7 +146,7 @@ export default function EnterpriseVisitorProfile() {
         performed_by: currentUser.name,
         performed_by_role: 'hr',
         severity: 'Critical',
-        remarks: `[HR REVOCATION EXECUTED]: ${revokeReason}`
+        remarks: `[HOD REVOCATION EXECUTED]: ${revokeReason}`
       }]);
       
       setRevokeModal(false);

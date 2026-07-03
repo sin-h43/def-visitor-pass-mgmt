@@ -206,7 +206,7 @@ export default function SecurityDashboard() {
       }]);
 
       setEmergencyModal(null); setEmergencyReason(''); fetchQueues();
-      alert('Emergency protocol executed. HR has been notified.');
+      alert('Emergency protocol executed. HOD has been notified.');
     } catch (error) { alert('Failed to process emergency checkout.'); } finally { setIsProcessing(false); }
   };
 
@@ -236,7 +236,7 @@ export default function SecurityDashboard() {
 
   const filterGroups = [
     { key: 'priority', title: 'Risk / Priority Level', options: [{ label: 'High Priority', value: 'high' }, { label: 'Medium Priority', value: 'medium' }, { label: 'Standard Priority', value: 'low' }] },
-    { key: 'category', title: 'Clearance Category', options: [{ label: 'Govt / Defence', value: 'Govt' }, { label: 'Foreign National', value: 'Foreign' }, { label: 'Service / Vendor', value: 'Service' }, { label: 'HR Registry', value: 'HR' }, { label: 'General Walk-in', value: 'General' }] }
+    { key: 'category', title: 'Clearance Category', options: [{ label: 'Govt / Defence', value: 'Govt' }, { label: 'Foreign National', value: 'Foreign' }, { label: 'Service / Vendor', value: 'Service' }, { label: 'HOD Registry', value: 'HR' }, { label: 'General Walk-in', value: 'General' }] }
   ];
 
   const applyFilters = (data: QueueItemWithDetails[]) => {
@@ -422,7 +422,7 @@ export default function SecurityDashboard() {
               <button onClick={() => setEmergencyModal(null)} className="text-rose-400 hover:text-rose-700"><X size={20}/></button>
             </div>
             <div className="p-5 space-y-4">
-              <p className="text-sm font-medium text-slate-600">This action immediately revokes access, creates a CRITICAL forensic log, and alerts HR. This cannot be undone.</p>
+              <p className="text-sm font-medium text-slate-600">This action immediately revokes access, creates a CRITICAL forensic log, and alerts HOD. This cannot be undone.</p>
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Reason for Removal (Required)</label>
                 <textarea autoFocus value={emergencyReason} onChange={e => setEmergencyReason(e.target.value)} rows={3} placeholder="Describe aggressive behavior, security breach, etc..." className="w-full border border-rose-200 rounded-lg p-3 text-sm focus:outline-none focus:border-rose-400 bg-rose-50/50 resize-none"/>

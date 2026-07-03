@@ -50,7 +50,7 @@ export default function SecurityNotificationCenter() {
         bans.forEach(b => newAlerts.push({
           id: `ban-${b.id}`,
           type: 'ban',
-          title: 'HR Permanent Ban',
+          title: 'HOD Permanent Ban',
           timestamp: b.timestamp,
           remarks: b.remarks || 'Visitor has been blacklisted.'
         }));
@@ -66,7 +66,7 @@ export default function SecurityNotificationCenter() {
         forensics.forEach(f => newAlerts.push({
           id: `forensic-${f.id}`,
           type: 'forensic',
-          title: f.incident_type === 'emergency_revocation' ? 'HR Emergency Revoke' : 'Active Breach',
+          title: f.incident_type === 'emergency_revocation' ? 'HOD Emergency Revoke' : 'Active Breach',
           timestamp: f.created_at,
           remarks: f.incident_type === 'emergency_revocation' ? f.reason : `Time Exceeded (${f.excess_minutes}m): ${f.reason}`,
           visit_id: f.visit_id
@@ -85,7 +85,7 @@ export default function SecurityNotificationCenter() {
         approvals.forEach(a => newAlerts.push({
           id: `approval-${a.visit_id}`,
           type: 'approval',
-          title: 'Clearance Granted',
+          title: 'HOD Clearance Granted',
           timestamp: a.created_at,
           remarks: 'Pass generated. Awaiting visitor arrival at Gate.',
           visit_id: a.visit_id,

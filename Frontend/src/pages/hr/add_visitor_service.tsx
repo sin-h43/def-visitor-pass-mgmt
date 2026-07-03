@@ -98,8 +98,8 @@ useEffect(() => {
           });
         }
       } catch (err) {
-        console.error('Failed to load HR profile:', err);
-        setCurrentUser(prev => ({ ...prev, name: 'HR Admin' }));
+        console.error('Failed to load HOD profile:', err);
+        setCurrentUser(prev => ({ ...prev, name: 'HOD Admin' }));
       }
     };
     loadUserProfile();

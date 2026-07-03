@@ -24,15 +24,15 @@ export default function AddVisitorGeneralPage() {
           });
         }
       } catch (err) {
-        console.error('Failed to load HR profile:', err);
-        setCurrentUser({ name: 'HR Admin', avatarUrl: '' });
+        console.error('Failed to load HOD profile:', err);
+        setCurrentUser({ name: 'HOD Admin', avatarUrl: '' });
       }
     };
     loadUserProfile();
   }, []);
 
   return (
-    <DashboardLayout role="hr" userName={currentUser.name || 'HR Admin'} avatarUrl={currentUser.avatarUrl || ''}>
+    <DashboardLayout role="hr" userName={currentUser.name || 'HOD Officer'} avatarUrl={currentUser.avatarUrl || ''}>
       <div className="max-w-4xl mx-auto pb-12 font-sans">
         
         {/* Navigation Breadcrumb Row */}

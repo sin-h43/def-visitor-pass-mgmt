@@ -71,9 +71,17 @@ export default function VisitorVerification() {
 
       if (error) throw error;
 
+      // ✅ FIX: Robust Timezone & Midnight Fallback
       let expiryTime = new Date();
       if (data.end_date) {
-        expiryTime = new Date(data.end_date);
+        const dateString = data.end_date;
+        // If there's no time attached, OR if it's midnight UTC (which causes the 5:30 AM bug)
+        if (!dateString.includes('T') || dateString.includes('T00:00:00')) {
+          const justDate = dateString.split('T')[0];
+          expiryTime = new Date(`${justDate}T18:00:00`); // Force 6:00 PM local time
+        } else {
+          expiryTime = new Date(dateString);
+        }
       } else {
         expiryTime.setHours(18, 0, 0, 0); 
       }
@@ -112,7 +120,6 @@ export default function VisitorVerification() {
         expiry: expiryTime.toISOString(),
         expiry_display: expiryTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
         
-        // Map Ban Details
         is_banned: data.visitors?.is_banned || false,
         banned_reason: data.visitors?.banned_reason || '',
         banned_at: data.visitors?.banned_at || null,
@@ -256,14 +263,13 @@ export default function VisitorVerification() {
     }
   };
 
-  if (loading) return <DashboardLayout role="security" userName={currentUser.name} headerAction={<SecurityNotificationCenter />}><div className="flex h-screen items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-slate-900"></div></div></DashboardLayout>;
+  if (loading) return <DashboardLayout role="security" userName={currentUser.name} avatarUrl={currentUser.avatar_url} headerAction={<SecurityNotificationCenter />}><div className="flex h-screen items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-slate-900"></div></div></DashboardLayout>;
   if (!visitor) return null;
 
-  // Lock out the Authorize button completely if banned
   const allDone = steps.filter(s => s.required).every(s => s.completed) && !visitor.is_banned;
 
   return (
-    <DashboardLayout role="security" userName={currentUser.name} headerAction={<SecurityNotificationCenter />} avatarUrl={currentUser.avatar_url}>
+    <DashboardLayout role="security" userName={currentUser.name} avatarUrl={currentUser.avatar_url} headerAction={<SecurityNotificationCenter />}>
       <div className="max-w-7xl mx-auto space-y-4">
         
         <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
@@ -278,7 +284,6 @@ export default function VisitorVerification() {
           </div>
         </div>
 
-        {/* HR BAN CRITICAL BANNER */}
         {visitor.is_banned && (
           <div className="bg-rose-50 border-2 border-rose-500 rounded-xl p-5 mb-4 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-fade-in">
             <div className="flex items-start gap-4">

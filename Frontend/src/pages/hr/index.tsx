@@ -55,7 +55,7 @@ export default function HRDashboard() {
           const emp = await fetchAndVerifyEmployee(user.email);
           setCurrentUser({ userName: emp.name, avatarUrl: emp.avatar_url || '', empId: emp.employee_id });
         } catch(e) {
-          setCurrentUser({ userName: 'HR Admin', avatarUrl: '', empId: 'HR-000' });
+          setCurrentUser({ userName: 'HOD Admin', avatarUrl: '', empId: 'HOD-000' });
         }
       }
     };
@@ -123,7 +123,7 @@ export default function HRDashboard() {
             category: computedCategory,
             purpose: row.purpose || '',
             hostName: row.host?.name || 'Unassigned',
-            hostDept: row.host?.role === 'hr' ? 'HR Officer' : 'Staff Member',
+            hostDept: row.host?.role === 'hr' ? 'HOD Officer' : 'Staff Member',
             hostId: row.host?.employee_id || '',
             requestedAt: row.created_at ? new Date(row.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
             visitDate: row.start_date ? new Date(row.start_date).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
@@ -188,7 +188,7 @@ export default function HRDashboard() {
       
       await supabase.from('audit_logs').insert([{
         action: newStatus === 'Approved' ? 'approved' : 'rejected',
-        remarks: `HR ${newStatus} visitor pass ${visitId}. Note: ${remarkText || 'No remarks provided.'}`,
+        remarks: `HOD${newStatus} visitor pass ${visitId}. Note: ${remarkText || 'No remarks provided.'}`,
         performed_by: currentUser.userName, 
         performed_by_role: 'hr'
       }]);
@@ -221,19 +221,19 @@ export default function HRDashboard() {
         incident_type: 'emergency_revocation', 
         severity: 'Critical',
         excess_minutes: 0,
-        reason: `HR INITIATED KICK-OUT: ${emergencyReason}`, 
-        reported_by: currentUser.userName || 'HR Desk', 
+        reason: `HOD INITIATED KICK-OUT: ${emergencyReason}`, 
+        reported_by: currentUser.userName || 'HOD Desk', 
         status: 'open'
       }]);
 
       await supabase.from('audit_logs').insert([{
         visitor_id: emergencyModal.visitorId, 
         action: 'emergency_removal', 
-        performed_by_id: currentUser.empId || 'HR-000', 
-        performed_by: currentUser.userName || 'HR Admin',
+        performed_by_id: currentUser.empId || 'HOD-000', 
+        performed_by: currentUser.userName || 'HOD Admin',
         performed_by_role: 'hr', 
         severity: 'Critical', 
-        remarks: `[EMERGENCY REVOCATION BY HR]: ${emergencyReason}`
+        remarks: `[EMERGENCY REVOCATION BY HOD]: ${emergencyReason}`
       }]);
 
       setEmergencyModal(null); 
@@ -299,7 +299,7 @@ export default function HRDashboard() {
     { key: 'id', label: 'PASS ID', render: (row) => <span className="text-blue-600 font-mono font-bold text-xs">{row.id}</span> },
     { key: 'visitorName', label: 'VISITOR DETAILS', render: (row) => ( <div><div className="font-semibold text-slate-800 text-sm">{row.visitorName}</div><div className="text-xs text-slate-500 font-mono">{row.phone}</div></div> ) },
     { key: 'category', label: 'CATEGORY', render: (row) => {
-        const colors: Record<string, string> = { HR: 'bg-purple-50 text-purple-500 border-purple-100', Govt:'bg-emerald-50 text-emerald-500 border-emerald-100', Foreign: 'bg-amber-50 text-amber-500 border-amber-100', Service: 'bg-orange-50 text-orange-500 border-orange-100', General: 'bg-blue-50 text-blue-500 border-blue-100' };
+        const colors: Record<string, string> = { HOD: 'bg-purple-50 text-purple-500 border-purple-100', Govt:'bg-emerald-50 text-emerald-500 border-emerald-100', Foreign: 'bg-amber-50 text-amber-500 border-amber-100', Service: 'bg-orange-50 text-orange-500 border-orange-100', General: 'bg-blue-50 text-blue-500 border-blue-100' };
         const safeCategory = row.category || 'General';
         return <span className={`px-2 py-0.5 text-xs font-bold rounded border ${colors[safeCategory] || 'bg-slate-100'}`}>{safeCategory}</span>;
       }
@@ -368,7 +368,7 @@ export default function HRDashboard() {
         {/* PAGE HEADER */}
         <div className="mb-4">
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Command Center</h1>
-          <p className="text-sm text-slate-500 font-medium mt-1">HR Administration & Access Control</p>
+          <p className="text-sm text-slate-500 font-medium mt-1">HOD Administration & Access Control</p>
         </div>
         
         {/* Dynamic Metric Cards */}

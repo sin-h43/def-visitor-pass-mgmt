@@ -48,7 +48,7 @@ export default function AuditLogsPage() {
           const emp = await fetchAndVerifyEmployee(user.email);
           setCurrentUser({ userName: emp.name, avatarUrl: emp.avatar_url || '' });
         } catch(e) {
-          setCurrentUser({ userName: 'HR Admin', avatarUrl: '' });
+          setCurrentUser({ userName: 'HOD Admin', avatarUrl: '' });
         }
       }
     };
@@ -159,8 +159,8 @@ const handleApproveEmployee = async (user: any) => {
       // 4. Log the audit
       await supabase.from('audit_logs').insert([{
         action: 'account_approved',
-        remarks: `HR authorized portal access for ${user.full_name} (${user.department})`,
-        performed_by: 'HR Admin', 
+        remarks: `HOD authorized portal access for ${user.full_name} (${user.department})`,
+        performed_by: 'HOD Admin', 
         performed_by_role: 'hr'
       }]);
 
@@ -234,7 +234,7 @@ const handleApproveEmployee = async (user: any) => {
       key: 'role',
       title: 'Performed By',
       options: [
-        { label: 'HR Officer', value: 'HR' },
+        { label: 'HOD Officer', value: 'HR' },
         { label: 'Security Guard', value: 'SECURITY' },
         { label: 'Employee', value: 'EMPLOYEE' }
       ]

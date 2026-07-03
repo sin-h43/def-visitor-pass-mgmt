@@ -187,7 +187,7 @@ export default function EmpNotificationCenter() {
                   } else if (visit.status === 'Cleared') {
                     nIcon = <CheckCircle className="w-4 h-4" />;
                     iconColor = 'text-emerald-500'; dotColor = 'bg-emerald-500';
-                    nTitle = 'HR Clearance Granted';
+                    nTitle = 'HOD Clearance Granted';
                     nDesc = 'Pass generated. Awaiting visitor arrival.';
                   } else if (visit.status === 'Active') {
                     nIcon = <User className="w-4 h-4" />;

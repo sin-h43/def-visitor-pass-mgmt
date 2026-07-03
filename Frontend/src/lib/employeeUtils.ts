@@ -41,7 +41,7 @@ export async function fetchAndVerifyEmployee(email: string): Promise<EmployeeRec
         // No row found
         throw new Error(
           `No employee record found for ${email}. ` +
-          `You must be approved by HR before registering visitors.`
+          `You must be approved by HOD before registering visitors.`
         );
       }
       
@@ -56,14 +56,14 @@ export async function fetchAndVerifyEmployee(email: string): Promise<EmployeeRec
     if (!data) {
       throw new Error(
         `No employee record found for ${email}. ` +
-        `Contact HR to activate your account.`
+        `Contact HOD to activate your account.`
       );
     }
 
     // Verify record has required fields
     if (!data.id) {
       console.error('❌ Employee record missing primary ID:', data);
-      throw new Error('Employee record missing primary ID. Contact HR.');
+      throw new Error('Employee record missing primary ID. Contact HOD .');
     }
 
     if (!data.name) {

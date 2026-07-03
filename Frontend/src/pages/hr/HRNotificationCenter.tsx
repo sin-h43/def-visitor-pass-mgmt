@@ -96,8 +96,8 @@ export default function HRNotificationCenter() {
   
       await supabase.from('audit_logs').insert([{
         action: 'account_approved',
-        remarks: `HR authorized portal access for ${user.full_name} (${user.department})`,
-        performed_by: 'HR Admin', 
+        remarks: `HOD authorized portal access for ${user.full_name} (${user.department})`,
+        performed_by: 'HOD Admin', 
         performed_by_role: 'hr'
       }]);
   
@@ -122,8 +122,8 @@ export default function HRNotificationCenter() {
   
       await supabase.from('audit_logs').insert([{
         action: 'account_rejected',
-        remarks: `HR declined portal access request for ${name}.`,
-        performed_by: 'HR Admin', 
+        remarks: `HOD declined portal access request for ${name}.`,
+        performed_by: 'HOD Admin', 
         performed_by_role: 'hr'
       }]);
   

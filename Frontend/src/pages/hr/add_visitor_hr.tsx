@@ -85,8 +85,8 @@ export default function AddVisitorHRPage() {
           });
         }
       } catch (err) {
-        console.error('Failed to load HR profile:', err);
-        setCurrentUser(prev => ({ ...prev, name: 'HR Admin' }));
+        console.error('Failed to load HOD profile:', err);
+        setCurrentUser(prev => ({ ...prev, name: 'HOD Admin' }));
       }
     };
     loadUserProfile();
@@ -258,7 +258,7 @@ export default function AddVisitorHRPage() {
 
       if (visitorError) throw visitorError;
 
-      let finalPurpose = `[HR TRACK: ${hrOnboardingTrack}] ${purpose}`;
+      let finalPurpose = `[HOD TRACK: ${hrOnboardingTrack}] ${purpose}`;
       // if (escorts.length > 0) {
       //   const guestList = escorts.map(esc => `${esc.name} (ID: ${esc.govId})`).join(', ');
       //   finalPurpose += ` | Accompanying Guest Manifest: ${guestList}`;
@@ -311,7 +311,7 @@ export default function AddVisitorHRPage() {
       if (err.code === '23503' || err.message?.includes('foreign key')) {
         setError(`❌ Database Error: The Host ID (${hostId}) could not be found. Please double-check the Host Employee ID.`);
       } else {
-        setError(err.message || 'System failed to write HR clearance logs.');
+        setError(err.message || 'System failed to write HOD clearance logs.');
       }
     } finally {
       setLoading(false);
@@ -323,7 +323,7 @@ export default function AddVisitorHRPage() {
       <DashboardLayout role="hr" userName={currentUser.name} headerAction={<HRNotificationCenter />} avatarUrl={currentUser.avatarUrl || ''}>
         <div className="bg-purple-50 border border-purple-200 rounded-xl p-8 max-w-4xl shadow-sm text-center animate-fade-in mx-auto mt-10">
           <CheckCircle2 className="w-16 h-16 text-purple-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-purple-800 mb-2">HR Registration Committed Successfully</h2>
+          <h2 className="text-2xl font-bold text-purple-800 mb-2">HOD Registration Committed Successfully</h2>
           <p className="text-purple-600 font-medium">The candidate onboarding matrix pass rules have been registered.</p>
         </div>
       </DashboardLayout>
@@ -342,7 +342,7 @@ export default function AddVisitorHRPage() {
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
           <div className="border-b border-slate-100 pb-4 mb-5">
             <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              <Shield className="w-5 h-5 text-purple-600" /> HR Registry Track System
+              <Shield className="w-5 h-5 text-purple-600" /> HOD Registry Track System
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">Initialize secure candidate assessment metrics and facility boarding pathways.</p>
           </div>
@@ -470,7 +470,7 @@ export default function AddVisitorHRPage() {
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-purple-50/20 p-4 border border-purple-100 rounded-xl">
               <div>
-                <label className="block text-xs font-bold text-purple-800 uppercase tracking-wider mb-1">HR Context Track *</label>
+                <label className="block text-xs font-bold text-purple-800 uppercase tracking-wider mb-1">HOD Context Track *</label>
                 <select value={hrOnboardingTrack} onChange={(e) => setHrOnboardingTrack(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-purple-500">
                   <option value="Interview Candidate">Recruitment / Interview Target</option>
                   <option value="Contractor Onboarding">Contracted Workforce Orientation</option>

@@ -61,7 +61,7 @@ export default function HRRepeatedVisitorLogPage() {
           const emp = await fetchAndVerifyEmployee(user.email);
           setCurrentUser({ userName: emp.name, avatarUrl: emp.avatar_url || '' });
         } catch(e) {
-          setCurrentUser({ userName: 'HR Admin', avatarUrl: '' });
+          setCurrentUser({ userName: 'HOD Admin', avatarUrl: '' });
         }
       }
     };

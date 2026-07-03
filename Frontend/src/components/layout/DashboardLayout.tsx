@@ -42,6 +42,21 @@ export default function DashboardLayout({ children, role, userName, headerAction
       { label: 'Settings', icon: Settings, path: '/security/settings' },
     ];
   }
+  // 1. Add this helper inside your DashboardLayout component
+const getDisplayRole = (roleProp: string | undefined) => {
+  const normalizedRole = roleProp?.toLowerCase();
+  
+  switch (normalizedRole) {
+    case 'hr':
+      return 'HOD OFFICER';
+    case 'emp':
+      return 'EMPLOYEE'; // Updates Anu A's screen from "EMP" to "EMPLOYEE"
+    case 'security':
+      return 'SECURITY DESK';
+    default:
+      return roleProp;
+  }
+};
 
   // Dynamic role title for the top right profile block
   // const roleLabel = role === 'hr' ? 'HR Officer' : role === 'security' ? 'Security Operations' : 'Core Entry Console';
@@ -131,8 +146,10 @@ export default function DashboardLayout({ children, role, userName, headerAction
 <div className="flex items-center gap-3">
   <div className="text-right hidden sm:block">
     <div className="text-sm font-bold text-slate-900">{userName}</div>
-    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{role}</div>
-  </div>
+<div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+  {getDisplayRole(role)}
+</div> 
+</div>
   
   {/* NEW: Render the image if it exists, otherwise fallback to initials */}
   {avatarUrl ? (

@@ -116,7 +116,7 @@ export default function VisitDetailDrawer({ isOpen, onClose, visit }: VisitDetai
           <section>
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center">
               <Shield className="w-4 h-4 mr-2 text-blue-600" /> 
-              {isAccountEvent ? 'System Audit Details' : 'HR / Security Remarks'}
+              {isAccountEvent ? 'System Audit Details' : 'HOD / Security Remarks'}
             </h3>
             <div className="w-full p-4 border border-slate-200 rounded-xl text-sm bg-blue-50/30 text-slate-700 whitespace-pre-wrap">
               {displayRemarks ? (

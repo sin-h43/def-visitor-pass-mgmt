@@ -338,7 +338,7 @@ export default function VisitorMgmtPage() {
 
   const categories = [
     { type: 'General', label: 'General Pass', desc: 'Standard public walk-ins, temporary business visits, or casual meetings.', icon: User, color: 'border-blue-100 hover:border-blue-300 hover:shadow-blue-50/50 hover:bg-blue-50 ', iconBg: 'bg-blue-50 text-blue-600', path: '/hr/add_visitor_general' },
-    { type: 'HR', label: 'HR Registry', desc: 'Candidate interviews, employee onboardings, and internal hr syncs.', icon: ShieldAlert, color: 'border-purple-100 hover:border-purple-300 hover:shadow-purple-50/50 hover:bg-purple-50', iconBg: 'bg-purple-50 text-purple-600', path: '/hr/add_visitor_hr' },
+    { type: 'HR', label: 'HOD Registry', desc: 'Candidate interviews, employee onboardings, and internal hr syncs.', icon: ShieldAlert, color: 'border-purple-100 hover:border-purple-300 hover:shadow-purple-50/50 hover:bg-purple-50', iconBg: 'bg-purple-50 text-purple-600', path: '/hr/add_visitor_hr' },
     { type: 'Govt', label: 'Govt / Defense', desc: 'High-security clearance pathways for officials and ministry personnel.', icon: Landmark, color: 'border-emerald-100 hover:border-emerald-300 hover:shadow-emerald-50/50 hover:bg-emerald-50', iconBg: 'bg-emerald-50 text-emerald-600', path: '/hr/add_visitor_govt' },
     { type: 'Foreign', label: 'Foreign National', desc: 'International delegates, international passports, embassy tracks.', icon: Globe, color: 'border-amber-100 hover:border-amber-300 hover:shadow-amber-50/50 hover:bg-amber-50', iconBg: 'bg-amber-50 text-amber-600', path: '/hr/add_visitor_foreign' },
     { type: 'Service', label: 'Service / Vendor', desc: 'Maintenance, infrastructure crews, and outsourced service tokens.', icon: Wrench, color: 'border-orange-100 hover:border-orange-300 hover:shadow-orange-50/50 hover:bg-orange-50/50', iconBg: 'bg-orange-50 text-orange-600', path: '/hr/add_visitor_service' },
@@ -394,7 +394,7 @@ export default function VisitorMgmtPage() {
       render: (row) => {
         const cat = row.category || 'General';
         if (cat === 'General') return <span className="font-bold text-blue-600 text-xs uppercase tracking-wide">General Pass</span>;
-        if (cat === 'HR') return <span className="font-bold text-purple-600 text-xs uppercase tracking-wide">HR Registry</span>;
+        if (cat === 'HR') return <span className="font-bold text-purple-600 text-xs uppercase tracking-wide">HOD Registry</span>;
         if (cat === 'Govt') return <span className="font-bold text-emerald-600 text-xs uppercase tracking-wide">Govt/Defence</span>;
         if (cat === 'Foreign') return <span className="font-bold text-amber-600 text-xs uppercase tracking-wide">Foreign National</span>;
         return <span className="font-bold text-orange-600 text-xs uppercase tracking-wide">Service</span>;
@@ -477,7 +477,7 @@ export default function VisitorMgmtPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { title: 'Pending HR Review', value: visitorLogs.filter(d => d.status === 'Pending').length.toString(), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+            { title: 'Pending HOD Review', value: visitorLogs.filter(d => d.status === 'Pending').length.toString(), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
             { title: 'Approved (Awaiting Gate)',  value: visitorLogs.filter(d => d.status === 'Approved').length.toString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
             { title: 'Active On-Site', value: visitorLogs.filter(d => d.status === 'Active').length.toString(), icon: ShieldCheck, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
             { title: 'Denied / Revoked', value: visitorLogs.filter(d => d.status === 'Denied' || d.status === 'Revoked').length.toString(), icon: XCircle, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100' }
@@ -571,7 +571,7 @@ export default function VisitorMgmtPage() {
                   const isService = selectedVisitor.category === 'Service';
 
                   const orgLabel = isGovt ? 'Command Ministry' : isService ? 'Contracting Agency' : isForeign ? 'Global Organization' : isHR ? 'Sponsoring Inst.' : 'Organization';
-                  const desigLabel = isGovt ? 'Official Rank' : isService ? 'Field Trade' : isForeign ? 'Diplomatic Rank' : isHR ? 'HR Track' : 'Designation';
+                  const desigLabel = isGovt ? 'Official Rank' : isService ? 'Field Trade' : isForeign ? 'Diplomatic Rank' : isHR ? 'HOD Track' : 'Designation';
                   
                   const tagMatch = selectedVisitor.purpose.match(/^\[(.*?)\]\s*(.*)/);
                   const secureTag = tagMatch ? tagMatch[1] : null;
@@ -678,7 +678,7 @@ export default function VisitorMgmtPage() {
               <div className="p-6 border-t border-slate-100 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                 <div className="flex justify-between items-end mb-2">
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Internal HR Remarks
+                    Internal HOD Remarks
                   </label>
                   <button 
                     onClick={() => handleUpdateRemarkOnly(selectedVisitor.id, panelRemark)}

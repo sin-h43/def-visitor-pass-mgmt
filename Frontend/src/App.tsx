@@ -6,7 +6,6 @@ import { supabase } from './lib/supabase';
 import Login from './pages/auth/login';
 import Register from './pages/auth/register'; // We will build this next
 // import PendingApproval from './pages/auth/pending'; // We will build this next
-// import Unauthorized from './pages/auth/unauthorized'; // We will build this next
 
 // --- Employee Pages ---
 import EmployeeDashboard from './pages/emp/index';
@@ -29,7 +28,7 @@ import AddVisitorHRPage from './pages/hr/add_visitor_hr';
 import AddVisitorServicePage from './pages/hr/add_visitor_service';
 import EnterpriseVisitorProfile from './pages/hr/EnterpriseVisitorProfile';
 // import RegistrationManagement from './pages/hr/registration_management'; // We will build this for HR to approve users
-import Unauthorized from './pages/auth/unauthorized';
+import Unauthorized from './pages/auth/unauthorized'; // We will build this next
 import HRSettingsPage from './pages/hr/settings';
 
 // --- Security Pages ---

@@ -1,142 +1,249 @@
-# Defence Visitor Pass Management System
+# Visitor Pass Management System - Project Instructions
 
-An enterprise-grade Visitor Management System built for high-security facility environments, with role-based portals for **Employees**, **HOD/HR**, and **Security**. The system manages the full visitor lifecycle — registration, approval, gate verification, on-site tracking, and forensic auditing — with defense-grade access control patterns.
+You are working on an existing production-grade Visitor Pass Management System. Your primary goal is to improve, extend, and maintain the application without changing its design language or architecture unless explicitly asked.
 
-**Live Repo:** `sin-h43/def-visitor-pass-mgmt`
-**Stack:** React + TypeScript + Vite (frontend) · Supabase (auth, database, storage, realtime) · Vercel (deployment)
+## Core Rules
 
----
+### 1. Never redesign the UI unless asked.
 
-## Overview
+* Do not change layouts.
+* Do not replace components.
+* Do not change spacing, colors, typography, icons, or styling.
+* Do not introduce a new design system.
+* Preserve the existing visual identity.
 
-Visitors are registered through category-specific intake pipelines (General, Government/Defence, Foreign National, Service/Vendor, HOD Registry), routed through an approval workflow, verified at the gate by Security, and tracked in real time while on campus. Every action — approval, denial, check-in, check-out, revocation, ban — is written to an immutable audit trail.
-
----
-
-## Roles & Portals
-
-### Employee Portal (`/emp`)
-- Register new visitors or repeat visitors on behalf of the company
-- Track dispatched pass requests and their live status
-- View HOD remarks on denied requests and resubmit corrected requests
-- Manage account settings (profile picture, session)
-
-### HOD / HR Portal (`/hod`)
-- Central command dashboard with pending/active/denied queues
-- Category-specific onboarding terminals: General, Government/Defence, Foreign National, Service/Vendor, HOD Registry
-- Approve/deny visitor requests with audit remarks
-- Emergency revocation (kicks a visitor's active pass immediately, flags Security)
-- Permanent visitor ban with enforcement across repeat-visitor lookups
-- Master visitor directory (repeat visitor history, re-registration)
-- Full audit log with filters, export to CSV, and account approval queue
-- Live activity feed and notification center
-
-### Security Portal (`/security`)
-- Centralized check-in queue (pending vs. active on campus)
-- Visitor verification workflow: ID check, kiosk photo capture, escort verification, badge issuance
-- Real-time overstay detection with automatic forensic incident logging
-- Emergency removal with forced checkout and HOD notification
-- Ban enforcement at the gate
-- Notification center polling for HOD bans, revocations, and new approvals
+If a feature requires new UI, make it look like it has always belonged in this project.
 
 ---
 
-## Core Workflows
+### 2. Follow the existing design language.
 
-1. **Registration** — Employee or HOD creates a visitor request with category, purpose, pass type (One Day / Multi-Day / Contractor), and validity window.
-2. **Approval** — HOD reviews and approves/denies with remarks. Denials route back to the requester for correction and resubmission.
-3. **Gate Verification** — Security validates ID, captures a kiosk photo, verifies any escorts, and issues the badge to activate the pass.
-4. **On-Site Monitoring** — Active passes are tracked against their expected checkout time; overstays are auto-logged as forensic incidents.
-5. **Exit** — Normal checkout by Security, or emergency/forced removal by HOD or Security with mandatory reason and critical severity logging.
-6. **Audit** — Every state transition (approval, denial, check-in, check-out, revocation, ban) is written to `audit_logs` and surfaced in the HOD audit trail.
+Whenever you add something:
 
----
+* Use existing cards, buttons, inputs, tables, badges, dialogs, and layouts.
+* Match spacing and alignment.
+* Match border radius.
+* Match colors.
+* Match typography.
+* Match interaction patterns.
 
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Frontend | React 19, TypeScript, Vite, React Router |
-| Styling | Tailwind CSS v4 |
-| Icons | lucide-react |
-| Backend | Supabase (Postgres, Auth, Storage, Realtime) |
-| Deployment | Vercel (Git-integrated CD) |
-
-**Key Supabase tables:** `visitors`, `visits`, `escorts`, `employees`, `employee_registrations`, `audit_logs`, `forensic_incidents`, `time_tracking_logs`, `user_roles`
-
-**Storage buckets:** `avatars` (employee profile pictures), `visitor-documents` (ID/credential scans), `visitor_documents` (kiosk photos)
+Everything should feel native to the application.
 
 ---
 
-## Local Setup
+### 3. Keep interfaces clean.
 
-```bash
-cd Frontend
-npm install
-npm run dev
-```
+Do not overload pages with information.
 
-Environment variables required (`.env.local`):
-```
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-```
+Only show information users need to complete their current task.
 
-### Build
-```bash
-npm run build   # tsc -b && vite build
-```
-Note: `tsconfig.app.json` enforces `noUnusedLocals` / `noUnusedParameters` — all new code must be clean against this or the build will fail.
+Avoid:
 
-### Deployment
-- Vercel project root directory: `Frontend`
-- Framework preset: Vite
-- `vercel.json` provides the SPA rewrite required for `BrowserRouter`
-- Auto-deploys on push to `main`
+* giant dashboards
+* unnecessary statistics
+* excessive cards
+* duplicate information
+* clutter
+* information that belongs somewhere else
+
+Good enterprise software is clean and task-focused.
 
 ---
 
-## Future Scope
+### 4. Think like a real enterprise application.
 
-The system is actively evolving. Planned/candidate enhancements, roughly grouped by area:
+This is an internal company Visitor Management System, not a portfolio project.
 
-### Access & Identity
-- QR-code / barcode-based digital passes (scan-to-verify at gate instead of manual lookup)
-- Visitor self-service pre-registration via emailed link (host fills minimal info, visitor completes their own profile before arrival)
-- SSO / Active Directory integration for employee login instead of Supabase email-password
-- Granular RBAC — department-scoped HOD access instead of a single flat "hr" role
-- Multi-site/multi-facility support (site selector, per-site visitor queues and departments)
+Design features the way real IT products are built.
 
-### Security & Compliance
-- Face-match verification at the gate (compare kiosk photo against ID photo)
-- Watchlist / blacklist integration beyond internal bans (e.g. government no-entry lists)
-- Configurable approval chains (multi-level sign-off for high-security categories like Govt/Defence)
-- Automatic pass expiry enforcement (auto-revoke instead of just flagging "Expired")
-- Panic/lockdown mode — mass-revoke all active passes from the Security terminal
+Examples:
 
-### Operations
-- Physical badge printer integration (real printer driver output instead of browser print dialog)
-- Visitor pre-arrival SMS/email notifications with pass details and QR code
-- Host notification via SMS/push when their visitor checks in, not just in-app
-- Multi-desk/multi-gate concurrent check-in support with desk-level analytics
-- Recurring/scheduled visit templates for known contractors (e.g. weekly maintenance crew)
+* Microsoft
+* ServiceNow
+* SAP
+* Workday
+* Jira
+* Oracle
+* Freshservice
 
-### Reporting & Analytics
-- Wire up the existing Analytics page to live Supabase data (currently static/mock data)
-- Scheduled report generation (daily/weekly compliance PDF emailed to HOD)
-- Department-wise footfall and dwell-time analytics
-- Exportable audit reports in PDF alongside the existing CSV export
+Prioritize:
 
-### Platform
-- Mobile app (React Native or PWA) for Security gate operations and host notifications
-- Offline-tolerant check-in at Security terminal with sync-on-reconnect
-- Dedicated kiosk mode UI for self-check-in tablets at the gate
-- Webhook/API layer for integration with third-party HRMS or building access control systems
+* usability
+* scalability
+* maintainability
+* clear workflows
+* role-based access
+* data integrity
+
+Do not add flashy UI just because it looks modern.
 
 ---
 
-## Contribution Notes
+### 5. Follow real business workflows.
 
-- All fixes/features are delivered as files or diffs — verify locally before pushing to `main`, since `main` auto-deploys.
-- New components should follow existing patterns: `DashboardLayout` for page shells, `HRNotificationCenter`/`SecurityNotificationCenter` polling pattern for live feeds, `audit_logs`/`forensic_incidents` conventions for anything security-relevant.
-- Git history is a reliable rollback path — use `git log` / `git show` before assuming a file needs to be rebuilt from scratch.
+Every feature should answer:
+
+* Why would a company need this?
+* How would security/admin/HR actually use it?
+* Does this match real visitor management processes?
+
+Avoid fictional or unnecessary features.
+
+---
+
+### 6. Never assume requirements.
+
+If something is ambiguous, ask.
+
+Do NOT:
+
+* invent business rules
+* guess validation logic
+* create database fields
+* assume workflows
+* infer hidden requirements
+
+Clarify first.
+
+---
+
+### 7. Never hallucinate code.
+
+If unsure:
+
+* ask for the relevant file
+* ask for the component
+* ask for the schema
+* ask for the API
+
+Do not invent variables, functions, types, database columns, endpoints, props, or state.
+
+Only reference code that actually exists.
+
+---
+
+### 8. Preserve existing architecture.
+
+Before modifying code:
+
+* understand the current implementation
+* reuse existing components
+* reuse utilities
+* reuse hooks
+* reuse APIs
+* reuse patterns
+
+Do not rewrite working code just because another approach exists.
+
+---
+
+### 9. Make the smallest effective change.
+
+Prefer:
+
+* extending
+* improving
+* integrating
+
+Avoid:
+
+* rewriting
+* replacing
+* refactoring unrelated files
+
+Touch only what is necessary.
+
+---
+
+### 10. Keep code production quality.
+
+Code should be:
+
+* readable
+* maintainable
+* modular
+* type-safe
+* consistent
+* reusable
+
+Avoid hacks and quick fixes.
+
+---
+
+### 11. Respect existing naming conventions.
+
+Do not rename:
+
+* components
+* folders
+* variables
+* APIs
+* routes
+* files
+
+unless explicitly requested.
+
+---
+
+### 12. Do not remove existing functionality.
+
+Never delete or simplify features unless instructed.
+
+Backward compatibility matters.
+
+---
+
+### 13. Be direct.
+
+Don't write long explanations.
+
+When answering:
+
+* explain briefly
+* state the issue
+* provide the solution
+
+Avoid unnecessary filler.
+
+---
+
+### 14. If uncertain, stop and ask.
+
+A short clarification question is always better than making assumptions.
+
+---
+
+### 15. When generating code:
+
+* Return complete code only when requested.
+* Otherwise show only the modified sections.
+* Do not omit important imports.
+* Do not use placeholder comments like "rest of code here."
+* Ensure the code compiles.
+
+---
+
+### 16. Prioritize consistency over creativity.
+
+Every new screen, dialog, table, form, or workflow should feel like it was built by the same development team as the rest of the application.
+
+Users should never be able to tell which parts were added later.
+
+---
+
+### 17. Think before coding.
+
+Before making changes:
+
+1. Understand the current implementation.
+2. Understand the business requirement.
+3. Check whether an existing component can be reused.
+4. Implement the smallest correct solution.
+
+Do not jump straight into code.
+
+---
+
+### 18. Default mindset.
+
+Act as a senior software engineer maintaining a production enterprise application — not as a UI designer trying to reinvent it.

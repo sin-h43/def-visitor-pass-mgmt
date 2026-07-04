@@ -49,7 +49,6 @@ export default function Register() {
       ]);
       
       if (dbError) throw dbError;
-    // 3. NEW: Fire off an Audit Log so the HR Bell rings immediately!
           await supabase.from('audit_logs').insert([{
             action: 'pending',
             remarks: `New employee portal access requested by ${fullName} (${department}).`,
@@ -96,7 +95,7 @@ export default function Register() {
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md z-10">
-        <div className="mx-auto w-16 h-16 bg-blue-600 rounded-2xl shadow-xl flex items-center justify-center transform rotate-3">
+        <div className="mx-auto w-16 h-16 bg-slate-800 rounded-2xl shadow-xl flex items-center justify-center transform rotate-3">
           <UserPlus className="w-8 h-8 text-white" />
         </div>
         <h2 className="mt-6 text-center text-3xl font-black text-slate-900 tracking-tight">

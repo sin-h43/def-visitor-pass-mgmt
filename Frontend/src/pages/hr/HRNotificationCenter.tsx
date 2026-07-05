@@ -27,22 +27,24 @@ export default function HRNotificationCenter() {
 
   const fetchData = async () => {
     try {
-      // 1. Fetch strictly PENDING requests
-      const { data: requests } = await supabase
+      // ✅ FIX: Use .ilike() instead of .eq() to prevent case-sensitivity bugs!
+      const { data: requests, error: reqError } = await supabase
         .from('employee_registrations')
         .select('*')
-        .eq('status', 'pending') // <-- This stops approved ghost cards!
+        .ilike('status', 'pending') 
         .order('created_at', { ascending: false });
 
+      if (reqError) throw reqError;
       if (requests) setPendingRequests(requests);
 
-      // 2. Fetch Recent Audit Logs
-      const { data: logs } = await supabase
+      // Fetch Recent Audit Logs
+      const { data: logs, error: logError } = await supabase
         .from('audit_logs')
         .select('*')
         .order('timestamp', { ascending: false })
         .limit(5);
 
+      if (logError) throw logError;
       if (logs) setRecentActivity(logs);
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -67,7 +69,7 @@ export default function HRNotificationCenter() {
       const generatedEmpId = `EMP-${Math.floor(10000 + Math.random() * 90000)}`;
 
       // 1. Create the employee
-      await supabase.from('employees').insert([{
+      const { error: empError } = await supabase.from('employees').insert([{
         employee_id: generatedEmpId,
         auth_id: req.auth_id,
         name: req.full_name,
@@ -76,9 +78,11 @@ export default function HRNotificationCenter() {
         department: req.department,
         role: 'employee'
       }]);
+      if (empError) throw empError;
 
       // 2. Mark as approved in DB
-      await supabase.from('employee_registrations').update({ status: 'approved' }).eq('id', req.id);
+      const { error: regError } = await supabase.from('employee_registrations').update({ status: 'approved' }).eq('id', req.id);
+      if (regError) throw regError;
 
       // 3. Log activity
       await supabase.from('audit_logs').insert([{
@@ -107,7 +111,8 @@ export default function HRNotificationCenter() {
     setPendingRequests(prev => prev.filter(r => r.id !== req.id));
 
     try {
-      await supabase.from('employee_registrations').update({ status: 'rejected' }).eq('id', req.id);
+      const { error: regError } = await supabase.from('employee_registrations').update({ status: 'rejected' }).eq('id', req.id);
+      if (regError) throw regError;
 
       await supabase.from('audit_logs').insert([{
         action: 'account_rejected',
@@ -126,9 +131,10 @@ export default function HRNotificationCenter() {
   };
 
   const formatAction = (action: string) => {
-    if (action.includes('reject') || action.includes('denied')) return { label: 'REJECTED', color: 'text-rose-600' };
-    if (action.includes('approve')) return { label: 'ACCOUNT APPROVED', color: 'text-emerald-600' };
-    if (action.includes('create') || action.includes('pending')) return { label: 'PENDING', color: 'text-amber-600' };
+    const lowerAction = action.toLowerCase();
+    if (lowerAction.includes('reject') || lowerAction.includes('denied')) return { label: 'REJECTED', color: 'text-rose-600' };
+    if (lowerAction.includes('approve')) return { label: 'ACCOUNT APPROVED', color: 'text-emerald-600' };
+    if (lowerAction.includes('create') || lowerAction.includes('pending')) return { label: 'PENDING', color: 'text-amber-600' };
     return { label: action.replace(/_/g, ' ').toUpperCase(), color: 'text-slate-600' };
   };
 
@@ -155,7 +161,7 @@ export default function HRNotificationCenter() {
               <h3 className="font-bold text-slate-900 text-sm">Notifications</h3>
             </div>
 
-            <div className="overflow-y-auto bg-slate-50/50 flex-1 p-4 space-y-6">
+            <div className="overflow-y-auto bg-slate-50/50 flex-1 p-4 space-y-6 custom-scrollbar">
               
               {/* ACTION REQUIRED SECTION */}
               <div>
@@ -178,14 +184,14 @@ export default function HRNotificationCenter() {
                           <button 
                             onClick={() => handleDecline(req)}
                             disabled={isProcessing}
-                            className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold rounded-lg flex items-center justify-center transition-colors"
+                            className="flex-1 py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold rounded-lg flex items-center justify-center transition-colors disabled:opacity-50"
                           >
                             <XCircle className="w-3.5 h-3.5 mr-1" /> Decline
                           </button>
                           <button 
                             onClick={() => handleApprove(req)}
                             disabled={isProcessing}
-                            className="flex-1 py-2 bg-blue-600 text-white hover:bg-blue-700 text-xs font-bold rounded-lg flex items-center justify-center transition-colors shadow-sm"
+                            className="flex-1 py-2 bg-blue-600 text-white hover:bg-blue-700 text-xs font-bold rounded-lg flex items-center justify-center transition-colors shadow-sm disabled:opacity-50"
                           >
                             <CheckCircle className="w-3.5 h-3.5 mr-1" /> Approve
                           </button>
@@ -203,30 +209,34 @@ export default function HRNotificationCenter() {
                 </h4>
                 
                 <div className="space-y-2">
-                  {recentActivity.map(log => {
-                    const statusInfo = formatAction(log.action);
-                    return (
-                      <div key={log.id} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className={`text-[10px] font-bold uppercase ${statusInfo.color}`}>
-                            {statusInfo.label}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
+                  {recentActivity.length === 0 ? (
+                    <p className="text-xs text-slate-400 font-medium italic">No recent activity.</p>
+                  ) : (
+                    recentActivity.map(log => {
+                      const statusInfo = formatAction(log.action);
+                      return (
+                        <div key={log.id} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className={`text-[10px] font-bold uppercase ${statusInfo.color}`}>
+                              {statusInfo.label}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-600 font-medium line-clamp-2">
+                            {log.remarks}
+                          </p>
                         </div>
-                        <p className="text-xs text-slate-600 font-medium line-clamp-2">
-                          {log.remarks}
-                        </p>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </div>
             </div>
 
             <div className="p-3 border-t border-slate-100 bg-slate-50 text-center">
-              <Link to="/hod/audit" onClick={() => setIsOpen(false)} className="text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors">
+              <Link to="/hr/audit" onClick={() => setIsOpen(false)} className="text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors">
                 View Full Audit History →
               </Link>
             </div>

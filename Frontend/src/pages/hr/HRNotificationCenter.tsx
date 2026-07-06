@@ -27,7 +27,6 @@ export default function HRNotificationCenter() {
 
   const fetchData = async () => {
     try {
-      // ✅ FIX: Use .ilike() instead of .eq() to prevent case-sensitivity bugs!
       const { data: requests, error: reqError } = await supabase
         .from('employee_registrations')
         .select('*')
@@ -62,7 +61,6 @@ export default function HRNotificationCenter() {
     if (isProcessing) return;
     setIsProcessing(true);
 
-    // 🔥 OPTIMISTIC UI: Instantly vanish the card from the screen!
     setPendingRequests(prev => prev.filter(r => r.id !== req.id));
 
     try {
@@ -88,7 +86,7 @@ export default function HRNotificationCenter() {
       await supabase.from('audit_logs').insert([{
         action: 'account_approved',
         remarks: `HOD authorized portal access for ${req.full_name} (${req.department})`,
-        performed_by: 'HR/HOD Admin',
+        performed_by: 'HOD Admin',
         performed_by_role: 'hr'
       }]);
 
@@ -116,8 +114,8 @@ export default function HRNotificationCenter() {
 
       await supabase.from('audit_logs').insert([{
         action: 'account_rejected',
-        remarks: `HR declined portal access request for ${req.full_name}.`,
-        performed_by: 'HR Admin',
+        remarks: `HOD declined portal access request for ${req.full_name}.`,
+        performed_by: 'HOD Admin',
         performed_by_role: 'hr'
       }]);
 

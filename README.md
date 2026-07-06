@@ -5,8 +5,6 @@ An enterprise-grade Visitor Management System built for high-security facility e
 **Live Repo:** `sin-h43/def-visitor-pass-mgmt`
 **Stack:** React + TypeScript + Vite (frontend) · Supabase (auth, database, storage, realtime) · Vercel (deployment)
 
----
-
 ## Overview
 
 Visitors are registered through category-specific intake pipelines (General, Government/Defence, Foreign National, Service/Vendor, HOD Registry), routed through an approval workflow, verified at the gate by Security, and tracked in real time while on campus. Every action — approval, denial, check-in, check-out, revocation, ban — is written to an immutable audit trail.
@@ -140,3 +138,4 @@ The system is actively evolving. Planned/candidate enhancements, roughly grouped
 - All fixes/features are delivered as files or diffs — verify locally before pushing to `main`, since `main` auto-deploys.
 - New components should follow existing patterns: `DashboardLayout` for page shells, `HRNotificationCenter`/`SecurityNotificationCenter` polling pattern for live feeds, `audit_logs`/`forensic_incidents` conventions for anything security-relevant.
 - Git history is a reliable rollback path — use `git log` / `git show` before assuming a file needs to be rebuilt from scratch.
+- 

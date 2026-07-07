@@ -79,7 +79,11 @@ export default function HRNotificationCenter() {
       if (empError) throw empError;
 
       // 2. Mark as approved in DB
-      const { error: regError } = await supabase.from('employee_registrations').update({ status: 'approved' }).eq('id', req.id);
+      const { error: regError } = await supabase.from('employee_registrations')
+      .update({ status: 'approved' })
+      .eq('id', req.id)
+      .select();
+
       if (regError) throw regError;
 
       // 3. Log activity
@@ -105,7 +109,6 @@ export default function HRNotificationCenter() {
     if (isProcessing) return;
     setIsProcessing(true);
 
-    // 🔥 OPTIMISTIC UI: Instantly vanish the card
     setPendingRequests(prev => prev.filter(r => r.id !== req.id));
 
     try {

@@ -257,19 +257,21 @@ export default function AddVisitorGovtPage() {
 
       const finalStartDate = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
       const finalEndDate = endDate ? new Date(endDate).toISOString() : finalStartDate;
+      const exactApprovalTime = new Date().toISOString();
 
       const { error: visitError } = await supabase.from('visits').insert({
         visit_id: newVisitId,
         visitor_id: finalVisitorId,
         host_employee_id: currentUser.empId,
-        visit_type: pipeline === 'Pre-Scheduled Visit' ? 'Scheduled' : 'immediate',
+        visit_type: `HR_${pipeline === 'Pre-Scheduled Visit' ? 'Scheduled' : pipeline === 'Repeated Visitor' ? 'Repeated' : 'immediate'}`,
         pass_type: passType,
         purpose: finalPurpose,
         start_date: finalStartDate,
         end_date: finalEndDate,
         status: 'Approved',
-        approved_at: new Date().toISOString(), // Automatically log approval time
-        department: department
+        department: department,
+        category : 'Government Clearance',
+        approved_at : exactApprovalTime,
       });
 
       if (visitError) throw visitError;

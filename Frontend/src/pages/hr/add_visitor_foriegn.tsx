@@ -33,6 +33,7 @@ interface ExistingVisitor {
   organization: string;
   designation: string;
   nationality: string;
+  
 }
 
 export default function AddVisitorForeignPage() {
@@ -245,18 +246,18 @@ export default function AddVisitorForeignPage() {
 
       const finalStartDate = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
       const finalEndDate = endDate ? new Date(endDate).toISOString() : finalStartDate;
+      const exactApprovalTime = new Date().toISOString();
 
       const { error: visitError } = await supabase.from('visits').insert({
         visit_id: newVisitId,
         visitor_id: finalVisitorId,
         host_employee_id: currentUser.empId, 
-        visit_type: pipeline === 'Pre-Scheduled Visit' ? 'Scheduled' : 'immediate',
-        pass_type: passType,
+        visit_type: `Foriegn_${pipeline === 'Pre-Scheduled Visit' ? 'Scheduled' : pipeline === 'Repeated Visitor' ? 'Repeated' : 'immediate'}`,
+        approved_at: exactApprovalTime,        pass_type: passType,
         purpose: finalPurpose,
         start_date: finalStartDate,
         end_date: finalEndDate,
         status: 'Approved',
-        approved_at: new Date().toISOString(), // Automatically log approval time
         department: department
       });
 

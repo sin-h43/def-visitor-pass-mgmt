@@ -381,15 +381,22 @@ export default function VisitorMgmtPage() {
       )
     },
     {
-      key: 'checkout',
-      label: 'CHECKOUT / STATUS LOG',
-      render: (row) => (
-        <div>
-          <div className="text-[11px] text-slate-500 mb-0.5 font-mono"><span className="font-semibold text-emerald-600">Approved:</span> {row.approvedAt !== 'N/A' ? row.approvedAt : '--'}</div>
-          <div className="text-[11px] text-slate-500 font-mono"><span className="font-semibold text-rose-600">Checkout:</span> {row.checkoutTime !== 'N/A' ? row.checkoutTime : '--'}</div>
-        </div>
-      )
-    },
+  key: 'checkout',
+  label: 'APPROVAL / CHECKOUT / EXPIRY',
+  render: (row) => (
+    <div className="space-y-1">
+      <div className="text-[11px] text-slate-500 font-mono">
+        <span className="font-semibold text-emerald-600">Approved:</span> {row.approvedAt !== 'N/A' ? row.approvedAt : '--'}
+      </div>
+      <div className="text-[11px] text-slate-500 font-mono">
+        <span className="font-semibold text-rose-600">Checkout:</span> {row.checkoutTime !== 'N/A' ? row.checkoutTime : '--'}
+      </div>
+      <div className="text-[11px] text-slate-500 font-mono">
+        <span className="font-semibold text-amber-600">Expiry:</span> {row.expectedOut !== 'N/A' ? row.expectedOut : '--'}
+      </div>
+    </div>
+  )
+},
     {
       key: 'category',
       label: 'CATEGORY',

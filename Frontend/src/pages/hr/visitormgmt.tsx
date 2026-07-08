@@ -108,10 +108,10 @@ export default function VisitorMgmtPage() {
       
       if (data) {
         const transformed: ExtendedVisitorRecord[] = data.map((row: any) => {
-          let uiPipeline = 'Walk in';
+          let uiPipeline: 'immediate' | 'scheduled' | 'repeated' = 'immediate';
           const dbType = row.visit_type?.toLowerCase();
-          if (dbType === 'prescheduled' || dbType === 'scheduled') uiPipeline = 'Pre-Scheduled';
-          if (dbType === 'repeated') uiPipeline = 'Repeated';
+          if (dbType === 'prescheduled' || dbType === 'scheduled') uiPipeline = 'scheduled';
+          if (dbType === 'repeated') uiPipeline = 'repeated';
 
           let computedCategory = 'General';
           if (row.visit_type) {

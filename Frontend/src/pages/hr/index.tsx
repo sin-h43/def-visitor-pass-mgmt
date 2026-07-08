@@ -16,6 +16,7 @@ export interface ExtendedVisitorRecord extends VisitorRecord {
   passType: string;
   checkoutTime?: string;
   approvedAt?: string;
+  expectedOut?: string;
 }
 
 export default function HRDashboard() {
@@ -107,7 +108,7 @@ export default function HRDashboard() {
             computedCategory = 'Foreign';
           }
           const escortsArray = Array.isArray(row.escorts) ? row.escorts : (row.escorts ? [row.escorts] : []);
-
+          const endD = row.end_date ? new Date(row.end_date) : null;
           return {
             id: row.visit_id || '',
             visitorId: row.visitors?.visitor_id || 'N/A', 
@@ -126,6 +127,7 @@ export default function HRDashboard() {
             // ✅ FIX: Map exactly to approved_at
             approvedAt: row.approved_at ? new Date(row.approved_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
             checkoutTime: row.actual_out ? new Date(row.actual_out).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
+            expectedOut: endD ? endD.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A',
             
             status: row.status || 'Pending',
             passType: row.pass_type || 'One_day',
@@ -315,6 +317,23 @@ export default function HRDashboard() {
         return <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded border border-slate-200">{row.status}</span>;
       }
     },
+    {
+  key: 'timing',
+  label: 'APPROVAL / CHECKOUT / EXPIRY',
+  render: (row) => (
+    <div className="space-y-1">
+      <div className="text-[11px] text-slate-500 font-mono">
+        <span className="font-semibold text-emerald-600">Approved:</span> {row.approvedAt !== 'N/A' ? row.approvedAt : '--'}
+      </div>
+      <div className="text-[11px] text-slate-500 font-mono">
+        <span className="font-semibold text-rose-600">Checkout:</span> {row.checkoutTime !== 'N/A' ? row.checkoutTime : '--'}
+      </div>
+      <div className="text-[11px] text-slate-500 font-mono">
+        <span className="font-semibold text-amber-600">Expiry:</span> {row.expectedOut !== 'N/A' ? row.expectedOut : '--'}
+      </div>
+    </div>
+  )
+},
     { key: 'id', label: 'ACTIONS', render: (row) => (
         <div className="flex items-center space-x-1">
           {row.status === 'Pending' && (

@@ -89,7 +89,7 @@ export default function SecurityDashboard() {
         const dbType = (visitLog.visit_type || '').toLowerCase();
         
         if (dbType.includes('govt')) category = 'Govt';
-        else if (dbType.includes('hr')) category = 'HR';
+        else if (dbType.includes('hod')) category = 'HOD';
         else if (dbType.includes('service')) category = 'Service';
         else if (dbType.includes('foreign') || isForeign) category = 'Foreign';
 
@@ -236,7 +236,13 @@ export default function SecurityDashboard() {
 
   const filterGroups = [
     { key: 'priority', title: 'Risk / Priority Level', options: [{ label: 'High Priority', value: 'high' }, { label: 'Medium Priority', value: 'medium' }, { label: 'Standard Priority', value: 'low' }] },
-    { key: 'category', title: 'Clearance Category', options: [{ label: 'Govt / Defence', value: 'Govt' }, { label: 'Foreign National', value: 'Foreign' }, { label: 'Service / Vendor', value: 'Service' }, { label: 'HOD Registry', value: 'HR' }, { label: 'General Walk-in', value: 'General' }] }
+    { key: 'category',
+      title: 'Clearance Category',
+      options: [{ label: 'Govt / Defence', value: 'Govt' },
+        { label: 'Foreign National', value: 'Foreign' },
+        { label: 'Service / Vendor', value: 'Service' },
+        { label: 'HOD Registry', value: 'HOD' },
+        { label: 'General Walk-in', value: 'General' }] }
   ];
 
   const applyFilters = (data: QueueItemWithDetails[]) => {

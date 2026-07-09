@@ -269,6 +269,7 @@ useEffect(() => {
         start_date: finalStartDate,
         end_date: finalEndDate,
         status: 'Approved',
+        category: 'service',
         approved_at: exactApprovalTime,
         department: department
       });

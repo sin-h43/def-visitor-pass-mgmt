@@ -250,10 +250,6 @@ export default function AddVisitorGovtPage() {
       if (visitorError) throw visitorError;
 
       let finalPurpose = `[GOVT CLEARANCE: ${govtIdType}] ${purpose}`;
-      // if (escorts.length > 0) {
-      //   const guestList = escorts.map(esc => `${esc.name} (ID: ${esc.govId})`).join(', ');
-      //   finalPurpose += ` | Accompanying Guest Manifest: ${guestList}`;
-      // }
 
       const finalStartDate = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
       const finalEndDate = endDate ? new Date(endDate).toISOString() : finalStartDate;
@@ -263,14 +259,14 @@ export default function AddVisitorGovtPage() {
         visit_id: newVisitId,
         visitor_id: finalVisitorId,
         host_employee_id: currentUser.empId,
-        visit_type: `HR_${pipeline === 'Pre-Scheduled Visit' ? 'Scheduled' : pipeline === 'Repeated Visitor' ? 'Repeated' : 'immediate'}`,
+        category: 'govt',
+        visit_type: pipeline === 'Pre-Scheduled Visit' ? 'Scheduled' : pipeline === 'Repeated Visitor' ? 'Repeated' : 'immediate',
         pass_type: passType,
         purpose: finalPurpose,
         start_date: finalStartDate,
         end_date: finalEndDate,
         status: 'Approved',
         department: department,
-        category : 'Government Clearance',
         approved_at : exactApprovalTime,
       });
 

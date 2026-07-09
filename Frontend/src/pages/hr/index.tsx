@@ -84,7 +84,7 @@ export default function HRDashboard() {
         .from('visits')
         // ✅ FIX: Explicitly request approved_at and actual_out
         .select(`
-          visit_id, visit_type, pass_type, purpose, status, start_date, end_date, created_at, hr_remarks, approved_at, actual_out,
+          visit_id, visit_type, pass_type, purpose, status, start_date, end_date, created_at, hr_remarks, approved_at, actual_out,category,
           visitors (visitor_id, name, gender, phone, email, nationality, organization, designation, document_url, dob, id_type, id_number, address),
           host:employees!visits_host_employee_id_fkey (name, role, employee_id), department
         `);
@@ -99,10 +99,10 @@ export default function HRDashboard() {
           if (dbType === 'repeated') uiPipeline = 'repeated';
 
           let computedCategory = 'General';
-          if (row.visit_type) {
-            const type = row.visit_type.toLowerCase();
+          if (row.category) {
+            const type = row.category.toLowerCase();
             if (type.includes('govt')) computedCategory = 'Govt';
-            else if (type.includes('hr')) computedCategory = 'HR';
+            else if (type.includes('hod')) computedCategory = 'HOD';
             else if (type.includes('service')) computedCategory = 'Service';
             else if (type.includes('foreign')) computedCategory = 'Foreign';
           } else if (row.visitors?.nationality?.toLowerCase() !== 'indian') {

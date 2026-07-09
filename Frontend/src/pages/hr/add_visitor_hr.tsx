@@ -259,12 +259,6 @@ export default function AddVisitorHRPage() {
       if (visitorError) throw visitorError;
 
       let finalPurpose = `[HOD TRACK: ${hrOnboardingTrack}] ${purpose}`;
-      // if (escorts.length > 0) {
-      //   const guestList = escorts.map(esc => `${esc.name} (ID: ${esc.govId})`).join(', ');
-      //   finalPurpose += ` | Accompanying Guest Manifest: ${guestList}`;
-      // }
-
-      // const startDate = pipeline === 'Pre-Scheduled Visit' && scheduledDate ? new Date(scheduledDate).toISOString() : new Date().toISOString();
       const finalStartDate = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
       // Default end date to start date + 1 hour if not provided, or map to user input
       const finalEndDate = endDate ? new Date(endDate).toISOString() : finalStartDate;
@@ -272,6 +266,7 @@ export default function AddVisitorHRPage() {
         visit_id: newVisitId,
         visitor_id: finalVisitorId,
         host_employee_id: currentUser.empId, // Dynamically linked to the HR's employee ID
+        category: 'hod',
         visit_type: pipeline === 'Pre-Scheduled Visit' ? 'Scheduled' : 'immediate', // Dynamically matching your DB
         pass_type: passType,
         purpose: finalPurpose,

@@ -251,9 +251,11 @@ export default function AddVisitorForeignPage() {
       const { error: visitError } = await supabase.from('visits').insert({
         visit_id: newVisitId,
         visitor_id: finalVisitorId,
+        category: 'foreign',
         host_employee_id: currentUser.empId, 
-        visit_type: `Foriegn_${pipeline === 'Pre-Scheduled Visit' ? 'Scheduled' : pipeline === 'Repeated Visitor' ? 'Repeated' : 'immediate'}`,
-        approved_at: exactApprovalTime,        pass_type: passType,
+        visit_type: pipeline === 'Pre-Scheduled Visit' ? 'Scheduled' : pipeline === 'Repeated Visitor' ? 'Repeated' : 'immediate',
+        approved_at: exactApprovalTime,        
+        pass_type: passType,
         purpose: finalPurpose,
         start_date: finalStartDate,
         end_date: finalEndDate,

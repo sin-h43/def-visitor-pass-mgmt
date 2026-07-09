@@ -114,10 +114,10 @@ export default function VisitorMgmtPage() {
           if (dbType === 'repeated') uiPipeline = 'repeated';
 
           let computedCategory = 'General';
-          if (row.visit_type) {
-            const type = row.visit_type.toLowerCase();
+          if (row.category) {
+            const type = row.category.toLowerCase();
             if (type.includes('govt')) computedCategory = 'Govt';
-            else if (type.includes('hr')) computedCategory = 'HR';
+            else if (type.includes('hod')) computedCategory = 'HOD';
             else if (type.includes('service')) computedCategory = 'Service';
             else if (type.includes('foreign')) computedCategory = 'Foreign';
           } else if (row.visitors?.nationality?.toLowerCase() !== 'indian') {

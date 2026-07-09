@@ -17,6 +17,7 @@ export interface ExtendedVisitorRecord extends VisitorRecord {
   checkoutTime?: string;
   approvedAt?: string;
   expectedOut?: string;
+  daysLeft?: string;
 }
 
 export default function HRDashboard() {
@@ -109,6 +110,14 @@ export default function HRDashboard() {
           }
           const escortsArray = Array.isArray(row.escorts) ? row.escorts : (row.escorts ? [row.escorts] : []);
           const endD = row.end_date ? new Date(row.end_date) : null;
+          let dLeft = 'N/A';
+          if (endD) {
+            const dTime = endD.getTime() - new Date().getTime();
+            const dRaw = dTime / (1000 * 60 * 60 * 24);
+            if (dRaw < 0) dLeft = 'Expired';
+            else if (dRaw < 1) dLeft = 'Expires Today';
+            else dLeft = `${Math.ceil(dRaw)} Days Left`;
+          }
           return {
             id: row.visit_id || '',
             visitorId: row.visitors?.visitor_id || 'N/A', 
@@ -128,7 +137,7 @@ export default function HRDashboard() {
             approvedAt: row.approved_at ? new Date(row.approved_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
             checkoutTime: row.actual_out ? new Date(row.actual_out).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
             expectedOut: endD ? endD.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A',
-            
+            daysLeft: dLeft,            
             status: row.status || 'Pending',
             passType: row.pass_type || 'One_day',
             pipeline: uiPipeline,
@@ -554,6 +563,12 @@ export default function HRDashboard() {
                         <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Requested By</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.hostName}</span></div>
                         <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Request Date</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.requestedAt}</span></div>
                         <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Scheduled Visit</span><span className="col-span-2 font-medium text-slate-900 text-blue-600">{selectedVisitor.visitDate}</span></div>
+                        {selectedVisitor.checkoutTime && (
+                            <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Gate Check-Out</span><span className="col-span-2 font-medium text-slate-900 text-rose-600">{selectedVisitor.checkoutTime !== 'N/A' ? selectedVisitor.checkoutTime : 'Pending / NA'}</span></div>
+                          )}
+                          <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100"><span className="text-slate-500">Authorized Pass</span><span className="col-span-2 font-black text-slate-800 capitalize tracking-wide">{selectedVisitor.passType}</span></div>
+                          <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Expiry Target</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.expectedOut}</span></div>
+                          <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Validity Status</span><span className={`col-span-2 font-bold ${selectedVisitor.daysLeft === 'Expired' ? 'text-rose-600' : 'text-emerald-600'}`}>{selectedVisitor.daysLeft}</span></div>                        
                       </div>
                     </section>
 

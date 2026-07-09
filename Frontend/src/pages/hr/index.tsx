@@ -40,7 +40,7 @@ export default function HRDashboard() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
-    category: ['Govt', 'Foreign', 'Service', 'General', 'HR'],
+    category: ['Govt', 'Foreign', 'Service', 'General', 'HOD'],
     pipeline: ['immediate', 'scheduled', 'repeated'],
     status: ['Pending', 'Approved', 'Denied', 'Cleared', 'Active']
   });
@@ -302,7 +302,7 @@ export default function HRDashboard() {
   });
 
   const hrFilterGroups = [
-    { key: 'category', title: 'Category Tracks', options: [ { label: 'Government / Defence', value: 'Govt' }, { label: 'Foreign Nationals', value: 'Foreign' }, { label: 'Service / Vendors', value: 'Service' }, { label: 'General Walk-ins', value: 'General' } ] },
+    { key: 'category', title: 'Category Tracks', options: [ { label: 'Government / Defence', value: 'Govt' }, { label: 'Foreign Nationals', value: 'Foreign' }, { label: 'Service / Vendors', value: 'Service' }, { label: 'General Walk-ins', value: 'General' },{ label: 'HOD Registry', value: 'HOD' } ] },
     { key: 'pipeline', title: 'Pipeline Types', options: [ { label: 'Immediate Access', value: 'immediate' }, { label: 'Pre-Scheduled Entry', value: 'scheduled' }, { label: 'Repeated Framework', value: 'repeated' } ] },
     { key: 'status', title: 'Pass Clearance Status', options: [ { label: 'Pending Review', value: 'Pending' }, { label: 'Approved Access', value: 'Approved' }, { label: 'Active On-Site', value: 'Active' }, { label: 'Cleared Outposts', value: 'Cleared' } ] }
   ];

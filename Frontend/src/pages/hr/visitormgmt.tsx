@@ -59,13 +59,13 @@ export default function VisitorMgmtPage() {
             uuid: employee.auth_id || employee.id,
             empId: employee.employee_id,
             name: employee.name,
-            dept: employee.department || 'HR Department',
+            dept: employee.department || 'HOD Department',
             avatarUrl: employee.avatar_url || '' 
           });
         }
       } catch (err) {
-        console.error('Failed to load HR profile:', err);
-        setCurrentUser(prev => ({ ...prev, name: 'HR Admin' }));
+        console.error('Failed to load HOD profile:', err);
+        setCurrentUser(prev => ({ ...prev, name: 'HOD Admin' }));
       }
     };
     loadUserProfile();
@@ -144,7 +144,7 @@ export default function VisitorMgmtPage() {
             category: computedCategory, 
             purpose: row.purpose || 'General Entry',
             hostName: row.host?.name || 'Unassigned',
-            hostDept: row.host?.role === 'hr' ? 'HR Officer' : 'Staff Member',
+            hostDept: row.host?.role === 'hr' ? 'HOD Admin' : 'Staff Member',
             hostId: row.host?.employee_id || 'N/A',
             requestedAt: row.created_at ? new Date(row.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
             visitDate: row.start_date ? new Date(row.start_date).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
@@ -245,19 +245,19 @@ export default function VisitorMgmtPage() {
         incident_type: 'emergency_revocation', 
         severity: 'Critical',
         excess_minutes: 0,
-        reason: `HR INITIATED KICK-OUT: ${emergencyReason}`, 
-        reported_by: currentUser.name || 'HR Desk', 
+        reason: `HOD INITIATED KICK-OUT: ${emergencyReason}`, 
+        reported_by: currentUser.name || 'HOD Desk', 
         status: 'open'
       }]);
 
       await supabase.from('audit_logs').insert([{
         visitor_id: emergencyModal.visitorId, 
         action: 'emergency_removal', 
-        performed_by_id: currentUser.empId || 'HR-000', 
-        performed_by: currentUser.name || 'HR Admin',
+        performed_by_id: currentUser.empId || 'HOD-000', 
+        performed_by: currentUser.name || 'HOD Admin',
         performed_by_role: 'hr', 
         severity: 'Critical', 
-        remarks: `[EMERGENCY REVOCATION BY HR]: ${emergencyReason}`
+        remarks: `[EMERGENCY REVOCATION BY HOD]: ${emergencyReason}`
       }]);
 
     } catch (error) { 
@@ -289,7 +289,8 @@ export default function VisitorMgmtPage() {
         { label: 'Government / Defence', value: 'Govt' },
         { label: 'Foreign Nationals', value: 'Foreign' },
         { label: 'Service / Vendors', value: 'Service' },
-        { label: 'General Walk-ins', value: 'General' }
+        { label: 'General Walk-ins', value: 'General' },
+        { label: 'HOD Registry', value: 'HOD' }
       ]
     },
     {

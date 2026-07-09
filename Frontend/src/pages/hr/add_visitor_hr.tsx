@@ -33,7 +33,7 @@ export default function AddVisitorHRPage() {
   const [passType, setPassType] = useState('One_day');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [department, setDepartment] = useState('HR Department');
+  const [department, setDepartment] = useState('HOD Department');
 
   const [existingVisitorId, setExistingVisitorId] = useState<string | null>(null);
 
@@ -234,7 +234,7 @@ export default function AddVisitorHRPage() {
         documentUrl = publicUrlData.publicUrl;
       }
       
-      setUploadingText('Saving secure HR registries...');
+      setUploadingText('Saving secure HOD registries...');
 // ✅ Changed to .upsert and added the onConflict rule at the bottom
       const { error: visitorError } = await supabase.from('visitors').upsert({
         visitor_id: finalVisitorId,
@@ -247,7 +247,7 @@ export default function AddVisitorHRPage() {
         id_type: idType,
         id_number: idNumber || 'Pending Verification',
         nationality: nationality,
-        organization: organization || 'Internal HR Evaluation',
+        organization: organization || 'Internal HOD Evaluation',
         designation: hrOnboardingTrack,
         document_url: documentUrl,
       }, {

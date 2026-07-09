@@ -309,7 +309,15 @@ export default function HRDashboard() {
 
   const columns: TableColumn<ExtendedVisitorRecord>[] = [
     { key: 'id', label: 'PASS ID', render: (row) => <span className="text-blue-600 font-mono font-bold text-xs">{row.id}</span> },
-    { key: 'visitorName', label: 'VISITOR DETAILS', render: (row) => ( <div><div className="font-semibold text-slate-800 text-sm">{row.visitorName}</div><div className="text-xs text-slate-500 font-mono">{row.phone}</div></div> ) },
+    { key: 'visitorName',
+      label: 'VISITOR DETAILS',
+      render: (row) => ( 
+      <div>
+        <div className="font-semibold text-slate-800 text-sm">{row.visitorName}</div>
+        <div className="text-xs text-slate-500 font-mono">{row.phone}</div>
+        <div className="text-xs text-slate-500 font-mono">{row.email}</div> 
+      </div> ) 
+    },
     { key: 'category', label: 'CATEGORY', render: (row) => {
         const colors: Record<string, string> = { HOD: 'bg-purple-50 text-purple-500 border-purple-100', Govt:'bg-emerald-50 text-emerald-500 border-emerald-100', Foreign: 'bg-amber-50 text-amber-500 border-amber-100', Service: 'bg-orange-50 text-orange-500 border-orange-100', General: 'bg-blue-50 text-blue-500 border-blue-100' };
         const safeCategory = row.category || 'General';

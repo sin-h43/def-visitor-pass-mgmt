@@ -133,9 +133,3 @@ The system is actively evolving. Planned/candidate enhancements, roughly grouped
 
 ---
 
-## Contribution Notes
-
-- All fixes/features are delivered as files or diffs — verify locally before pushing to `main`, since `main` auto-deploys.
-- New components should follow existing patterns: `DashboardLayout` for page shells, `HRNotificationCenter`/`SecurityNotificationCenter` polling pattern for live feeds, `audit_logs`/`forensic_incidents` conventions for anything security-relevant.
-- Git history is a reliable rollback path — use `git log` / `git show` before assuming a file needs to be rebuilt from scratch.
-- 

@@ -79,12 +79,13 @@ export default function HRNotificationCenter() {
       if (empError) throw empError;
 
       // 2. Mark as approved in DB
-      const { error: regError } = await supabase.from('employee_registrations')
+      const { data, error: regError } = await supabase.from('employee_registrations')
       .update({ status: 'approved' })
       .eq('id', req.id)
       .select();
 
       if (regError) throw regError;
+      if (!data || (Array.isArray(data) && data.length === 0)) throw new Error('Update blocked (0 rows affected) — check RLS policy on employee_registrations');
 
       // 3. Log activity
       await supabase.from('audit_logs').insert([{
@@ -112,8 +113,11 @@ export default function HRNotificationCenter() {
     setPendingRequests(prev => prev.filter(r => r.id !== req.id));
 
     try {
-      const { error: regError } = await supabase.from('employee_registrations').update({ status: 'rejected' }).eq('id', req.id);
+      const { error: regError } = await supabase.from('employee_registrations')
+      .update({ status: 'rejected' })
+      .eq('id', req.id);
       if (regError) throw regError;
+      // if (!data || data.length === 0) throw new Error('Update blocked (0 rows affected) — check RLS policy on employee_registrations');
 
       await supabase.from('audit_logs').insert([{
         action: 'account_rejected',
@@ -147,7 +151,7 @@ export default function HRNotificationCenter() {
       >
         <Bell className="w-5 h-5 text-slate-700" />
         {pendingRequests.length > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white border-2 border-white shadow-sm">
+          <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white border-2 border-white shadow-sm">
             {pendingRequests.length}
           </span>
         )}
@@ -166,8 +170,8 @@ export default function HRNotificationCenter() {
               
               {/* ACTION REQUIRED SECTION */}
               <div>
-                <h4 className="text-[10px] font-bold text-blue-600 uppercase tracking-wider flex items-center mb-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mr-2"></span>
+                <h4 className="text-[10px] font-bold text-blue-500 uppercase tracking-wider flex items-center mb-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-2"></span>
                   Action Required ({pendingRequests.length})
                 </h4>
                 
@@ -192,7 +196,7 @@ export default function HRNotificationCenter() {
                           <button 
                             onClick={() => handleApprove(req)}
                             disabled={isProcessing}
-                            className="flex-1 py-2 bg-blue-600 text-white hover:bg-blue-700 text-xs font-bold rounded-lg flex items-center justify-center transition-colors shadow-sm disabled:opacity-50"
+                            className="flex-1 py-2 bg-blue-500 text-white hover:bg-blue-700 text-xs font-bold rounded-lg flex items-center justify-center transition-colors shadow-sm disabled:opacity-50"
                           >
                             <CheckCircle className="w-3.5 h-3.5 mr-1" /> Approve
                           </button>
@@ -237,7 +241,7 @@ export default function HRNotificationCenter() {
             </div>
 
             <div className="p-3 border-t border-slate-100 bg-slate-50 text-center">
-              <Link to="/hr/audit" onClick={() => setIsOpen(false)} className="text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors">
+              <Link to="/hod/audit" onClick={() => setIsOpen(false)} className="text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors">
                 View Full Audit History →
               </Link>
             </div>

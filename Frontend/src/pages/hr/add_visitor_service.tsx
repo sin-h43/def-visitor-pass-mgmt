@@ -267,7 +267,7 @@ useEffect(() => {
         pass_type: passType,
         purpose: finalPurpose,
         start_date: finalStartDate,
-        end_date: finalEndDate,
+        end_date: finalEndDate || '--',
         status: 'Approved',
         category: 'service',
         approved_at: exactApprovalTime,

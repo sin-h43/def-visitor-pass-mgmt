@@ -271,7 +271,7 @@ export default function AddVisitorHRPage() {
         pass_type: passType,
         purpose: finalPurpose,
         start_date: finalStartDate, 
-        end_date: finalEndDate,    
+        end_date: finalEndDate || '--',    
         status: 'Approved',
         department: department
       });

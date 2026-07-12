@@ -60,7 +60,7 @@ export default function RegistrationForm() {
   // Field Target Operations
   const [pipeline, setPipeline] = useState(prefillData?.pipeline === 'Pre-Scheduled' ? 'Pre-Scheduled Visit' : (prefillData?.pipeline === 'Repeated' ? 'Repeated Visitor' : 'New Visitor / Urgent Access'));
   const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [endDate, setEndDate] = useState('--');
   const [department, setDepartment] = useState(prefillData?.department || 'Research Wing');
 
   const [visitorId, setVisitorId] = useState<string | null>(prefillData?.visitorId || null); 
@@ -346,7 +346,7 @@ export default function RegistrationForm() {
           visit_type: dbVisitType, 
           purpose: finalPurpose, 
           start_date: startDateIso, 
-          end_date: endDateIso,
+          end_date: endDateIso || '--',
           pass_type: passType,
           status: 'Pending',       
           hr_remarks: null,        

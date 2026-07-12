@@ -260,7 +260,7 @@ export default function AddVisitorGovtPage() {
         visitor_id: finalVisitorId,
         host_employee_id: currentUser.empId,
         category: 'govt',
-        visit_type: pipeline === 'Pre-Scheduled Visit' ? 'Scheduled' : pipeline === 'Repeated Visitor' ? 'Repeated' : 'immediate',
+        visit_type: pipeline === 'Pre-Scheduled Visit' ? 'Scheduled' : 'immediate',
         pass_type: passType,
         purpose: finalPurpose,
         start_date: finalStartDate,

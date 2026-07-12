@@ -254,7 +254,7 @@ export default function AddVisitorForeignPage() {
         category: 'foreign',
         host_employee_id: currentUser.empId, 
         visit_type: pipeline === 'Pre-Scheduled Visit' ? 'Scheduled' : pipeline === 'Repeated Visitor' ? 'Repeated' : 'immediate',
-        approved_at: exactApprovalTime,        
+        approved_at: exactApprovalTime || '--',        
         pass_type: passType,
         purpose: finalPurpose,
         start_date: finalStartDate,

@@ -292,7 +292,7 @@ export default function HRDashboard() {
 
   const matrixFilteredRows = dataList.filter(row => {
     const matchesSearch = row.visitorName.toLowerCase().includes(searchTerm.toLowerCase()) || row.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = (selectedFilters.category || []).includes(row.category || '');
+    const matchesCategory = (selectedFilters.category.length === 0) || selectedFilters.category.includes(row.category || '');
     const matchesPipeline = (selectedFilters.pipeline || []).includes(row.pipeline);
     const matchesStatus = (selectedFilters.status || []).includes(row.status);
 
@@ -475,7 +475,7 @@ export default function HRDashboard() {
                   </div>
                   <span className="text-xs text-slate-400">Go →</span>
                 </Link>
-                <Link to="/hod/hrrep" className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-amber-500 hover:bg-slate-50/50 transition-all group">
+                <Link to="/hod/hodrep" className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:border-amber-500 hover:bg-slate-50/50 transition-all group">
                   <div className="flex items-center text-sm font-medium text-slate-700">
                     <History className="w-4 h-4 mr-3 text-slate-400 group-hover:text-amber-500" />
                     Review Repeated Manifests
@@ -553,7 +553,7 @@ export default function HRDashboard() {
               {(() => {
                 const isForeign = selectedVisitor.category === 'Foreign';
                 const isGovt = selectedVisitor.category === 'Govt';
-                const isHR = selectedVisitor.category === 'HR';
+                const isHR = selectedVisitor.category === 'HOD';
                 const isService = selectedVisitor.category === 'Service';
 
                 const orgLabel = isGovt ? 'Command Ministry' : isService ? 'Contracting Agency' : isForeign ? 'Global Organization' : isHR ? 'Sponsoring Inst.' : 'Organization';

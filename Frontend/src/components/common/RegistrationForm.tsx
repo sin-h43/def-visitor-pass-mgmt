@@ -360,9 +360,17 @@ export default function RegistrationForm() {
           const standardGeneratedId = `VIS${timestamp}`;
           activeVisitorId = standardGeneratedId;
           const { error: visitorError } = await supabase.from('visitors').insert({
-            visitor_id: standardGeneratedId, name: visitorName, email: email || null, phone: phone,
-            gender: gender || 'Others', dob: dob || null, address: address || null, id_type: idType,
-            id_number: idNumber || 'Pending', nationality: nationality, organization: organization || null,
+            visitor_id: standardGeneratedId,
+            name: visitorName,
+            email: email || null,
+            phone: phone,
+            gender: gender || 'Others',
+            dob: dob || null,
+            address: address || null,
+            id_type: idType,
+            id_number: idNumber || 'Pending',
+            nationality: nationality,
+            organization: organization || null,
             designation: designation || null,
             document_url: documentUrl
           });

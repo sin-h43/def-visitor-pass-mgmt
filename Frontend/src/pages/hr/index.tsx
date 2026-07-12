@@ -16,8 +16,9 @@ export interface ExtendedVisitorRecord extends VisitorRecord {
   passType: string;
   checkoutTime?: string;
   approvedAt?: string;
-  expectedOut?: string;
+  // expectedOut?: string;
   daysLeft?: string;
+  endDate?:string;
 }
 
 export default function HRDashboard() {
@@ -136,7 +137,8 @@ export default function HRDashboard() {
             // ✅ FIX: Map exactly to approved_at
             approvedAt: row.approved_at ? new Date(row.approved_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
             checkoutTime: row.actual_out ? new Date(row.actual_out).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'N/A',
-            expectedOut: endD ? endD.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A',
+            // expectedOut: endD ? endD.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A',
+            endDate: row.end_date || '--',
             daysLeft: dLeft,            
             status: row.status || 'Pending',
             passType: row.pass_type || 'One_day',
@@ -346,7 +348,7 @@ export default function HRDashboard() {
         <span className="font-semibold text-rose-600">Checkout:</span> {row.checkoutTime !== 'N/A' ? row.checkoutTime : '--'}
       </div>
       <div className="text-[11px] text-slate-500 font-mono">
-        <span className="font-semibold text-amber-600">Expiry:</span> {row.expectedOut !== 'N/A' ? row.expectedOut : '--'}
+        <span className="font-semibold text-amber-600">Expiry:</span> {row.endDate}
       </div>
     </div>
   )
@@ -575,7 +577,7 @@ export default function HRDashboard() {
                             <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Gate Check-Out</span><span className="col-span-2 font-medium text-slate-900 text-rose-600">{selectedVisitor.checkoutTime !== 'N/A' ? selectedVisitor.checkoutTime : 'Pending / NA'}</span></div>
                           )}
                           <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100"><span className="text-slate-500">Authorized Pass</span><span className="col-span-2 font-black text-slate-800 capitalize tracking-wide">{selectedVisitor.passType}</span></div>
-                          <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Expiry Target</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.expectedOut}</span></div>
+                          <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Expiry Target</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.endDate}</span></div>
                           <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Validity Status</span><span className={`col-span-2 font-bold ${selectedVisitor.daysLeft === 'Expired' ? 'text-rose-600' : 'text-emerald-600'}`}>{selectedVisitor.daysLeft}</span></div>                        
                       </div>
                     </section>

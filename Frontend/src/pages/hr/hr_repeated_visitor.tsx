@@ -256,7 +256,7 @@ export default function HRRepeatedVisitorLogPage() {
             <RefreshCw className="w-3 h-3 mr-1.5" /> Re-Register
           </button>
           <button 
-            onClick={() => navigate(`/hod/hrrep/${row.id}`, { state: { profile: row } })} 
+            onClick={() => navigate(`/hod/hodrep/${row.id}`, { state: { profile: row } })} 
             className="px-3 py-1.5 bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-indigo-100 transition-all border border-indigo-200"
           >
             Full Profile

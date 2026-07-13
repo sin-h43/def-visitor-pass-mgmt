@@ -208,7 +208,7 @@ export default function HRRepeatedVisitorLogPage() {
       label: 'IDENTITY PROFILE',
       render: (row) => (
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
+          <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
             {row.name.substring(0, 2).toUpperCase()}
           </div>
           <div>
@@ -233,7 +233,7 @@ export default function HRRepeatedVisitorLogPage() {
       label: 'HISTORY VOLUME',
       render: (row) => (
         <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full border ${
-          row.totalVisits > 1 ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-600 border-slate-200'
+          row.totalVisits > 1 ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-50 text-slate-600 border-slate-200'
         }`}>
           {row.totalVisits} {row.totalVisits === 1 ? 'Visit' : 'Visits'}
         </span>
@@ -257,7 +257,7 @@ export default function HRRepeatedVisitorLogPage() {
           </button>
           <button 
             onClick={() => navigate(`/hod/hodrep/${row.id}`, { state: { profile: row } })} 
-            className="px-3 py-1.5 bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-indigo-100 transition-all border border-indigo-200"
+            className="px-3 py-1.5 bg-blue-50 text-blue-700 text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-blue-100 transition-all border border-blue-200"
           >
             Full Profile
           </button>
@@ -271,7 +271,7 @@ export default function HRRepeatedVisitorLogPage() {
       <DashboardLayout role="hr" userName={currentUser.userName}  >
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-pulse flex flex-col items-center">
-            <div className="h-8 w-8 bg-indigo-600 rounded-full mb-4"></div>
+            <div className="h-8 w-8 bg-blue-600 rounded-full mb-4"></div>
             <p className="text-slate-500 font-medium tracking-wide">Compiling Visitor Master Directory...</p>
           </div>
         </div>
@@ -310,7 +310,7 @@ export default function HRRepeatedVisitorLogPage() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`pb-2 px-1 relative ${activeTab === tab ? 'text-indigo-600 font-bold border-b-2 border-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`pb-2 px-1 relative ${activeTab === tab ? 'text-blue-600 font-bold border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
               >
                 {tab}
               </button>

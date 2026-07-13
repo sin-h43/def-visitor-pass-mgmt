@@ -39,7 +39,7 @@ export default function AddVisitorGeneralPage() {
         <div className="mb-6">
           <button 
             onClick={() => navigate(-1)} 
-            className="flex items-center text-xs font-bold text-slate-400 hover:text-slate-800 transition-colors"
+            className="flex items-center text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5 mr-1.5" /> Back to Operational Manifest
           </button>

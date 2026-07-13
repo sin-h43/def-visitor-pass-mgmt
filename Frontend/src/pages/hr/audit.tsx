@@ -347,10 +347,7 @@ export default function AuditLogsPage() {
     <DashboardLayout role="hr" userName={currentUser.userName} headerAction={<HRNotificationCenter/>} avatarUrl={currentUser.avatarUrl}>
       <div className="max-w-7xl mx-auto space-y-6">
         
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-slate-800 text-white rounded-lg shadow-sm">
-            <Shield className="w-6 h-6" />
-          </div>
+        <div className="flex items-center space-x-3">          
           <div>
             <h1 className="text-2xl font-bold text-slate-800">Security Audit & Access</h1>
             <p className="text-sm text-slate-500">Immutable ledger of all access grants, denials, and facility movements.</p>

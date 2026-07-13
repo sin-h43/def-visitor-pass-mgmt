@@ -475,9 +475,6 @@ export default function VisitorMgmtPage() {
       <div className="max-w-7xl mx-auto space-y-8">
         
         <div className="flex items-center space-x-3">
-          <div className="p-2 bg-slate-800 text-white rounded-lg shadow-sm">
-            <Users className="w-6 h-6" />
-          </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-800">Visitor Clearance Management</h1>
             <p className="text-sm text-slate-500">Review pending requests and manage facility access approvals.</p>

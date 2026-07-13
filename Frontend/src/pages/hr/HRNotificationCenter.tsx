@@ -241,7 +241,7 @@ export default function HRNotificationCenter() {
             </div>
 
             <div className="p-3 border-t border-slate-100 bg-slate-50 text-center">
-              <Link to="/hod/audit" onClick={() => setIsOpen(false)} className="text-xs font-bold text-slate-500 hover:text-blue-600 transition-colors">
+              <Link to="/hod/audit" onClick={() => setIsOpen(false)} className="text-xs font-bold text-slate-500 hover:text-blue-500 transition-colors">
                 View Full Audit History →
               </Link>
             </div>

@@ -40,7 +40,7 @@ export default function VisitDetailDrawer({ isOpen, onClose, visit }: VisitDetai
             <h2 className="text-lg font-bold text-slate-800">
               {isAccountEvent ? 'System Audit Record' : 'Visit Forensic Record'}
             </h2>
-            <p className="text-xs font-mono text-blue-600 mt-0.5 font-bold">TOKEN: {displayId}</p>
+            <p className="text-xs font-mono text-blue-500 mt-0.5 font-bold">TOKEN: {displayId}</p>
           </div>
           <button onClick={onClose} className="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition-colors">
             <X className="w-5 h-5" />
@@ -77,7 +77,7 @@ export default function VisitDetailDrawer({ isOpen, onClose, visit }: VisitDetai
           {/* 2. Timeline (Adaptive for System vs. Physical entries) */}
           <section>
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center">
-              <Clock className="w-4 h-4 mr-2 text-blue-600" /> 
+              <Clock className="w-4 h-4 mr-2 text-blue-500" /> 
               {isAccountEvent ? 'Event Timestamp' : 'Gate Validation Timeline'}
             </h3>
             
@@ -115,7 +115,7 @@ export default function VisitDetailDrawer({ isOpen, onClose, visit }: VisitDetai
           {/* 3. Remarks Block */}
           <section>
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center">
-              <Shield className="w-4 h-4 mr-2 text-blue-600" /> 
+              <Shield className="w-4 h-4 mr-2 text-blue-500" /> 
               {isAccountEvent ? 'System Audit Details' : 'HOD / Security Remarks'}
             </h3>
             <div className="w-full p-4 border border-slate-200 rounded-xl text-sm bg-blue-50/30 text-slate-700 whitespace-pre-wrap">
@@ -131,7 +131,7 @@ export default function VisitDetailDrawer({ isOpen, onClose, visit }: VisitDetai
           {!isAccountEvent && (
             <section>
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
-                <span className="flex items-center"><Users className="w-4 h-4 mr-2 text-blue-600" /> Escort Manifest</span>
+                <span className="flex items-center"><Users className="w-4 h-4 mr-2 text-blue-500" /> Escort Manifest</span>
                 <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold border border-slate-200">
                   {visit.escorts?.length || 0} Personnel
                 </span>

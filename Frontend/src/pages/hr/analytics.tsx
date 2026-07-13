@@ -50,7 +50,7 @@ export default function AnalyticsPage() {
 
   // High-density data metrics reflecting your visual design requirements
   const visitorCategories: CategoryMetric[] = [
-    { category: 'Contractors', count: 248, percentage: 38, color: 'bg-blue-600', bg: 'bg-blue-50' },
+    { category: 'Contractors', count: 248, percentage: 38, color: 'bg-blue-500', bg: 'bg-blue-50' },
     { category: 'Vendors', count: 157, percentage: 24, color: 'bg-sky-500', bg: 'bg-sky-50' },
     { category: 'Government', count: 105, percentage: 16, color: 'bg-amber-500', bg: 'bg-amber-50' },
     { category: 'Foreign Nationals', count: 78, percentage: 12, color: 'bg-purple-600', bg: 'bg-purple-50' },
@@ -130,7 +130,7 @@ export default function AnalyticsPage() {
         {/* High-Density Metric Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { title: 'Total Visitors', value: '654', diff: '+8.4%', direction: 'up', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+            { title: 'Total Visitors', value: '654', diff: '+8.4%', direction: 'up', icon: Users, color: 'text-blue-500', bg: 'bg-blue-50' },
             { title: 'Approval Rate', value: '92.6%', diff: '+5.2%', direction: 'up', icon: ShieldCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
             { title: 'Denial Rate', value: '7.4%', diff: '-2.1%', direction: 'down', icon: XCircle, color: 'text-rose-600', bg: 'bg-rose-50' },
             { title: 'Avg. Processing Time', value: '18m 42s', diff: '-4.3%', direction: 'down', icon: Clock, color: 'text-sky-600', bg: 'bg-sky-50' }
@@ -283,7 +283,7 @@ export default function AnalyticsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center pt-2">
               <div className="relative flex items-center justify-center h-40">
-                <div className="w-32 h-32 rounded-full border-[14px] border-blue-600 flex items-center justify-center relative">
+                <div className="w-32 h-32 rounded-full border-[14px] border-blue-500 flex items-center justify-center relative">
                   <div className="absolute inset-[-14px] rounded-full border-[14px] border-sky-500 border-t-transparent border-r-transparent transform rotate-45" />
                   <div className="absolute inset-[-14px] rounded-full border-[14px] border-amber-500 border-t-transparent border-r-transparent border-b-transparent transform -rotate-45" />
                   <div className="text-center">
@@ -317,7 +317,7 @@ export default function AnalyticsPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4">
               {['Daily Report', 'Weekly Report', 'Monthly Report', 'Custom Report'].map((title, idx) => (
                 <div key={idx} className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 flex flex-col items-center justify-between text-center shadow-xs group hover:bg-white hover:border-blue-500 transition-all cursor-pointer">
-                  <div className="p-2.5 bg-white border border-slate-200 rounded-lg text-blue-600 group-hover:bg-blue-50 transition-colors shadow-xs">
+                  <div className="p-2.5 bg-white border border-slate-200 rounded-lg text-blue-500 group-hover:bg-blue-50 transition-colors shadow-xs">
                     <FileText className="w-5 h-5" />
                   </div>
                   <span className="text-xs font-bold text-slate-700 mt-3 block">{title}</span>

@@ -310,7 +310,7 @@ export default function HRDashboard() {
   ];
 
   const columns: TableColumn<ExtendedVisitorRecord>[] = [
-    { key: 'id', label: 'PASS ID', render: (row) => <span className="text-blue-600 font-mono font-bold text-xs">{row.id}</span> },
+    { key: 'id', label: 'PASS ID', render: (row) => <span className="text-blue-500 font-mono font-bold text-xs">{row.id}</span> },
     { key: 'visitorName',
       label: 'VISITOR DETAILS',
       render: (row) => ( 
@@ -366,7 +366,7 @@ export default function HRDashboard() {
               <AlertOctagon className="w-4 h-4" />
             </button>
           )}
-          <button onClick={() => handleOpenDrawer(row)} className="p-1 text-blue-600 hover:bg-blue-50 rounded" title="Open Clearance Drawer"><Eye className="w-4 h-4" /></button>
+          <button onClick={() => handleOpenDrawer(row)} className="p-1 text-blue-500 hover:bg-blue-50 rounded" title="Open Clearance Drawer"><Eye className="w-4 h-4" /></button>
         </div>
       )
     }
@@ -385,7 +385,7 @@ export default function HRDashboard() {
     <DashboardLayout role="hr" userName={currentUser.userName} headerAction={<HRNotificationCenter />} avatarUrl={currentUser.avatarUrl}>
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-pulse flex flex-col items-center">
-            <div className="h-8 w-8 bg-blue-600 rounded-full mb-4"></div>
+            <div className="h-8 w-8 bg-blue-500 rounded-full mb-4"></div>
             <p className="text-slate-500 font-medium">Loading command center...</p>
           </div>
         </div>
@@ -412,7 +412,7 @@ export default function HRDashboard() {
         {/* Dynamic Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { title: 'Total Requests', value: dataList.length.toString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+            { title: 'Total Requests', value: dataList.length.toString(), icon: Users, color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-100' },
             { title: 'Pending Clearance',  value: dataList.filter(d => d.status === 'Pending').length.toString(), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
             { title: 'Denied Access', value: dataList.filter(d => d.status === 'Denied').length.toString(), icon: XCircle, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
             { title: 'Active On-Site', value: dataList.filter(d => d.status === 'Approved' || d.status === 'Active').length.toString(), icon: ShieldCheck, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' }
@@ -452,7 +452,7 @@ export default function HRDashboard() {
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`pb-2 px-1 relative ${activeTab === tab ? 'text-blue-600 font-bold border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`pb-2 px-1 relative ${activeTab === tab ? 'text-blue-500 font-bold border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   {tab}
                 </button>
@@ -572,7 +572,7 @@ export default function HRDashboard() {
                       <div className="space-y-1 text-sm">
                         <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Requested By</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.hostName}</span></div>
                         <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Request Date</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.requestedAt}</span></div>
-                        <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Scheduled Visit</span><span className="col-span-2 font-medium text-slate-900 text-blue-600">{selectedVisitor.visitDate}</span></div>
+                        <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Scheduled Visit</span><span className="col-span-2 font-medium text-slate-900 text-blue-500">{selectedVisitor.visitDate}</span></div>
                         {selectedVisitor.checkoutTime && (
                             <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Gate Check-Out</span><span className="col-span-2 font-medium text-slate-900 text-rose-600">{selectedVisitor.checkoutTime !== 'N/A' ? selectedVisitor.checkoutTime : 'Pending / NA'}</span></div>
                           )}
@@ -584,7 +584,7 @@ export default function HRDashboard() {
 
                     <section>
                       <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                        <User className="w-4 h-4 mr-2 text-blue-600" /> Visitor Identity
+                        <User className="w-4 h-4 mr-2 text-blue-500" /> Visitor Identity
                       </h3>
                       <div className="space-y-1 text-sm">
                         <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Full Name</span><span className="col-span-2 font-bold text-slate-900">{selectedVisitor.visitorName}</span></div>
@@ -608,7 +608,7 @@ export default function HRDashboard() {
 
                     <section>
                       <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                        <Building className="w-4 h-4 mr-2 text-blue-600" /> Purpose of Visit
+                        <Building className="w-4 h-4 mr-2 text-blue-500" /> Purpose of Visit
                       </h3>
                       <div className="space-y-1 text-sm">
                         <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Department</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.department}</span></div>
@@ -624,7 +624,7 @@ export default function HRDashboard() {
 
                     <section>
                       <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                        <Users className="w-4 h-4 mr-2 text-blue-600" /> Accompanying Escorts
+                        <Users className="w-4 h-4 mr-2 text-blue-500" /> Accompanying Escorts
                       </h3>
                       {selectedVisitor.escorts && selectedVisitor.escorts.length > 0 ? (
                         <div className="space-y-3 mt-2">
@@ -642,7 +642,7 @@ export default function HRDashboard() {
 
                     <section>
                       <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                        <FileText className="w-4 h-4 mr-2 text-blue-600" /> Attached Credentials
+                        <FileText className="w-4 h-4 mr-2 text-blue-500" /> Attached Credentials
                       </h3>
                       {selectedVisitor.documentUrl ? (
                         <a href={selectedVisitor.documentUrl} target="_blank" rel="noopener noreferrer" className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex flex-col items-center justify-center text-center hover:bg-blue-100 transition-colors group cursor-pointer">
@@ -668,7 +668,7 @@ export default function HRDashboard() {
                 </label>
                 <button 
                   onClick={() => handleUpdateRemarkOnly(selectedVisitor.id, panelRemark)}
-                  className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded transition-colors"
+                  className="text-[10px] font-bold text-blue-500 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded transition-colors"
                 >
                   Save Note
                 </button>

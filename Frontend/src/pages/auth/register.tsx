@@ -223,7 +223,7 @@ export default function Register() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center items-center py-3.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 transition-all disabled:opacity-70"
+                className="w-full flex justify-center items-center py-3.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-blue-500 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all disabled:opacity-70"
               >
                 {loading ? (
                   <>
@@ -240,7 +240,7 @@ export default function Register() {
           <div className="mt-8 pt-6 border-t border-slate-100 text-center">
             <p className="text-sm text-slate-500 font-medium">
               Already have an active clearance?{' '}
-              <Link to="/login" className="font-bold text-slate-900 hover:text-blue-600 transition-colors">
+              <Link to="/login" className="font-bold text-slate-900 hover:text-blue-500 transition-colors">
                 Sign in here
               </Link>
             </p>

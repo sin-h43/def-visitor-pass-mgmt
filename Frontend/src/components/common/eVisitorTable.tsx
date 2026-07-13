@@ -120,7 +120,7 @@ export default function VisitorTable({
                     <div className="flex items-center justify-center space-x-2 relative">
                       <button 
                         onClick={() => handleOpenDrawer(row)}
-                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors"
                         title="View Details"
                       >
                         <Eye className="w-4 h-4" />
@@ -173,7 +173,7 @@ export default function VisitorTable({
             <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/50">
               <section>
                 <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                  <User className="w-4 h-4 mr-2 text-blue-600" /> Personal Information
+                  <User className="w-4 h-4 mr-2 text-blue-500" /> Personal Information
                 </h3>
                 <div className="space-y-4 text-sm">
                   <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Full Name</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.visitorName}</span></div>
@@ -189,7 +189,7 @@ export default function VisitorTable({
 
               <section>
                 <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                  <Building className="w-4 h-4 mr-2 text-blue-600" /> Visit Details
+                  <Building className="w-4 h-4 mr-2 text-blue-500" /> Visit Details
                 </h3>
                 <div className="space-y-4 text-sm">
                   <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Organization</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.organization}</span></div>
@@ -207,7 +207,7 @@ export default function VisitorTable({
 
               <section>
                 <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                  <Shield className="w-4 h-4 mr-2 text-blue-600" /> Host & Escorts
+                  <Shield className="w-4 h-4 mr-2 text-blue-500" /> Host & Escorts
                 </h3>
                 <div className="space-y-4 text-sm mb-4">
                   <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Assigned Host</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.hostName}</span></div>
@@ -233,7 +233,7 @@ export default function VisitorTable({
 
               <section>
                 <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                  <FileText className="w-4 h-4 mr-2 text-blue-600" /> Attached Documents
+                  <FileText className="w-4 h-4 mr-2 text-blue-500" /> Attached Documents
                 </h3>
                 
                 {selectedVisitor.documentUrl ? (
@@ -293,7 +293,7 @@ export default function VisitorTable({
                       </button>
                       <button 
                         onClick={() => { handleCloseDrawer(); onEdit(selectedVisitor); }}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                        className="px-4 py-2 bg-blue-500 hover:bg-blue-700 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors shadow-sm"
                       >
                         <Pencil className="w-4 h-4" /> Edit
                       </button>

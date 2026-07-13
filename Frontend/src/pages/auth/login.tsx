@@ -152,7 +152,7 @@ export default function Login() {
           <div className="mt-8 pt-6 border-t border-slate-100 text-center">
             <p className="text-sm text-slate-500 font-medium">
               Need an employee account?{' '}
-              <Link to="/register" className="font-bold text-blue-600 hover:text-blue-500 transition-colors">
+              <Link to="/register" className="font-bold text-blue-500 hover:text-blue-500 transition-colors">
                 Request access here
               </Link>
             </p>

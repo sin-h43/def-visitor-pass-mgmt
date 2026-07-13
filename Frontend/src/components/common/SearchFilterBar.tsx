@@ -66,7 +66,7 @@ export default function SearchFilterBar({
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           className={`flex items-center px-4 py-2 text-sm font-semibold border rounded-lg shadow-sm transition-all gap-2 bg-white ${
-            isOpen ? 'border-blue-500 text-blue-600 bg-blue-50/10' : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+            isOpen ? 'border-blue-500 text-blue-500 bg-blue-50/10' : 'border-slate-300 text-slate-700 hover:bg-slate-50'
           }`}
         >
           <Filter className="w-4 h-4 text-slate-500" />
@@ -91,7 +91,7 @@ export default function SearchFilterBar({
                       >
                         <span className="truncate max-w-[180px]">{opt.label}</span>
                         <div className={`w-4 h-4 border rounded flex items-center justify-center transition-all ${
-                          isChecked ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 bg-white'
+                          isChecked ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300 bg-white'
                         }`}>
                           {isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
                         </div>

@@ -335,7 +335,7 @@ export default function AuditLogsPage() {
       render: (row) => (
         <button 
           onClick={() => { setSelectedLog(row); setIsDrawerOpen(true); }}
-          className="px-3 py-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold"
+          className="px-3 py-1.5 text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold"
         >
           <Eye className="w-4 h-4" /> View
         </button>
@@ -363,7 +363,7 @@ export default function AuditLogsPage() {
             onClick={() => setActiveTab('System Logs')}
             className={`flex items-center px-4 py-3 text-sm font-bold border-b-2 transition-colors ${
               activeTab === 'System Logs' 
-                ? 'border-blue-600 text-blue-600' 
+                ? 'border-blue-500 text-blue-500' 
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
             }`}
           >
@@ -374,7 +374,7 @@ export default function AuditLogsPage() {
             onClick={() => setActiveTab('Account Requests')}
             className={`flex items-center px-4 py-3 text-sm font-bold border-b-2 transition-colors ${
               activeTab === 'Account Requests' 
-                ? 'border-blue-600 text-blue-600' 
+                ? 'border-blue-500 text-blue-500' 
                 : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
             }`}
           >
@@ -396,7 +396,7 @@ export default function AuditLogsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
                 <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Ledger Entries</p><p className="text-2xl font-bold text-slate-800 mt-1">{metrics.total}</p></div>
-                <div className="p-3 rounded-lg bg-blue-50 text-blue-600 border border-blue-100"><FileText className="w-5 h-5" /></div>
+                <div className="p-3 rounded-lg bg-blue-50 text-blue-500 border border-blue-100"><FileText className="w-5 h-5" /></div>
               </div>
               <div className="bg-white p-5 border border-slate-200 rounded-xl shadow-sm flex items-center justify-between">
                 <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Today's Check-ins</p><p className="text-2xl font-bold text-emerald-600 mt-1">{metrics.todayCheckins}</p></div>
@@ -526,7 +526,7 @@ export default function AuditLogsPage() {
               <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Timestamp</p>
-                  <p className="text-sm font-bold text-slate-800 flex items-center"><Clock className="w-4 h-4 mr-1.5 text-blue-600" /> {selectedLog.timestamp}</p>
+                  <p className="text-sm font-bold text-slate-800 flex items-center"><Clock className="w-4 h-4 mr-1.5 text-blue-500" /> {selectedLog.timestamp}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Severity</p>
@@ -538,7 +538,7 @@ export default function AuditLogsPage() {
 
               <section>
                 <h3 className="text-sm font-black text-slate-800 border-b border-slate-200 pb-2 mb-3 flex items-center">
-                  <Shield className="w-4 h-4 mr-2 text-blue-600" /> Performed By (Actor)
+                  <Shield className="w-4 h-4 mr-2 text-blue-500" /> Performed By (Actor)
                 </h3>
                 <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-2 text-sm">
                   <div className="grid grid-cols-3 gap-2"><span className="text-slate-500 font-medium">Name</span><span className="col-span-2 font-bold text-slate-900">{selectedLog.performer_name}</span></div>
@@ -551,18 +551,18 @@ export default function AuditLogsPage() {
 
               <section>
                 <h3 className="text-sm font-black text-slate-800 border-b border-slate-200 pb-2 mb-3 flex items-center">
-                  <User className="w-4 h-4 mr-2 text-blue-600" /> Target Subject (Visitor)
+                  <User className="w-4 h-4 mr-2 text-blue-500" /> Target Subject (Visitor)
                 </h3>
                 <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-2 text-sm">
                   <div className="grid grid-cols-3 gap-2"><span className="text-slate-500 font-medium">Name</span><span className="col-span-2 font-bold text-slate-900">{selectedLog.visitor_name}</span></div>
-                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500 font-medium">Pass ID</span><span className="col-span-2 font-mono font-bold text-blue-600">{selectedLog.visitor_id}</span></div>
+                  <div className="grid grid-cols-3 gap-2"><span className="text-slate-500 font-medium">Pass ID</span><span className="col-span-2 font-mono font-bold text-blue-500">{selectedLog.visitor_id}</span></div>
                   <div className="grid grid-cols-3 gap-2"><span className="text-slate-500 font-medium">Phone</span><span className="col-span-2 font-mono text-slate-700">{selectedLog.visitor_phone}</span></div>
                 </div>
               </section>
 
               <section>
                 <h3 className="text-sm font-black text-slate-800 border-b border-slate-200 pb-2 mb-3 flex items-center">
-                  <FileText className="w-4 h-4 mr-2 text-blue-600" /> Action & System Remarks
+                  <FileText className="w-4 h-4 mr-2 text-blue-500" /> Action & System Remarks
                 </h3>
                 <div className={`p-4 border rounded-xl shadow-sm text-sm font-medium ${selectedLog.action.includes('reject') || selectedLog.action.includes('emergency') ? 'bg-red-50 border-red-200 text-red-800' : 'bg-slate-50 border-slate-200 text-slate-800'}`}>
                   {selectedLog.remarks}

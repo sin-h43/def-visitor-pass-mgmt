@@ -204,7 +204,7 @@ export default function DispatchedLogsPage() {
               </div>
               <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/50">
                 <section>
-                  <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center"><User className="w-4 h-4 mr-2 text-blue-600" /> Visitor Identity</h3>
+                  <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center"><User className="w-4 h-4 mr-2 text-blue-500" /> Visitor Identity</h3>
                   <div className="space-y-1 text-sm">
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Full Name</span><span className="col-span-2 font-bold text-slate-900">{selectedVisitor.visitorName}</span></div>
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Phone</span><span className="col-span-2 font-medium text-slate-900 font-mono">{selectedVisitor.phone}</span></div>
@@ -212,7 +212,7 @@ export default function DispatchedLogsPage() {
                   </div>
                 </section>
                 <section>
-                  <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center"><Building className="w-4 h-4 mr-2 text-blue-600" /> Purpose of Visit</h3>
+                  <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center"><Building className="w-4 h-4 mr-2 text-blue-500" /> Purpose of Visit</h3>
                   <div className="space-y-1 text-sm">
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Pipeline</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.pipeline}</span></div>
                     <div>

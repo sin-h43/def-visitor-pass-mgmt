@@ -169,7 +169,7 @@ export default function EnterpriseVisitorProfile() {
       <DashboardLayout role="hr" userName={currentUser.name}>
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-pulse flex flex-col items-center">
-            <div className="h-8 w-8 bg-blue-600 rounded-full mb-4"></div>
+            <div className="h-8 w-8 bg-blue-500 rounded-full mb-4"></div>
             <p className="text-slate-500 font-medium">Decrypting secure dossier...</p>
           </div>
         </div>
@@ -184,7 +184,7 @@ export default function EnterpriseVisitorProfile() {
           <ShieldAlert className="w-12 h-12 text-rose-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-slate-700">Dossier Not Found</h2>
           <p className="text-slate-500 mt-2">No active records exist for this profile ID.</p>
-          <button onClick={() => navigate(-1)} className="mt-6 text-blue-600 font-bold hover:underline">Return to Ledger</button>
+          <button onClick={() => navigate(-1)} className="mt-6 text-blue-500 font-bold hover:underline">Return to Ledger</button>
         </div>
       </DashboardLayout>
     );
@@ -235,7 +235,7 @@ export default function EnterpriseVisitorProfile() {
       {/* 🖨️ PRINT-ONLY BADGE LAYOUT (Hidden on screen) */}
       <div className="hidden print:flex fixed inset-0 bg-white items-center justify-center z-[9999]">
         <div className="w-[300px] h-[450px] border-4 border-slate-900 rounded-2xl flex flex-col items-center justify-between p-6 relative overflow-hidden bg-white">
-          <div className="absolute top-0 left-0 w-full h-24 bg-blue-600"></div>
+          <div className="absolute top-0 left-0 w-full h-24 bg-blue-500"></div>
           <div className="relative z-10 w-full text-center mb-4">
             <h1 className="text-white font-black tracking-widest uppercase text-xl">VISITOR PASS</h1>
             <p className="text-blue-100 text-xs font-mono">{currentPass?.visit_id}</p>
@@ -383,7 +383,7 @@ export default function EnterpriseVisitorProfile() {
                   <ShieldCheck className="w-4 h-4 mr-2 text-slate-500" /> Internal Sponsor
                 </h3>
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 font-bold flex items-center justify-center text-sm border border-blue-100 shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-500 font-bold flex items-center justify-center text-sm border border-blue-100 shrink-0">
                     {(currentPass?.host?.name || 'UA').substring(0, 2).toUpperCase()}
                   </div>
                   <div className="truncate">
@@ -474,7 +474,7 @@ export default function EnterpriseVisitorProfile() {
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col h-[600px]">
             <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-5">
               <h3 className="text-sm font-bold text-slate-900 flex items-center">
-                <Activity className="w-4 h-4 mr-2 text-blue-600" /> Forensic History
+                <Activity className="w-4 h-4 mr-2 text-blue-500" /> Forensic History
               </h3>
               <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 border border-slate-200 rounded-md">
                 <span className="text-[10px] font-black text-slate-500 font-mono tracking-wide">{combinedTimeline.length} EVENTS</span>
@@ -589,7 +589,7 @@ export default function EnterpriseVisitorProfile() {
                     
                     return (
                       <tr key={log.visit_id} className="hover:bg-slate-50 transition-colors group">
-                        <td className="px-6 py-3 text-blue-600 font-mono font-bold text-xs">{log.visit_id}</td>
+                        <td className="px-6 py-3 text-blue-500 font-mono font-bold text-xs">{log.visit_id}</td>
                         <td className="px-6 py-3">
                           <div className="text-slate-800 text-xs font-bold">{rowDate}</div>
                           <div className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5">{log.visit_type}</div>
@@ -615,7 +615,7 @@ export default function EnterpriseVisitorProfile() {
                         <td className="px-6 py-3 text-right">
                           <button 
                             onClick={() => handleOpenVisitDetails(log)}
-                            className="inline-flex items-center px-3 py-1.5 bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 text-slate-500 rounded-lg text-xs font-bold transition-colors"
+                            className="inline-flex items-center px-3 py-1.5 bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-500 hover:border-blue-200 text-slate-500 rounded-lg text-xs font-bold transition-colors"
                           >
                             <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> Review Log
                           </button>

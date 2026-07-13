@@ -345,7 +345,7 @@ export default function VisitorVerification() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center"><FileText className="w-3 h-3 mr-2 text-blue-600"/> Submitted ID Proof</h3>
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center"><FileText className="w-3 h-3 mr-2 text-blue-500"/> Submitted ID Proof</h3>
                 {visitor.document_url ? (
                   <div className="relative group bg-slate-100 rounded-lg border border-slate-200 h-48 overflow-hidden">
                     <img src={visitor.document_url} alt="ID" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
@@ -356,7 +356,7 @@ export default function VisitorVerification() {
 
               <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col">
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center justify-between">
-                  <span className="flex items-center"><Users className="w-3 h-3 mr-2 text-blue-600"/> Escort Manifest</span>
+                  <span className="flex items-center"><Users className="w-3 h-3 mr-2 text-blue-500"/> Escort Manifest</span>
                   <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold text-[10px]">{escorts.length} Persons</span>
                 </h3>
                 <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
@@ -380,7 +380,7 @@ export default function VisitorVerification() {
             </div>
 
             <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center"><Camera className="w-3 h-3 mr-2 text-blue-600"/> Security Photo Kiosk</h3>
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center"><Camera className="w-3 h-3 mr-2 text-blue-500"/> Security Photo Kiosk</h3>
               {!photoUrl ? (
                 <div>
                   {!showCamera ? (
@@ -403,7 +403,7 @@ export default function VisitorVerification() {
                 <div className="flex gap-5 items-center bg-slate-50 p-4 rounded-lg border border-slate-100">
                   <img src={photoUrl} className="w-20 h-20 object-cover rounded-full border-4 border-white shadow-md" alt="Captured"/>
                   <div className="flex gap-3">
-                    <button onClick={uploadPhoto} disabled={uploading} className="px-5 py-2.5 bg-blue-600 text-white font-bold text-xs rounded-lg shadow-sm hover:bg-blue-700 transition-colors">{uploading ? 'Encrypting...' : 'Lock & Save Photo'}</button>
+                    <button onClick={uploadPhoto} disabled={uploading} className="px-5 py-2.5 bg-blue-500 text-white font-bold text-xs rounded-lg shadow-sm hover:bg-blue-700 transition-colors">{uploading ? 'Encrypting...' : 'Lock & Save Photo'}</button>
                     <button onClick={() => setPhotoUrl(null)} className="px-5 py-2.5 bg-white text-slate-700 font-bold text-xs rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">Retake</button>
                   </div>
                 </div>

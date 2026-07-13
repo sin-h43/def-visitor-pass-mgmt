@@ -340,7 +340,7 @@ export default function VisitorMgmtPage() {
   }, [visitorLogs, searchTerm, selectedFilters, activeTab]);
 
   const categories = [
-    { type: 'General', label: 'General Pass', desc: 'Standard public walk-ins, temporary business visits, or casual meetings.', icon: User, color: 'border-blue-100 hover:border-blue-300 hover:shadow-blue-50/50 hover:bg-blue-50 ', iconBg: 'bg-blue-50 text-blue-600', path: '/hod/add_visitor_general' },
+    { type: 'General', label: 'General Pass', desc: 'Standard public walk-ins, temporary business visits, or casual meetings.', icon: User, color: 'border-blue-100 hover:border-blue-300 hover:shadow-blue-50/50 hover:bg-blue-50 ', iconBg: 'bg-blue-50 text-blue-500', path: '/hod/add_visitor_general' },
     { type: 'HOD', label: 'HOD Registry', desc: 'Candidate interviews, employee onboardings, and internal hr syncs.', icon: ShieldAlert, color: 'border-purple-100 hover:border-purple-300 hover:shadow-purple-50/50 hover:bg-purple-50', iconBg: 'bg-purple-50 text-purple-600', path: '/hod/add_visitor_hr' },
     { type: 'Govt', label: 'Govt / Defense', desc: 'High-security clearance pathways for officials and ministry personnel.', icon: Landmark, color: 'border-emerald-100 hover:border-emerald-300 hover:shadow-emerald-50/50 hover:bg-emerald-50', iconBg: 'bg-emerald-50 text-emerald-600', path: '/hod/add_visitor_govt' },
     { type: 'Foreign', label: 'Foreign National', desc: 'International delegates, international passports, embassy tracks.', icon: Globe, color: 'border-amber-100 hover:border-amber-300 hover:shadow-amber-50/50 hover:bg-amber-50', iconBg: 'bg-amber-50 text-amber-600', path: '/hod/add_visitor_foreign' },
@@ -377,7 +377,7 @@ export default function VisitorMgmtPage() {
       render: (row) => (
         <div>
           <div className="text-[11px] text-slate-500 mb-0.5 font-mono"><span className="font-semibold text-slate-700">Req:</span> {row.requestedAt}</div>
-          <div className="text-[11px] text-slate-500 font-mono"><span className="font-semibold text-blue-600">Entry:</span> {row.visitDate}</div>
+          <div className="text-[11px] text-slate-500 font-mono"><span className="font-semibold text-blue-500">Entry:</span> {row.visitDate}</div>
         </div>
       )
     },
@@ -403,7 +403,7 @@ export default function VisitorMgmtPage() {
       label: 'CATEGORY',
       render: (row) => {
         const cat = row.category || 'General';
-        if (cat === 'General') return <span className="font-bold text-blue-600 text-xs uppercase tracking-wide">General Pass</span>;
+        if (cat === 'General') return <span className="font-bold text-blue-500 text-xs uppercase tracking-wide">General Pass</span>;
         if (cat === 'HR') return <span className="font-bold text-purple-600 text-xs uppercase tracking-wide">HOD Registry</span>;
         if (cat === 'Govt') return <span className="font-bold text-emerald-600 text-xs uppercase tracking-wide">Govt/Defence</span>;
         if (cat === 'Foreign') return <span className="font-bold text-amber-600 text-xs uppercase tracking-wide">Foreign National</span>;
@@ -449,7 +449,7 @@ export default function VisitorMgmtPage() {
               <AlertOctagon className="w-4 h-4" />
             </button>
           )}
-          <button onClick={() => { setSelectedVisitor(row); setIsDrawerOpen(true); }} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Review Full Details">
+          <button onClick={() => { setSelectedVisitor(row); setIsDrawerOpen(true); }} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Review Full Details">
             <Eye className="w-4 h-4" />
           </button>
         </div>
@@ -462,7 +462,7 @@ export default function VisitorMgmtPage() {
       <DashboardLayout role="hr" userName={currentUser.name} avatarUrl={currentUser.avatarUrl || ''}>
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-pulse flex flex-col items-center">
-            <div className="h-8 w-8 bg-blue-600 rounded-full mb-4"></div>
+            <div className="h-8 w-8 bg-blue-500 rounded-full mb-4"></div>
             <p className="text-slate-500 font-medium">Syncing Master Security Manifest...</p>
           </div>
         </div>
@@ -487,7 +487,7 @@ export default function VisitorMgmtPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { title: 'Pending HOD Review', value: visitorLogs.filter(d => d.status === 'Pending').length.toString(), icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
-            { title: 'Approved (Awaiting Gate)',  value: visitorLogs.filter(d => d.status === 'Approved').length.toString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+            { title: 'Approved (Awaiting Gate)',  value: visitorLogs.filter(d => d.status === 'Approved').length.toString(), icon: Users, color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-100' },
             { title: 'Active On-Site', value: visitorLogs.filter(d => d.status === 'Active').length.toString(), icon: ShieldCheck, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
             { title: 'Denied / Revoked', value: visitorLogs.filter(d => d.status === 'Denied' || d.status === 'Revoked').length.toString(), icon: XCircle, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100' }
           ].map((stat, idx) => (  
@@ -534,7 +534,7 @@ export default function VisitorMgmtPage() {
 
           <div className="flex border-b border-slate-200 text-xs font-semibold space-x-4">
             {['All Passes', 'Pending', 'Active', 'Checked Out', 'Expired'].map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-2 px-1 relative ${activeTab === tab ? 'text-blue-600 font-bold border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
+              <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-2 px-1 relative ${activeTab === tab ? 'text-blue-500 font-bold border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-600'}`}>
                 {tab}
               </button>
             ))}
@@ -595,7 +595,7 @@ export default function VisitorMgmtPage() {
                         <div className="space-y-1 text-sm">
                           <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Requested By</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.hostName}</span></div>
                           <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Request Date</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.requestedAt}</span></div>
-                          <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Scheduled Visit</span><span className="col-span-2 font-medium text-slate-900 text-blue-600">{selectedVisitor.visitDate}</span></div>
+                          <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Scheduled Visit</span><span className="col-span-2 font-medium text-slate-900 text-blue-500">{selectedVisitor.visitDate}</span></div>
                           {selectedVisitor.checkoutTime && (
                             <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Gate Check-Out</span><span className="col-span-2 font-medium text-slate-900 text-rose-600">{selectedVisitor.checkoutTime !== 'N/A' ? selectedVisitor.checkoutTime : 'Pending / NA'}</span></div>
                           )}
@@ -607,7 +607,7 @@ export default function VisitorMgmtPage() {
 
                       <section>
                         <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                          <User className="w-4 h-4 mr-2 text-blue-600" /> Visitor Identity
+                          <User className="w-4 h-4 mr-2 text-blue-500" /> Visitor Identity
                         </h3>
                         <div className="space-y-1 text-sm">
                           <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Full Name</span><span className="col-span-2 font-bold text-slate-900">{selectedVisitor.visitorName}</span></div>
@@ -631,7 +631,7 @@ export default function VisitorMgmtPage() {
 
                       <section>
                         <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                          <Building className="w-4 h-4 mr-2 text-blue-600" /> Purpose of Visit
+                          <Building className="w-4 h-4 mr-2 text-blue-500" /> Purpose of Visit
                         </h3>
                         <div className="space-y-1 text-sm">
                           <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Department</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.department}</span></div>
@@ -647,7 +647,7 @@ export default function VisitorMgmtPage() {
 
                       <section>
                         <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                          <Users className="w-4 h-4 mr-2 text-blue-600" /> Accompanying Escorts
+                          <Users className="w-4 h-4 mr-2 text-blue-500" /> Accompanying Escorts
                         </h3>
                         {selectedVisitor.escorts && selectedVisitor.escorts.length > 0 ? (
                           <div className="space-y-3 mt-2">
@@ -665,7 +665,7 @@ export default function VisitorMgmtPage() {
 
                       <section>
                         <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-                          <FileText className="w-4 h-4 mr-2 text-blue-600" /> Attached Credentials
+                          <FileText className="w-4 h-4 mr-2 text-blue-500" /> Attached Credentials
                         </h3>
                         {selectedVisitor.documentUrl ? (
                           <a href={selectedVisitor.documentUrl} target="_blank" rel="noopener noreferrer" className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex flex-col items-center justify-center text-center hover:bg-blue-100 transition-colors group cursor-pointer">
@@ -691,7 +691,7 @@ export default function VisitorMgmtPage() {
                   </label>
                   <button 
                     onClick={() => handleUpdateRemarkOnly(selectedVisitor.id, panelRemark)}
-                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded transition-colors"
+                    className="text-[10px] font-bold text-blue-500 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded transition-colors"
                   >
                     Save Note
                   </button>

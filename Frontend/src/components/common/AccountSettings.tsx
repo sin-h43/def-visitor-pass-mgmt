@@ -101,7 +101,7 @@ export default function AccountSettings({ role, headerAction }: AccountSettingsP
       <DashboardLayout role={role} userName="Loading..." headerAction={headerAction}>
         <div className="flex items-center justify-center h-[60vh]">
           <div className="animate-pulse flex flex-col items-center">
-            <div className="h-8 w-8 bg-blue-600 rounded-full mb-4"></div>
+            <div className="h-8 w-8 bg-blue-500 rounded-full mb-4"></div>
             <p className="text-slate-500 font-medium">Loading account settings...</p>
           </div>
         </div>
@@ -121,7 +121,7 @@ export default function AccountSettings({ role, headerAction }: AccountSettingsP
         {/* Profile Picture Panel */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-5 flex items-center">
-            <Camera className="w-4 h-4 mr-2 text-blue-600" /> Profile Picture
+            <Camera className="w-4 h-4 mr-2 text-blue-500" /> Profile Picture
           </h3>
           <div className="flex items-center gap-5">
             <div className="relative">
@@ -160,7 +160,7 @@ export default function AccountSettings({ role, headerAction }: AccountSettingsP
         {/* Read-Only Account Info */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center">
-            <IdCard className="w-4 h-4 mr-2 text-blue-600" /> Account Information
+            <IdCard className="w-4 h-4 mr-2 text-blue-500" /> Account Information
           </h3>
           <div className="space-y-2 text-sm">
             <div className="grid grid-cols-3 gap-2">

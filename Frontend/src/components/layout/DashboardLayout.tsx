@@ -92,7 +92,7 @@ const getDisplayRole = (roleProp: string | undefined) => {
                 to={item.path} 
                 title={!isLeftSidebarOpen ? item.label : undefined}
                 className={`flex items-center px-3 py-2.5 rounded-lg transition-colors group whitespace-nowrap justify-start ${
-                  isActive ? 'bg-blue-600 text-white' : 'hover:bg-gray-800 hover:text-white'
+                  isActive ? 'bg-blue-500 text-white' : 'hover:bg-gray-800 hover:text-white'
                 }`}
               >
                 <item.icon className={`w-5 h-5 shrink-0 mr-3 ${
@@ -159,7 +159,7 @@ const getDisplayRole = (roleProp: string | undefined) => {
       className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm" 
     />
   ) : (
-    <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold shadow-sm">
+    <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center text-sm font-bold shadow-sm">
       {userName.charAt(0).toUpperCase()}
     </div>
   )}

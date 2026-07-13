@@ -185,9 +185,9 @@ export default function EmployeeDashboard() {
             <div>
               <h3 className="text-lg font-semibold text-blue-500">New Visitor Request</h3>
               <p className="text-sm text-slate-400 mt-2">Create a new gate pass request or pre-schedule an upcoming visit.</p>
-              <span className="text-blue-500 text-sm font-medium mt-4 inline-block group-hover:text-blue-600">Open Form →</span>
+              <span className="text-blue-500 text-sm font-medium mt-4 inline-block group-hover:text-blue-500">Open Form →</span>
             </div>
-            <div className="flex flex-col items-center justify-center p-4 border border-blue-100 bg-blue-50 rounded-lg text-blue-600 shrink-0">
+            <div className="flex flex-col items-center justify-center p-4 border border-blue-100 bg-blue-50 rounded-lg text-blue-500 shrink-0">
               <UserPlus className="w-8 h-8 mb-2" />
               <span className="font-semibold text-sm">Add Visitor</span>
             </div>
@@ -216,7 +216,7 @@ export default function EmployeeDashboard() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-2">
               <div className="flex space-x-6 text-sm font-medium">
                 {(['All Visitors', 'Pre-Scheduled', 'Repeated', 'Expired'] as const).map(tab => (
-                  <button key={tab} onClick={() => setCurrentTab(tab)} className={`pb-2 border-b-2 transition-colors font-semibold ${currentTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+                  <button key={tab} onClick={() => setCurrentTab(tab)} className={`pb-2 border-b-2 transition-colors font-semibold ${currentTab === tab ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
                     {tab}
                   </button>
                 ))}
@@ -241,7 +241,7 @@ export default function EmployeeDashboard() {
               </div>
               <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/50">
                 <section>
-                  <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center"><User className="w-4 h-4 mr-2 text-blue-600" /> Visitor Identity</h3>
+                  <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center"><User className="w-4 h-4 mr-2 text-blue-500" /> Visitor Identity</h3>
                   <div className="space-y-1 text-sm">
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Full Name</span><span className="col-span-2 font-bold text-slate-900">{selectedVisitor.visitorName}</span></div>
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Phone</span><span className="col-span-2 font-medium text-slate-900 font-mono">{selectedVisitor.phone}</span></div>
@@ -249,7 +249,7 @@ export default function EmployeeDashboard() {
                   </div>
                 </section>
                 <section>
-                  <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center"><Building className="w-4 h-4 mr-2 text-blue-600" /> Purpose of Visit</h3>
+                  <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 flex items-center"><Building className="w-4 h-4 mr-2 text-blue-500" /> Purpose of Visit</h3>
                   <div className="space-y-1 text-sm">
                     <div className="grid grid-cols-3 gap-2"><span className="text-slate-500">Pipeline</span><span className="col-span-2 font-medium text-slate-900">{selectedVisitor.pipeline}</span></div>
                     <div>
@@ -266,7 +266,7 @@ export default function EmployeeDashboard() {
                 </div>
                 {selectedVisitor.status === 'Denied' && (
                   <div className="mt-4 flex gap-2">
-                    <button onClick={() => { setIsDrawerOpen(false); handleEdit(selectedVisitor); }} className="w-full py-2.5 bg-blue-600 text-white font-bold rounded-xl shadow-sm hover:bg-blue-700 transition-colors text-xs">Correct & Resend</button>
+                    <button onClick={() => { setIsDrawerOpen(false); handleEdit(selectedVisitor); }} className="w-full py-2.5 bg-blue-500 text-white font-bold rounded-xl shadow-sm hover:bg-blue-700 transition-colors text-xs">Correct & Resend</button>
                   </div>
                 )}
               </div>

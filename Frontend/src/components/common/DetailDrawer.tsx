@@ -29,12 +29,12 @@ export default function DetailDrawer({ isOpen, onClose, title = "Access Registry
             {isAuditLog ? (
               <div className="p-2 bg-slate-800 text-white rounded-lg"><Activity className="w-5 h-5" /></div>
             ) : (
-              <div className="p-2 bg-blue-600 text-white rounded-lg"><FileText className="w-5 h-5" /></div>
+              <div className="p-2 bg-blue-500 text-white rounded-lg"><FileText className="w-5 h-5" /></div>
             )}
             <div>
               <h3 className="font-bold text-lg text-slate-900">{isAuditLog ? "Forensic Activity Signature Payload" : title}</h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                System Token ID Reference: <span className="text-blue-600 font-mono font-bold">{data.id}</span>
+                System Token ID Reference: <span className="text-blue-500 font-mono font-bold">{data.id}</span>
               </p>
             </div>
           </div>
@@ -91,7 +91,7 @@ export default function DetailDrawer({ isOpen, onClose, title = "Access Registry
                     </div>
                     <div>
                       <span className="text-[10px] font-bold text-slate-400 block uppercase mb-0.5">Target Resource Ref</span>
-                      <span className="font-mono font-bold text-blue-600 text-sm">{data.targetPassId}</span>
+                      <span className="font-mono font-bold text-blue-500 text-sm">{data.targetPassId}</span>
                     </div>
                   </div>
 

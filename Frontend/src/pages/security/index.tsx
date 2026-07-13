@@ -285,7 +285,7 @@ export default function SecurityDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm flex items-center justify-between">
             <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pending Gate Clearance</p><p className="text-2xl font-bold font-black text-slate-800 mt-1">{queue.length}</p></div>
-            <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600"><Users size={20} /></div>
+            <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500"><Users size={20} /></div>
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm flex items-center justify-between">
             <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active on Campus</p><p className="text-2xl font-black font-bold text-emerald-600 mt-1">{activeCampus.length}</p></div>
@@ -313,7 +313,7 @@ export default function SecurityDashboard() {
           />
 
           <div className="flex border-b border-slate-200 text-sm font-semibold space-x-4 mt-2">
-            <button onClick={() => setActiveTab('pending')} className={`pb-3 px-1 relative ${activeTab === 'pending' ? 'text-blue-600  border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
+            <button onClick={() => setActiveTab('pending')} className={`pb-3 px-1 relative ${activeTab === 'pending' ? 'text-blue-500  border-b-2 border-blue-500' : 'text-slate-400 hover:text-slate-600'}`}>
               Pending Queue <span className="ml-1 bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-xs">{filteredQueue.length}</span>
             </button>
             <button onClick={() => setActiveTab('active')} className={`pb-3 px-1 relative ${activeTab === 'active' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-400 hover:text-slate-600'}`}>

@@ -72,7 +72,7 @@ export default function SearchFilterMatrix({
                         type="checkbox" 
                         checked={(selectedFilters[bucket.key] || []).includes(opt.value)}
                         onChange={() => onFilterToggle(bucket.key, opt.value)}
-                        className="rounded text-blue-600 focus:ring-blue-500 border-slate-300"
+                        className="rounded text-blue-500 focus:ring-blue-500 border-slate-300"
                       />
                       <span className="truncate max-w-[220px]">{opt.label}</span>
                     </label>

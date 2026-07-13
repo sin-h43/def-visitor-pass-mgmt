@@ -135,7 +135,7 @@ export default function EmpNotificationCenter() {
       >
         <Bell className="w-5 h-5 text-slate-700" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white border-2 border-white shadow-sm animate-pulse">
+          <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white border-2 border-white shadow-sm animate-pulse">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -156,7 +156,7 @@ export default function EmpNotificationCenter() {
                 )}
               </div>
               {unreadCount > 0 && (
-                <button onClick={markAllAsRead} className="text-[10px] font-bold text-slate-500 hover:text-blue-600 flex items-center transition-colors bg-slate-50 hover:bg-blue-50 px-2 py-1 rounded-md border border-slate-100 hover:border-blue-100">
+                <button onClick={markAllAsRead} className="text-[10px] font-bold text-slate-500 hover:text-blue-500 flex items-center transition-colors bg-slate-50 hover:bg-blue-50 px-2 py-1 rounded-md border border-slate-100 hover:border-blue-100">
                   <CheckSquare className="w-3 h-3 mr-1" /> Mark all read
                 </button>
               )}

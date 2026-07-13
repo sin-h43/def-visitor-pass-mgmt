@@ -177,7 +177,7 @@ export default function App() {
             <div className="text-center">
               <h1 className="text-4xl font-bold text-slate-800 mb-2">404</h1>
               <p>Portal gateway not found.</p>
-              <a href="/" className="text-blue-600 hover:underline mt-4 inline-block">Return to Login</a>
+              <a href="/" className="text-blue-500 hover:underline mt-4 inline-block">Return to Login</a>
             </div>
           </div>
         } />

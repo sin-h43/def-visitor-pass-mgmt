@@ -1,7 +1,7 @@
 // components/layout/DashboardLayout.tsx
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Calendar, Bell, LayoutDashboard, UserPlus, FileText, Settings, Shield, Users, PanelLeftClose, PanelLeftOpen, Repeat } from 'lucide-react';
+import { Calendar, Bell, LayoutDashboard, UserPlus, FileText, Settings, Users, PanelLeftClose, PanelLeftOpen, Repeat } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -73,7 +73,8 @@ const getDisplayRole = (roleProp: string | undefined) => {
         {/* Brand Header: Static padding guarantees the shield icon never jumps or moves */}
         <div className="h-16 flex items-center px-6 border-b border-gray-800 text-white font-bold text-lg shrink-0">
           <div className="flex items-center">
-            <Shield className="w-6 h-6 text-amber-500 mr-3 shrink-0" />
+            <img src= '/defence.svg?v=2' alt='Defence Logo' className='w-6 h-6 mr-3 shrink-0' />
+            {/* <Shield className="w-6 h-6 text-amber-500 mr-3 shrink-0" /> */}
             <span className={`transition-all duration-200 ${
               isLeftSidebarOpen ? 'opacity-100 max-w-xs' : 'opacity-0 max-w-0 overflow-hidden'
             }`}>

@@ -5,7 +5,7 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
 import type { TableColumn } from '../../types/visitor';
 import { supabase } from '../../lib/supabase';
-import { fetchAndVerifyEmployee } from '../../lib/employeeUtils'; // ✅ FIX: Added identity fetcher
+import { fetchAndVerifyEmployee } from '../../lib/employeeUtils'; 
 import EmpNotificationCenter from '../../components/common/empNotificationCenter';
 
 interface VisitHistory { visitId: string; date: string; rawDate: string; purpose: string; department: string; hostName: string; status: string; }

@@ -66,7 +66,7 @@ export default function SearchFilterBar({
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           className={`flex items-center px-4 py-2 text-sm font-semibold border rounded-lg shadow-sm transition-all gap-2 bg-white ${
-            isOpen ? 'border-blue-500 text-blue-500 bg-blue-50/10' : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+            isOpen ? 'border-blue-100 text-blue-500 bg-blue-50/10' : 'border-slate-300 text-slate-700 hover:bg-slate-50'
           }`}
         >
           <Filter className="w-4 h-4 text-slate-500" />

@@ -42,7 +42,7 @@ export default function SearchFilterMatrix({
           placeholder={placeholder} 
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-9 pr-4 py-2 text-sm border border-slate-400/60 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 text-slate-800 font-medium"
+          className="pl-9 pr-4 py-2 text-sm border border-slate-400/60 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-200 w-64 text-slate-800 font-medium"
         />
       </div>
 
@@ -72,7 +72,7 @@ export default function SearchFilterMatrix({
                         type="checkbox" 
                         checked={(selectedFilters[bucket.key] || []).includes(opt.value)}
                         onChange={() => onFilterToggle(bucket.key, opt.value)}
-                        className="rounded text-blue-500 focus:ring-blue-500 border-slate-300"
+                        className="rounded text-blue-200 focus:ring-blue-200 border-slate-300"
                       />
                       <span className="truncate max-w-[220px]">{opt.label}</span>
                     </label>

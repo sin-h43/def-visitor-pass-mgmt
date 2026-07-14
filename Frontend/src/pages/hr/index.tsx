@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link  } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { User, Building, Bell, FileText, Users, Clock, XCircle, ShieldCheck, UserPlus, History, Shield, Eye, CheckCircle, X, AlertOctagon } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import DataTable from '../../components/common/DataTable';
@@ -22,6 +22,8 @@ export interface ExtendedVisitorRecord extends VisitorRecord {
 }
 
 export default function HRDashboard() {
+
+  const navigate =useNavigate();
   const [dataList, setDataList] = useState<ExtendedVisitorRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('All Requests');
@@ -501,13 +503,13 @@ export default function HRDashboard() {
                 </h3>
                 <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
               </div>
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs custom-scrollbar">
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs custom-scrollbar" >
                 {liveAuditLogs.length > 0 ? (
                   liveAuditLogs.map((log) => {
                     const timeFormatted = new Date(log.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
                     const colorClass = getAuditColor(log.action);
                     return (
-                      <div key={log.id} className={`p-3 border rounded-lg transition-all duration-300 ${colorClass}`}>
+                      <div key={log.id} onClick={()=> navigate('/hod/audit')} className={`p-3 border rounded-lg transition-all duration-300 ${colorClass}`}>
                         <div className="flex justify-between font-bold text-[10px] uppercase tracking-wider mb-1">
                           <span>{log.action.replace(/_/g, ' ')}</span>
                           <span className="font-mono text-slate-500">{timeFormatted}</span>
